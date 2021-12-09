@@ -1,0 +1,15 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"module": "ESNext",
+		"target": "ES6",
+		"allowJs": true,
+		"noImplicitAny": true,
+		"moduleResolution": "node",
+		"types": ["svelte", "node"],
+		// "importsNotUsedAsValues": "error",
+		"importHelpers": true,
+		"lib": ["es2018", "DOM", "ES5", "ES6", "ES7"]
+	},
+	"include": ["**/*.ts"]
+}
