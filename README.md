@@ -41,11 +41,11 @@ Technical informations: #dev #note #2021/12/09 #status/draft
 SelfHosted LiveSync Readme : #dev #readme #2021/12/06 #status/proofread
 Old Note: #dev #readme #2021/12/10 #status/abandoned
 ```
-####Tag hierarchy of status
+#### Tag hierarchy of status
 
 ![](./images/respect-nestedtag-1.png)
 
-####Tag hierarchy of date
+#### Tag hierarchy of date
 
 ![](./images/respect-nestedtag-2.png)
 ### Settings
