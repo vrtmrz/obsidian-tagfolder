@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { currentFile } from "store";
+
 	import { TreeItem, ViewItem, TagFolderItem } from "./types";
 	export let entry: TreeItem | ViewItem;
 	export let openfile: (path: string) => void;
 	let collapsed = true;
-
+	let currentFilelocal = "";
+	let isSelected = false;
 	function toggleFolder() {
 		collapsed = !collapsed;
 	}
@@ -13,22 +16,39 @@
 			if ("tag" in item) {
 				filenames = [...filenames, ...getFilenames(item)];
 			} else {
-				filenames = [...filenames, item.entry.path];
+				filenames = [...filenames, item.path];
 			}
 		}
 		return Array.from(new Set([...filenames]));
 	}
+
 	function countUnique(entry: TreeItem) {
 		return getFilenames(entry).length;
 	}
 	function openfileLocal(entry: TagFolderItem) {
-		if ("entry" in entry) openfile(entry.entry.path);
+		if ("path" in entry) openfile(entry.path);
 	}
+
+	currentFile.subscribe((path: string) => {
+		currentFilelocal = path;
+		isSelected = false;
+		if ("tags" in entry && entry.path == path) {
+			isSelected = true;
+		}
+		if ("tag" in entry && getFilenames(entry).contains(path)) {
+			isSelected = true;
+		}
+	});
 </script>
 
 <div class="nav-folder  {collapsed ? 'is-collapsed' : ''}">
 	{#if "tag" in entry}
-		<div class="nav-folder-title" on:click={toggleFolder}>
+		<div
+			class="nav-folder-title {entry.children && collapsed && isSelected
+				? 'is-active'
+				: ''}"
+			on:click={toggleFolder}
+		>
 			<div class="nav-folder-collapse-indicator collapse-icon">
 				<svg
 					viewBox="0 0 100 100"
@@ -56,10 +76,13 @@
 				{/each}
 			</div>
 		{/if}
-	{:else if "entry" in entry}
-		<div class="nav-folder-title" on:click={() => openfileLocal(entry)}>
+	{:else if "path" in entry}
+		<div
+			class="nav-folder-title {isSelected ? 'is-active' : ''}"
+			on:click={() => openfileLocal(entry)}
+		>
 			<div class="nav-folder-title-content">
-				{entry.entry.path}
+				{entry.displayName}
 			</div>
 		</div>
 	{/if}

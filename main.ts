@@ -16,14 +16,24 @@ import {
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 
 import { TreeItem, ViewItem } from "types";
-import { treeRoot } from "store";
+import { treeRoot, currentFile } from "store";
+
+type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
 
 interface TagFolderSettings {
-	mySetting: string;
+	displayMethod: DISPLAY_METHOD;
+	alwaysOpen: boolean;
+	ignoreDocTags: string;
+	ignoreTags: string;
+	hideOnRootTags: string;
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
-	mySetting: "default",
+	displayMethod: "NAME",
+	alwaysOpen: false,
+	ignoreDocTags: "",
+	ignoreTags: "",
+	hideOnRootTags: "",
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -32,7 +42,7 @@ class TagFolderView extends ItemView {
 	component: TagFolderViewComponent;
 	plugin: TagFolderPlugin;
 	icon: "stacked-levels";
-	getIcon():string{
+	getIcon(): string {
 		return "stacked-levels";
 	}
 
@@ -54,9 +64,9 @@ class TagFolderView extends ItemView {
 			target: this.contentEl,
 			props: {
 				openfile: this.plugin.focusFile,
+				vaultname: this.plugin.app.vault.getName(),
 			},
 		});
-		this.component.$set({ props: { openFile: this.plugin.focusFile } });
 	}
 
 	async onClose() {
@@ -79,7 +89,7 @@ const sortChildren = (
 		if ("tag" in a && "tag" in b) {
 			return a.tag.localeCompare(b.tag);
 		} else if ("tags" in a && "tags" in b) {
-			return a.entry.name.localeCompare(b.entry.name);
+			return a.displayName.localeCompare(b.displayName);
 		} else {
 			return 0;
 		}
@@ -167,6 +177,21 @@ export default class TagFolderPlugin extends Plugin {
 			leaf.openFile(targetFile);
 		}
 	};
+	getDisplayName(file: TFile): string {
+		if (this.settings.displayMethod == "NAME") {
+			return file.basename;
+		}
+		const path = file.path.split("/");
+		path.pop();
+		const dpath = path.join("/");
+
+		if (this.settings.displayMethod == "NAME : PATH") {
+			return `${file.basename} : ${dpath}`;
+		}
+		if (this.settings.displayMethod == "PATH/NAME") {
+			return `${dpath}/${file.basename}`;
+		}
+	}
 	async onload() {
 		await this.loadSettings();
 
@@ -176,7 +201,9 @@ export default class TagFolderPlugin extends Plugin {
 			return this.view;
 		});
 		this.app.workspace.onLayoutReady(async () => {
-			// this.activateView();
+			if (this.settings.alwaysOpen) {
+				this.activateView();
+			}
 		});
 		this.addCommand({
 			id: "tagfolder-open",
@@ -190,12 +217,26 @@ export default class TagFolderPlugin extends Plugin {
 			1000,
 			false
 		);
+		this.watchWorkspaceOpen = this.watchWorkspaceOpen.bind(this);
 		this.registerEvent(
 			this.app.metadataCache.on("changed", this.metadataCacheChanged)
 		);
+		this.registerEvent(
+			this.app.workspace.on("file-open", this.watchWorkspaceOpen)
+		);
+		this.watchWorkspaceOpen(this.app.workspace.getActiveFile());
 
-		// To prepare.
-		// this.addSettingTab(new TabFolderSettingTab(this.app, this));
+		this.addSettingTab(new TagFolderSettingTab(this.app, this));
+	}
+	currentOpeningFile = "";
+
+	watchWorkspaceOpen(file: TFile) {
+		if (file) {
+			this.currentOpeningFile = file.path;
+		} else {
+			this.currentOpeningFile = "";
+		}
+		currentFile.set(this.currentOpeningFile);
 	}
 	metadataCacheChanged(file: TFile) {
 		this.loadFileInfo(file);
@@ -208,10 +249,10 @@ export default class TagFolderPlugin extends Plugin {
 	// Sweep updated file or all files to retrive tags.
 	async loadFileInfo(diff?: TFile) {
 		if (this.view == null) return;
-		const files = this.app.vault
-			.getFiles()
-			.filter((e) => e.extension == "md");
 		if (this.fileCaches.length == 0 || !diff) {
+			const files = this.app.vault
+				.getFiles()
+				.filter((e) => e.extension == "md");
 			this.fileCaches = files.map((e) => {
 				return {
 					file: e,
@@ -229,13 +270,29 @@ export default class TagFolderPlugin extends Plugin {
 		}
 
 		const items: ViewItem[] = [];
+		const ignoreDocTags = this.settings.ignoreDocTags
+			.replace(/\n| /g, "")
+			.split(",");
+		const ignoreTags = this.settings.ignoreTags
+			.replace(/\n| /g, "")
+			.split(",");
+
 		for (const f of this.fileCaches) {
-			let allTags = getAllTags(f.metadata).map((e) => e.substring(1));
+			const allTagsDocs = getAllTags(f.metadata);
+			let allTags = allTagsDocs.map((e) => e.substring(1));
 			if (allTags.length == 0) {
 				allTags = ["_orphan"];
 			}
+			if (allTags.some((e) => ignoreDocTags.contains(e))) {
+				continue;
+			}
+			allTags = allTags.filter((e) => !ignoreTags.contains(e));
 
-			items.push({ tags: allTags, entry: f.file });
+			items.push({
+				tags: allTags,
+				path: f.file.path,
+				displayName: this.getDisplayName(f.file),
+			});
 		}
 		const root: TreeItem = {
 			tag: "root",
@@ -255,6 +312,7 @@ export default class TagFolderPlugin extends Plugin {
 		root.children.sort(sortChildren);
 
 		this.view.setTreeRoot(root);
+		currentFile.set(this.currentOpeningFile);
 	}
 
 	onunload() {
@@ -287,31 +345,74 @@ export default class TagFolderPlugin extends Plugin {
 	}
 }
 
-class TabFolderSettingTab extends PluginSettingTab {
+class TagFolderSettingTab extends PluginSettingTab {
 	plugin: TagFolderPlugin;
 
 	constructor(app: App, plugin: TagFolderPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
-
+	hide() {
+		this.plugin.loadFileInfo();
+	}
 	display(): void {
 		const { containerEl } = this;
 
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Settings for my awesome plugin." });
+		containerEl.createEl("h2", { text: "Settings for Tag Folder." });
 
 		new Setting(containerEl)
-			.setName("Setting #1")
-			.setDesc("It's a secret")
-			.addText((text) =>
-				text
-					.setPlaceholder("Enter your secret")
-					.setValue(this.plugin.settings.mySetting)
+			.setName("Always Open")
+			.setDesc("Open Tag Folder when obsidian has been launched")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.alwaysOpen)
 					.onChange(async (value) => {
-						console.log("Secret: " + value);
-						this.plugin.settings.mySetting = value;
+						this.plugin.settings.alwaysOpen = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Display method")
+			.setDesc("Filename display")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions({
+						"PATH/NAME": "PATH/NAME",
+						NAME: "NAME",
+						"NAME : PATH": "NAME : PATH",
+					})
+					.setValue(this.plugin.settings.displayMethod)
+					.onChange(async (value: DISPLAY_METHOD) => {
+						this.plugin.settings.displayMethod = value;
+						this.plugin.loadFileInfo(null);
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Ignore note Tag")
+			.setDesc(
+				"If the note has the tag listed below, the note would be treated as there was not."
+			)
+			.addTextArea((text) =>
+				text
+					.setValue(this.plugin.settings.ignoreDocTags)
+					.setPlaceholder("test,test1,test2")
+					.onChange(async (value) => {
+						this.plugin.settings.ignoreDocTags = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Ignore Tag")
+			.setDesc("Tags in the list would be treated as there were not.")
+			.addTextArea((text) =>
+				text
+					.setValue(this.plugin.settings.ignoreTags)
+					.setPlaceholder("test,test1,test2")
+					.onChange(async (value) => {
+						this.plugin.settings.ignoreTags = value;
 						await this.plugin.saveSettings();
 					})
 			);

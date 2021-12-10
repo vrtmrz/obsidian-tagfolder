@@ -1,8 +1,7 @@
-import { TFile } from "obsidian";
-
 export interface ViewItem {
 	tags: string[];
-	entry: TFile;
+	path: string;
+	displayName: string;
 }
 
 export interface TreeItem {
