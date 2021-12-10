@@ -20,7 +20,7 @@ Apple : #food #red #sweet
 Pear  : #food #green #sweet
 Tuna  : #food #red
 ```
-![](./images/simplecase.png)
+![](./images/simplecase.png)  
 ...and more are shown.
 So if you tag many to each doc, It would be heavy.
 I'll make the new options that delay the folder expansion in the tree, but it will have the limitations that active file marking would be disabled till expanding the tree.
