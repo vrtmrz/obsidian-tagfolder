@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { currentFile } from "store";
-
-	import { TreeItem, ViewItem, TagFolderItem } from "./types";
-	export let entry: TreeItem | ViewItem;
+	import { TreeItem, TagFolderItem } from "./types";
+	export let entry: TagFolderItem;
 	export let openfile: (path: string) => void;
+	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
 	let collapsed = true;
-	let currentFilelocal = "";
 	let isSelected = false;
-	function toggleFolder() {
-		collapsed = !collapsed;
+
+	function toggleFolder(entry: TagFolderItem) {
+		if ("tag" in entry) {
+			expandFolder(entry, collapsed);
+			collapsed = !collapsed;
+		}
 	}
 	function getFilenames(entry: TreeItem) {
 		let filenames: string[] = [];
@@ -30,7 +33,6 @@
 	}
 
 	currentFile.subscribe((path: string) => {
-		currentFilelocal = path;
 		isSelected = false;
 		if ("tags" in entry && entry.path == path) {
 			isSelected = true;
@@ -47,7 +49,7 @@
 			class="nav-folder-title {entry.children && collapsed && isSelected
 				? 'is-active'
 				: ''}"
-			on:click={toggleFolder}
+			on:click={() => toggleFolder(entry)}
 		>
 			<div class="nav-folder-collapse-indicator collapse-icon">
 				<svg
@@ -72,7 +74,7 @@
 		{#if entry.children && !collapsed}
 			<div class="nav-folder-children">
 				{#each entry.children as item}
-					<svelte:self entry={item} {openfile} />
+					<svelte:self entry={item} {openfile} {expandFolder} />
 				{/each}
 			</div>
 		{/if}

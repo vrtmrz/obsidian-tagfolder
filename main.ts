@@ -15,7 +15,7 @@ import {
 
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 
-import { TreeItem, ViewItem } from "types";
+import { TagFolderItem, TreeItem, ViewItem } from "types";
 import { treeRoot, currentFile } from "store";
 
 type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
@@ -64,6 +64,7 @@ class TagFolderView extends ItemView {
 			target: this.contentEl,
 			props: {
 				openfile: this.plugin.focusFile,
+				expandFolder: this.plugin.expandFolder,
 				vaultname: this.plugin.app.vault.getName(),
 			},
 		});
@@ -96,8 +97,9 @@ const sortChildren = (
 	}
 };
 
-const expandTree = (node: TreeItem, ancestor: string[]) => {
+const expandTree = (node: TreeItem) => {
 	const tree = node.children;
+	const ancestor = [...node.ancestors, node.tag];
 	const tags = Array.from(
 		new Set(
 			node.children
@@ -109,7 +111,7 @@ const expandTree = (node: TreeItem, ancestor: string[]) => {
 
 	for (const tag of tags) {
 		if (ancestor.contains(tag)) continue;
-		const newChildrens = node.children.filter(
+		const newChildren = node.children.filter(
 			(e) => "tags" in e && e.tags.contains(tag)
 		);
 		if (tree.find((e) => "tag" in e && e.tag == tag)) {
@@ -117,51 +119,89 @@ const expandTree = (node: TreeItem, ancestor: string[]) => {
 		}
 		const newLeaf: TreeItem = {
 			tag: tag,
-			children: newChildrens,
+			children: newChildren,
+			ancestors: ancestor,
 		};
 		tree.push(newLeaf);
-		expandTree(newLeaf, [...ancestor, tag]);
+		splitTag(newLeaf);
 	}
 	tree.sort(sortChildren);
 };
 const splitTag = (entry: TreeItem) => {
-	for (const v of entry.children) {
-		if ("tag" in v) {
-			splitTag(v);
-			if (v.tag.contains("/")) {
-				const w = v;
-				entry.children.remove(w);
-				const tagsArray = v.tag.split("/");
+	let modified = false;
+	for (const curEntry of entry.children) {
+		if ("tag" in curEntry) {
+			splitTag(curEntry);
+			if (curEntry.tag.contains("/")) {
+				const tempEntry = curEntry;
+				entry.children.remove(tempEntry);
+				const tagsArray = tempEntry.tag.split("/");
 				const tagCar = tagsArray.shift();
 				const tagCdr = tagsArray.join("/");
 				const parent = entry.children.find(
 					(e) => "tag" in e && e.tag == tagCar
 				) as TreeItem;
 				if (!parent) {
-					// console.log("parent missing, create new!");
 					const x: TreeItem = {
 						tag: tagCar,
-						children: [{ tag: tagCdr, children: [...v.children] }],
+						children: [],
+						ancestors: [...tempEntry.ancestors, tempEntry.tag],
 					};
-
+					x.children = [
+						{
+							tag: tagCdr,
+							children: [...tempEntry.children],
+							ancestors: [
+								...tempEntry.ancestors,
+								tempEntry.tag,
+								tagCdr,
+							],
+						},
+					];
 					entry.children.push(x);
 					splitTag(entry);
+					modified = true;
 				} else {
+					const oldIx = parent.children.find(
+						(e) => "tag" in e && e.tag == tagCdr
+					);
+					parent.children.remove(oldIx);
 					parent.children.push({
 						tag: tagCdr,
-						children: [...v.children],
+						children: [...tempEntry.children],
+						ancestors: [
+							...tempEntry.ancestors,
+							tempEntry.tag,
+							tagCdr,
+						],
 					});
 					splitTag(parent);
+					modified = true;
 				}
 			}
 		}
 	}
-	entry.children.sort(sortChildren);
+	if (!modified) {
+		entry.children.sort(sortChildren);
+	} else {
+		splitTag(entry);
+	}
 };
 
 export default class TagFolderPlugin extends Plugin {
 	settings: TagFolderSettings;
 	view: TagFolderView;
+
+	// Folder opening status.
+	expandedFolders: string[] = ["root"];
+
+	// The Tag Tree.
+	root: TreeItem;
+
+	// The File that now opening
+	currentOpeningFile = "";
+
+	// Called when item clicked in the tag folder pane.
 	readonly focusFile = (path: string): void => {
 		const targetFile = this.app.vault
 			.getFiles()
@@ -177,6 +217,42 @@ export default class TagFolderPlugin extends Plugin {
 			leaf.openFile(targetFile);
 		}
 	};
+
+	expandLastExpandedFolders(entry: TagFolderItem) {
+		if ("tag" in entry) {
+			const key = [...entry.ancestors, entry.tag].join("/");
+			if (this.expandedFolders.contains(key)) {
+				expandTree(entry);
+				splitTag(entry);
+				for (const child of entry.children) {
+					this.expandLastExpandedFolders(child);
+				}
+			}
+		}
+	}
+	// Expand the folder (called from Tag pane.)
+	readonly expandFolder = (entry: TagFolderItem, expanded: boolean) => {
+		if ("tag" in entry) {
+			const key = [...entry.ancestors, entry.tag].join("/");
+			if (expanded) {
+				this.expandedFolders = Array.from(
+					new Set([...this.expandedFolders, key])
+				);
+				this.expandedFolders.sort(
+					(a, b) => a.split("/").length - b.split("/").length
+				);
+			} else {
+				this.expandedFolders = this.expandedFolders.filter(
+					(e) => e != key
+				);
+			}
+			// apply to tree opened status.
+			this.expandLastExpandedFolders(entry);
+			// apply to pane.
+			this.view.setTreeRoot(this.root);
+		}
+	};
+
 	getDisplayName(file: TFile): string {
 		if (this.settings.displayMethod == "NAME") {
 			return file.basename;
@@ -228,7 +304,6 @@ export default class TagFolderPlugin extends Plugin {
 
 		this.addSettingTab(new TagFolderSettingTab(this.app, this));
 	}
-	currentOpeningFile = "";
 
 	watchWorkspaceOpen(file: TFile) {
 		if (file) {
@@ -239,7 +314,9 @@ export default class TagFolderPlugin extends Plugin {
 		currentFile.set(this.currentOpeningFile);
 	}
 	metadataCacheChanged(file: TFile) {
-		this.loadFileInfo(file);
+		(async () => {
+			await this.loadFileInfo(file);
+		})();
 	}
 	fileCaches: {
 		file: TFile;
@@ -250,18 +327,16 @@ export default class TagFolderPlugin extends Plugin {
 	async loadFileInfo(diff?: TFile) {
 		if (this.view == null) return;
 		if (this.fileCaches.length == 0 || !diff) {
-			const files = this.app.vault
-				.getFiles()
-				.filter((e) => e.extension == "md");
-			this.fileCaches = files.map((e) => {
+			const files = this.app.vault.getMarkdownFiles();
+			this.fileCaches = files.map((fileEntry) => {
 				return {
-					file: e,
-					metadata: this.app.metadataCache.getFileCache(e),
+					file: fileEntry,
+					metadata: this.app.metadataCache.getFileCache(fileEntry),
 				};
 			});
 		} else {
 			this.fileCaches = this.fileCaches.filter(
-				(e) => e.file.path != diff.path
+				(fileCache) => fileCache.file.path != diff.path
 			);
 			this.fileCaches.push({
 				file: diff,
@@ -277,42 +352,45 @@ export default class TagFolderPlugin extends Plugin {
 			.replace(/\n| /g, "")
 			.split(",");
 
-		for (const f of this.fileCaches) {
-			const allTagsDocs = getAllTags(f.metadata);
+		for (const fileCache of this.fileCaches) {
+			const allTagsDocs = getAllTags(fileCache.metadata);
 			let allTags = allTagsDocs.map((e) => e.substring(1));
 			if (allTags.length == 0) {
 				allTags = ["_orphan"];
 			}
-			if (allTags.some((e) => ignoreDocTags.contains(e))) {
+			if (allTags.some((tag) => ignoreDocTags.contains(tag))) {
 				continue;
 			}
-			allTags = allTags.filter((e) => !ignoreTags.contains(e));
+			allTags = allTags.filter((tag) => !ignoreTags.contains(tag));
 
 			items.push({
 				tags: allTags,
-				path: f.file.path,
-				displayName: this.getDisplayName(f.file),
+				path: fileCache.file.path,
+				displayName: this.getDisplayName(fileCache.file),
+				ancestors: [],
 			});
 		}
 		const root: TreeItem = {
 			tag: "root",
 			children: [...items],
+			ancestors: [],
 		};
 
-		// Expands subfolders in advance.
-		expandTree(root, []);
+		expandTree(root);
 
-		// Omit orphan items.
+		// Omit items on root
 		root.children = root.children.filter((e) => "tag" in e);
 
 		// Split tag that having slashes.
 		splitTag(root);
 
+		// restore opened folder
+		this.expandLastExpandedFolders(root);
 		// sort again.
 		root.children.sort(sortChildren);
 
+		this.root = root;
 		this.view.setTreeRoot(root);
-		currentFile.set(this.currentOpeningFile);
 	}
 
 	onunload() {
