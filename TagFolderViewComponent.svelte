@@ -7,6 +7,11 @@
 	export let openfile: (path: string) => void;
 	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
 	export let vaultname: string = "";
+	export let showMenu: (
+		evt: MouseEvent,
+		path: string,
+		entry: TagFolderItem
+	) => void;
 
 	treeRoot.subscribe((root: TreeItem) => {
 		items = root.children;
@@ -21,7 +26,13 @@
 		</div>
 		<div class="nav-folder-children">
 			{#each items as entry}
-				<TreeItemComponent {entry} {openfile} {expandFolder} />
+				<TreeItemComponent
+					{entry}
+					{openfile}
+					{expandFolder}
+					{showMenu}
+					path="/"
+				/>
 			{/each}
 		</div>
 	</div>

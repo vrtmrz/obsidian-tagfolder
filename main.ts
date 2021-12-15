@@ -11,6 +11,9 @@ import {
 	TFile,
 	ItemView,
 	WorkspaceLeaf,
+	TFolder,
+	Menu,
+	Notice,
 } from "obsidian";
 
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
@@ -26,6 +29,16 @@ interface TagFolderSettings {
 	ignoreDocTags: string;
 	ignoreTags: string;
 	hideOnRootTags: string;
+	sortType:
+		| "DISPNAME_ASC"
+		| "DISPNAME_DESC"
+		| "NAME_ASC"
+		| "NAME_DESC"
+		| "MTIME_ASC"
+		| "MTIME_DESC"
+		| "FULLPATH_ASC"
+		| "FULLPATH_DESC";
+	sortTypeTag: "NAME_ASC" | "NAME_DESC" | "ITEMS_ASC" | "ITEMS_DESC";
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -34,6 +47,8 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	ignoreDocTags: "",
 	ignoreTags: "",
 	hideOnRootTags: "",
+	sortType: "DISPNAME_ASC",
+	sortTypeTag: "NAME_ASC",
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -49,6 +64,7 @@ class TagFolderView extends ItemView {
 	constructor(leaf: WorkspaceLeaf, plugin: TagFolderPlugin) {
 		super(leaf);
 		this.plugin = plugin;
+		this.showMenu = this.showMenu.bind(this);
 	}
 
 	getViewType() {
@@ -66,6 +82,7 @@ class TagFolderView extends ItemView {
 				openfile: this.plugin.focusFile,
 				expandFolder: this.plugin.expandFolder,
 				vaultname: this.plugin.app.vault.getName(),
+				showMenu: this.showMenu,
 			},
 		});
 	}
@@ -76,27 +93,60 @@ class TagFolderView extends ItemView {
 	setTreeRoot(root: TreeItem) {
 		treeRoot.set(root);
 	}
+	showMenu(evt: MouseEvent, path: string, entry: TagFolderItem) {
+		const x = path.replace(/\/→ /g, "###");
+		const expandedTags = x
+			.split("/")
+			.filter((e) => e.trim() != "")
+			.map((e) => e.replace(/###/g, "/"))
+			.map((e) => "#" + e)
+			.join(" ")
+			.trim();
+		const menu = new Menu(this.plugin.app);
+
+		if (navigator && navigator.clipboard) {
+			menu.addItem((item) =>
+				item
+					.setTitle("Copy tags")
+					.setIcon("hashtag")
+					.onClick(async () => {
+						await navigator.clipboard.writeText(expandedTags);
+						new Notice("Copied");
+					})
+			);
+		}
+		menu.showAtMouseEvent(evt);
+	}
 }
 
-const sortChildren = (
-	a: TreeItem | ViewItem,
-	b: TreeItem | ViewItem
-): number => {
-	if ("tag" in a && !("tag" in b)) {
-		return -1;
-	} else if (!("tag" in a) && !("tag" in b)) {
-		return 1;
-	} else {
-		if ("tag" in a && "tag" in b) {
-			return a.tag.localeCompare(b.tag);
-		} else if ("tags" in a && "tags" in b) {
-			return a.displayName.localeCompare(b.displayName);
-		} else {
-			return 0;
+const rippleDirty = (entry: TreeItem): boolean => {
+	for (const child of entry.children) {
+		if ("tag" in child) {
+			if (rippleDirty(child)) {
+				entry.descendants = null;
+			}
 		}
 	}
+	if (entry.descendants == null) return true;
 };
-
+const expandDecendants = (entry: TreeItem): ViewItem[] => {
+	const ret: ViewItem[] = [];
+	for (const v of entry.children) {
+		if ("tag" in v) {
+			if (v.descendants == null) {
+				ret.push(
+					...expandDecendants(v).filter((e) => !ret.contains(e))
+				);
+			} else {
+				ret.push(...v.descendants.filter((e) => !ret.contains(e)));
+			}
+		} else {
+			if (!ret.contains(v)) ret.push(v);
+		}
+	}
+	entry.descendants = ret;
+	return ret;
+};
 const expandTree = (node: TreeItem) => {
 	const tree = node.children;
 	const ancestor = [...node.ancestors, node.tag];
@@ -120,73 +170,133 @@ const expandTree = (node: TreeItem) => {
 		const newLeaf: TreeItem = {
 			tag: tag,
 			children: newChildren,
-			ancestors: ancestor,
+			ancestors: [...ancestor, tag],
+			descendants: null,
 		};
 		tree.push(newLeaf);
 		splitTag(newLeaf);
 	}
-	tree.sort(sortChildren);
 };
-const splitTag = (entry: TreeItem) => {
+const splitTag = (entry: TreeItem): boolean => {
 	let modified = false;
+	entry.children = entry.children.sort((a, b) => {
+		if ("tag" in a && "tag" in b) {
+			return a.tag.split("/").length - b.tag.split("/").length;
+		} else {
+			return 0;
+		}
+	});
 	for (const curEntry of entry.children) {
 		if ("tag" in curEntry) {
-			splitTag(curEntry);
+			modified = splitTag(curEntry) || modified;
 			if (curEntry.tag.contains("/")) {
 				const tempEntry = curEntry;
 				entry.children.remove(tempEntry);
 				const tagsArray = tempEntry.tag.split("/");
 				const tagCar = tagsArray.shift();
-				const tagCdr = tagsArray.join("/");
+				const tagCdr = "→ " + tagsArray.join("/");
 				const parent = entry.children.find(
 					(e) => "tag" in e && e.tag == tagCar
 				) as TreeItem;
+				const tempChildren = tempEntry.children;
 				if (!parent) {
+					const xchild: TreeItem = {
+						tag: tagCdr,
+						children: [...tempChildren],
+						ancestors: [
+							...tempEntry.ancestors,
+							tempEntry.tag,
+							tagCdr,
+						],
+						descendants: null,
+					};
 					const x: TreeItem = {
 						tag: tagCar,
-						children: [],
+						children: [xchild],
 						ancestors: [...tempEntry.ancestors, tempEntry.tag],
+						descendants: null,
 					};
-					x.children = [
-						{
-							tag: tagCdr,
-							children: [...tempEntry.children],
-							ancestors: [
-								...tempEntry.ancestors,
-								tempEntry.tag,
-								tagCdr,
-							],
-						},
-					];
+					x.children = [xchild];
 					entry.children.push(x);
 					splitTag(entry);
 					modified = true;
 				} else {
 					const oldIx = parent.children.find(
 						(e) => "tag" in e && e.tag == tagCdr
-					);
-					parent.children.remove(oldIx);
-					parent.children.push({
-						tag: tagCdr,
-						children: [...tempEntry.children],
-						ancestors: [
-							...tempEntry.ancestors,
-							tempEntry.tag,
-							tagCdr,
-						],
-					});
-					splitTag(parent);
+					) as TreeItem;
+					if (oldIx != null) {
+						oldIx.children.push(
+							...tempChildren.filter(
+								(e) => !oldIx.children.contains(e)
+							)
+						);
+						splitTag(oldIx);
+					} else {
+						const x: TreeItem = {
+							tag: tagCdr,
+							children: [...tempChildren],
+							ancestors: [
+								...tempEntry.ancestors,
+								tempEntry.tag,
+								tagCdr,
+							],
+							descendants: null,
+						};
+						parent.children.push(x);
+						splitTag(parent);
+					}
 					modified = true;
 				}
 			}
 		}
 	}
-	if (!modified) {
-		entry.children.sort(sortChildren);
-	} else {
+	if (modified) {
 		splitTag(entry);
 	}
+	return modified;
 };
+function getCompareMethodTags(settings: TagFolderSettings) {
+	const invert = settings.sortTypeTag.contains("_DESC") ? -1 : 1;
+	switch (settings.sortTypeTag) {
+		case "ITEMS_ASC":
+		case "ITEMS_DESC":
+			return (a: TreeItem, b: TreeItem) =>
+				(a.descendants.length - b.descendants.length) * invert;
+		case "NAME_ASC":
+		case "NAME_DESC":
+			return (a: TreeItem, b: TreeItem) =>
+				a.tag.localeCompare(b.tag) * invert;
+		default:
+			console.warn("Compare method (tags) corrupted");
+			return (a: TreeItem, b: TreeItem) =>
+				a.tag.localeCompare(b.tag) * invert;
+	}
+}
+
+function getCompareMethodItems(settings: TagFolderSettings) {
+	const invert = settings.sortType.contains("_DESC") ? -1 : 1;
+	switch (settings.sortType) {
+		case "DISPNAME_ASC":
+		case "DISPNAME_DESC":
+			return (a: ViewItem, b: ViewItem) =>
+				a.displayName.localeCompare(b.displayName) * invert;
+		case "FULLPATH_ASC":
+		case "FULLPATH_DESC":
+			return (a: ViewItem, b: ViewItem) =>
+				a.path.localeCompare(b.path) * invert;
+		case "MTIME_ASC":
+		case "MTIME_DESC":
+			return (a: ViewItem, b: ViewItem) => (a.mtime - b.mtime) * invert;
+		case "NAME_ASC":
+		case "NAME_DESC":
+			return (a: ViewItem, b: ViewItem) =>
+				a.filename.localeCompare(b.filename) * invert;
+		default:
+			console.warn("Compare method (items) corrupted");
+			return (a: ViewItem, b: ViewItem) =>
+				a.displayName.localeCompare(b.displayName) * invert;
+	}
+}
 
 export default class TagFolderPlugin extends Plugin {
 	settings: TagFolderSettings;
@@ -201,6 +311,8 @@ export default class TagFolderPlugin extends Plugin {
 	// The File that now opening
 	currentOpeningFile = "";
 
+	compareItems: (a: ViewItem, b: ViewItem) => number;
+	compareTags: (a: TreeItem, b: TreeItem) => number;
 	// Called when item clicked in the tag folder pane.
 	readonly focusFile = (path: string): void => {
 		const targetFile = this.app.vault
@@ -238,7 +350,7 @@ export default class TagFolderPlugin extends Plugin {
 				this.expandedFolders = Array.from(
 					new Set([...this.expandedFolders, key])
 				);
-				this.expandedFolders.sort(
+				this.expandedFolders = this.expandedFolders.sort(
 					(a, b) => a.split("/").length - b.split("/").length
 				);
 			} else {
@@ -249,7 +361,7 @@ export default class TagFolderPlugin extends Plugin {
 			// apply to tree opened status.
 			this.expandLastExpandedFolders(entry);
 			// apply to pane.
-			this.view.setTreeRoot(this.root);
+			this.setRoot(this.root);
 		}
 	};
 
@@ -270,7 +382,7 @@ export default class TagFolderPlugin extends Plugin {
 	}
 	async onload() {
 		await this.loadSettings();
-
+		this.sortChildren = this.sortChildren.bind(this);
 		this.registerView(VIEW_TYPE_TAGFOLDER, (leaf) => {
 			this.view = new TagFolderView(leaf, this);
 			this.loadFileInfo();
@@ -297,6 +409,9 @@ export default class TagFolderPlugin extends Plugin {
 		this.registerEvent(
 			this.app.metadataCache.on("changed", this.metadataCacheChanged)
 		);
+		this.refreshAllTree = this.refreshAllTree.bind(this);
+		this.registerEvent(this.app.vault.on("rename", this.refreshAllTree));
+		this.registerEvent(this.app.vault.on("delete", this.refreshAllTree));
 		this.registerEvent(
 			this.app.workspace.on("file-open", this.watchWorkspaceOpen)
 		);
@@ -318,11 +433,44 @@ export default class TagFolderPlugin extends Plugin {
 			await this.loadFileInfo(file);
 		})();
 	}
+	refreshAllTree(file: TFile | TFolder) {
+		this.loadFileInfo();
+	}
 	fileCaches: {
 		file: TFile;
 		metadata: CachedMetadata;
 	}[] = [];
-
+	sortChildren(a: TreeItem | ViewItem, b: TreeItem | ViewItem) {
+		if ("tag" in a && !("tag" in b)) {
+			return -1;
+		} else if (!("tag" in a) && "tag" in b) {
+			return 1;
+		} else {
+			if ("tag" in a && "tag" in b) {
+				return this.compareTags(a, b);
+			} else if ("tags" in a && "tags" in b) {
+				return this.compareItems(a, b);
+			} else {
+				return 0;
+			}
+		}
+	}
+	sortTree(entry: TreeItem) {
+		entry.children = entry.children.sort(this.sortChildren);
+		for (const child of entry.children) {
+			if ("tag" in child) {
+				this.sortTree(child);
+			}
+		}
+		entry.descendants = entry.descendants.sort(this.sortChildren);
+	}
+	setRoot(root: TreeItem) {
+		rippleDirty(root);
+		expandDecendants(root);
+		this.sortTree(root);
+		this.root = root;
+		this.view.setTreeRoot(root);
+	}
 	// Sweep updated file or all files to retrive tags.
 	async loadFileInfo(diff?: TFile) {
 		if (this.view == null) return;
@@ -356,7 +504,7 @@ export default class TagFolderPlugin extends Plugin {
 			const allTagsDocs = getAllTags(fileCache.metadata);
 			let allTags = allTagsDocs.map((e) => e.substring(1));
 			if (allTags.length == 0) {
-				allTags = ["_orphan"];
+				allTags = ["_untagged"];
 			}
 			if (allTags.some((tag) => ignoreDocTags.contains(tag))) {
 				continue;
@@ -368,12 +516,15 @@ export default class TagFolderPlugin extends Plugin {
 				path: fileCache.file.path,
 				displayName: this.getDisplayName(fileCache.file),
 				ancestors: [],
+				mtime: fileCache.file.stat.mtime,
+				filename: fileCache.file.basename,
 			});
 		}
 		const root: TreeItem = {
 			tag: "root",
 			children: [...items],
 			ancestors: [],
+			descendants: null,
 		};
 
 		expandTree(root);
@@ -386,11 +537,8 @@ export default class TagFolderPlugin extends Plugin {
 
 		// restore opened folder
 		this.expandLastExpandedFolders(root);
-		// sort again.
-		root.children.sort(sortChildren);
 
-		this.root = root;
-		this.view.setTreeRoot(root);
+		this.setRoot(root);
 	}
 
 	onunload() {
@@ -416,10 +564,14 @@ export default class TagFolderPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			await this.loadData()
 		);
+		this.compareItems = getCompareMethodItems(this.settings);
+		this.compareTags = getCompareMethodTags(this.settings);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.compareItems = getCompareMethodItems(this.settings);
+		this.compareTags = getCompareMethodTags(this.settings);
 	}
 }
 
@@ -468,6 +620,64 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+		const setOrderMethod = async (key: string, order: string) => {
+			const oldSetting = this.plugin.settings.sortType.split("_");
+			if (!key) key = oldSetting[0];
+			if (!order) order = oldSetting[1];
+			//@ts-ignore
+			this.plugin.settings.sortType = `${key}_${order}`;
+			await this.plugin.saveSettings();
+			this.plugin.setRoot(this.plugin.root);
+		};
+		const setOrderMethodTag = async (key: string, order: string) => {
+			const oldSetting = this.plugin.settings.sortTypeTag.split("_");
+			if (!key) key = oldSetting[0];
+			if (!order) order = oldSetting[1];
+			//@ts-ignore
+			this.plugin.settings.sortTypeTag = `${key}_${order}`;
+			await this.plugin.saveSettings();
+			this.plugin.setRoot(this.plugin.root);
+		};
+		new Setting(containerEl)
+			.setName("Order method (Tags)")
+			.setDesc("how to order tags")
+			.addDropdown((dd) => {
+				dd.addOptions({
+					NAME: "File name",
+					ITEMS: "Count of items",
+				})
+					.setValue(this.plugin.settings.sortTypeTag.split("_")[0])
+					.onChange((key) => setOrderMethodTag(key, null));
+			})
+			.addDropdown((dd) => {
+				dd.addOptions({
+					ASC: "Ascending",
+					DESC: "Descending",
+				})
+					.setValue(this.plugin.settings.sortTypeTag.split("_")[1])
+					.onChange((order) => setOrderMethodTag(null, order));
+			});
+		new Setting(containerEl)
+			.setName("Order method (Items)")
+			.setDesc("how to order items")
+			.addDropdown((dd) => {
+				dd.addOptions({
+					DISPNAME: "Displaying name",
+					NAME: "File name",
+					MTIME: "Modified time",
+					FULLPATH: "Fullpath of the file",
+				})
+					.setValue(this.plugin.settings.sortType.split("_")[0])
+					.onChange((key) => setOrderMethod(key, null));
+			})
+			.addDropdown((dd) => {
+				dd.addOptions({
+					ASC: "Ascending",
+					DESC: "Descending",
+				})
+					.setValue(this.plugin.settings.sortType.split("_")[1])
+					.onChange((order) => setOrderMethod(null, order));
+			});
 		new Setting(containerEl)
 			.setName("Ignore note Tag")
 			.setDesc(

@@ -33,7 +33,7 @@ I'll make the new options that delay the folder expansion in the tree, but it wi
 
 The nested tag works well for Tag Folder.
 
-Tag Folder respects nested tags and makes the dedicated hierarchy. The nested child doesn't leak out of the parent.
+Tag Folder respects nested tags and makes the dedicated hierarchy. The nested child doesn't leak out over the parent.
 
 ```
 TagFolder Readme: #dev #readme #2021/12/10 #status/draft
@@ -57,6 +57,19 @@ Open Tag Folder when obsidian launched automatically.
 #### Display Method
 
 You can configure how the entry shows.
+#### Order method (Tags)
+
+You can order tags by:
+- Filename
+- Count of items
+
+#### Order method (Items)
+
+You can order items by:
+- Displaying name
+- Filename
+- Modified time
+- Fullpath of the file
 
 #### Ignore note Tag
 

@@ -4,8 +4,15 @@
 	export let entry: TagFolderItem;
 	export let openfile: (path: string) => void;
 	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
+	export let showMenu: (
+		evt: MouseEvent,
+		path: string,
+		entry: TagFolderItem
+	) => void;
+	export let path: string;
 	let collapsed = true;
 	let isSelected = false;
+	let currentPath = path + ("tag" in entry ? entry.tag+"/" : "") ;
 
 	function toggleFolder(entry: TagFolderItem) {
 		if ("tag" in entry) {
@@ -14,15 +21,12 @@
 		}
 	}
 	function getFilenames(entry: TreeItem) {
-		let filenames: string[] = [];
-		for (const item of entry.children) {
-			if ("tag" in item) {
-				filenames = [...filenames, ...getFilenames(item)];
-			} else {
-				filenames = [...filenames, item.path];
-			}
+		if (entry.descendants == null) {
+			return [];
+		} else {
+			const filenames = entry.descendants.map((e) => e.path);
+			return Array.from(new Set([...filenames]));
 		}
-		return Array.from(new Set([...filenames]));
 	}
 
 	function countUnique(entry: TreeItem) {
@@ -30,6 +34,13 @@
 	}
 	function openfileLocal(entry: TagFolderItem) {
 		if ("path" in entry) openfile(entry.path);
+	}
+	function handleContextMenu(
+		e: MouseEvent,
+		path: string,
+		entry: TagFolderItem
+	) {
+		showMenu(e, path, entry);
 	}
 
 	currentFile.subscribe((path: string) => {
@@ -50,6 +61,7 @@
 				? 'is-active'
 				: ''}"
 			on:click={() => toggleFolder(entry)}
+			on:contextmenu={(e) => handleContextMenu(e, currentPath, entry)}
 		>
 			<div class="nav-folder-collapse-indicator collapse-icon">
 				<svg
@@ -73,8 +85,27 @@
 		</div>
 		{#if entry.children && !collapsed}
 			<div class="nav-folder-children">
-				{#each entry.children as item}
-					<svelte:self entry={item} {openfile} {expandFolder} />
+				{#each entry.children.filter((e) => "tag" in e) as item}
+					<svelte:self
+						entry={item}
+						{openfile}
+						{expandFolder}
+						{showMenu}
+						path={currentPath}
+					/>
+				{/each}
+			</div>
+		{/if}
+		{#if entry.descendants && !collapsed}
+			<div class="nav-folder-children">
+				{#each entry.descendants as item}
+					<svelte:self
+						entry={item}
+						{openfile}
+						{expandFolder}
+						{showMenu}
+						path={currentPath}
+					/>
 				{/each}
 			</div>
 		{/if}
@@ -82,6 +113,7 @@
 		<div
 			class="nav-folder-title {isSelected ? 'is-active' : ''}"
 			on:click={() => openfileLocal(entry)}
+			on:contextmenu={(e) => handleContextMenu(e, currentPath, entry)}
 		>
 			<div class="nav-folder-title-content">
 				{entry.displayName}
