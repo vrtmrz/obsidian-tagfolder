@@ -19,7 +19,7 @@ import {
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 
 import { TagFolderItem, TreeItem, ViewItem } from "types";
-import { treeRoot, currentFile } from "store";
+import { treeRoot, currentFile, maxDepth } from "store";
 
 type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
 
@@ -39,6 +39,7 @@ interface TagFolderSettings {
 		| "FULLPATH_ASC"
 		| "FULLPATH_DESC";
 	sortTypeTag: "NAME_ASC" | "NAME_DESC" | "ITEMS_ASC" | "ITEMS_DESC";
+	expandLimit: number;
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -49,9 +50,25 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	hideOnRootTags: "",
 	sortType: "DISPNAME_ASC",
 	sortTypeTag: "NAME_ASC",
+	expandLimit: 0,
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
+
+const OrderKeyTag: Record<string, string> = {
+	NAME: "File name",
+	ITEMS: "Count of items",
+};
+const OrderDirection: Record<string, string> = {
+	ASC: "Ascending",
+	DESC: "Descending",
+};
+const OrderKeyItem: Record<string, string> = {
+	DISPNAME: "Displaying name",
+	NAME: "File name",
+	MTIME: "Modified time",
+	FULLPATH: "Fullpath of the file",
+};
 
 class TagFolderView extends ItemView {
 	component: TagFolderViewComponent;
@@ -64,7 +81,121 @@ class TagFolderView extends ItemView {
 	constructor(leaf: WorkspaceLeaf, plugin: TagFolderPlugin) {
 		super(leaf);
 		this.plugin = plugin;
+
 		this.showMenu = this.showMenu.bind(this);
+		this.showOrder = this.showOrder.bind(this);
+		this.newNote = this.newNote.bind(this);
+		this.showLevelSelect = this.showLevelSelect.bind(this);
+	}
+
+	newNote(evt: MouseEvent) {
+		//@ts-ignore
+		this.plugin.app.commands.executeCommandById("file-explorer:new-file");
+	}
+	showOrder(evt: MouseEvent) {
+		const menu = new Menu(this.plugin.app);
+
+		menu.addItem((item) => {
+			item.setTitle("Tags")
+				.setIcon("hashtag")
+				.onClick(async (evt2) => {
+					const menu2 = new Menu(this.plugin.app);
+					for (const key in OrderKeyTag) {
+						for (const direction in OrderDirection) {
+							menu2.addItem((item) => {
+								const newSetting = `${key}_${direction}`;
+								item.setTitle(
+									OrderKeyTag[key] +
+										" " +
+										OrderDirection[direction]
+								).onClick(async () => {
+									//@ts-ignore
+									this.plugin.settings.sortTypeTag =
+										newSetting;
+									await this.plugin.saveSettings();
+									this.plugin.setRoot(this.plugin.root);
+								});
+								if (
+									newSetting ==
+									this.plugin.settings.sortTypeTag
+								) {
+									item.setIcon("checkmark");
+								}
+
+								menu2.showAtMouseEvent(evt);
+								return item;
+							});
+						}
+					}
+				});
+			return item;
+		});
+		menu.addItem((item) => {
+			item.setTitle("Items")
+				.setIcon("document")
+				.onClick(async (evt2) => {
+					const menu2 = new Menu(this.plugin.app);
+					for (const key in OrderKeyItem) {
+						for (const direction in OrderDirection) {
+							menu2.addItem((item) => {
+								const newSetting = `${key}_${direction}`;
+								item.setTitle(
+									OrderKeyItem[key] +
+										" " +
+										OrderDirection[direction]
+								).onClick(async () => {
+									//@ts-ignore
+									this.plugin.settings.sortType = newSetting;
+									await this.plugin.saveSettings();
+									this.plugin.setRoot(this.plugin.root);
+								});
+								if (
+									newSetting == this.plugin.settings.sortType
+								) {
+									item.setIcon("checkmark");
+								}
+
+								menu2.showAtMouseEvent(evt);
+								return item;
+							});
+						}
+					}
+				});
+			return item;
+		});
+		menu.showAtMouseEvent(evt);
+	}
+	showLevelSelect(evt: MouseEvent) {
+		const menu = new Menu(this.plugin.app);
+		const setLevel = async (level: number) => {
+			this.plugin.settings.expandLimit = level;
+			await this.plugin.saveSettings();
+			maxDepth.set(level);
+			this.plugin.setRoot(this.plugin.root);
+		};
+		for (const level of [2, 3, 4, 5]) {
+			menu.addItem((item) => {
+				item.setTitle(`Level ${level - 1}`).onClick(() => {
+					setLevel(level);
+				});
+				if (this.plugin.settings.expandLimit == level)
+					item.setIcon("checkmark");
+				return item;
+			});
+		}
+
+		menu.addItem((item) => {
+			item.setTitle("No limit")
+				// .setIcon("hashtag")
+				.onClick(() => {
+					setLevel(0);
+				});
+			if (this.plugin.settings.expandLimit == 0)
+				item.setIcon("checkmark");
+
+			return item;
+		});
+		menu.showAtMouseEvent(evt);
 	}
 
 	getViewType() {
@@ -83,6 +214,9 @@ class TagFolderView extends ItemView {
 				expandFolder: this.plugin.expandFolder,
 				vaultname: this.plugin.app.vault.getName(),
 				showMenu: this.showMenu,
+				showLevelSelect: this.showLevelSelect,
+				showOrder: this.showOrder,
+				newNote: this.newNote,
 			},
 		});
 	}
@@ -418,6 +552,7 @@ export default class TagFolderPlugin extends Plugin {
 		this.watchWorkspaceOpen(this.app.workspace.getActiveFile());
 
 		this.addSettingTab(new TagFolderSettingTab(this.app, this));
+		maxDepth.set(this.settings.expandLimit);
 	}
 
 	watchWorkspaceOpen(file: TFile) {
@@ -642,18 +777,12 @@ class TagFolderSettingTab extends PluginSettingTab {
 			.setName("Order method (Tags)")
 			.setDesc("how to order tags")
 			.addDropdown((dd) => {
-				dd.addOptions({
-					NAME: "File name",
-					ITEMS: "Count of items",
-				})
+				dd.addOptions(OrderKeyTag)
 					.setValue(this.plugin.settings.sortTypeTag.split("_")[0])
 					.onChange((key) => setOrderMethodTag(key, null));
 			})
 			.addDropdown((dd) => {
-				dd.addOptions({
-					ASC: "Ascending",
-					DESC: "Descending",
-				})
+				dd.addOptions(OrderDirection)
 					.setValue(this.plugin.settings.sortTypeTag.split("_")[1])
 					.onChange((order) => setOrderMethodTag(null, order));
 			});
@@ -661,20 +790,12 @@ class TagFolderSettingTab extends PluginSettingTab {
 			.setName("Order method (Items)")
 			.setDesc("how to order items")
 			.addDropdown((dd) => {
-				dd.addOptions({
-					DISPNAME: "Displaying name",
-					NAME: "File name",
-					MTIME: "Modified time",
-					FULLPATH: "Fullpath of the file",
-				})
+				dd.addOptions(OrderKeyItem)
 					.setValue(this.plugin.settings.sortType.split("_")[0])
 					.onChange((key) => setOrderMethod(key, null));
 			})
 			.addDropdown((dd) => {
-				dd.addOptions({
-					ASC: "Ascending",
-					DESC: "Descending",
-				})
+				dd.addOptions(OrderDirection)
 					.setValue(this.plugin.settings.sortType.split("_")[1])
 					.onChange((order) => setOrderMethod(null, order));
 			});
