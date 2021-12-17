@@ -95,4 +95,7 @@
 	.nav-folder {
 		padding-bottom: 64px;
 	}
+	.nav-files-container {
+		height: 100%;
+	}
 </style>
