@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-tagfolder",
-	"version": "0.5.1",
+	"version": "0.5.2",
 	"description": "Show tags as folder",
 	"main": "main.js",
 	"type": "module",
@@ -19,7 +19,7 @@
 		"builtin-modules": "^3.2.0",
 		"esbuild": "0.13.12",
 		"esbuild-svelte": "^0.6.0",
-		"obsidian": "^0.12.17",
+		"obsidian": "^0.13.11",
 		"svelte": "^3.44.2",
 		"svelte-check": "^2.2.10",
 		"svelte-preprocess": "^4.9.8",

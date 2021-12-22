@@ -20,7 +20,7 @@
 	export let newNote: (evt: MouseEvent) => void;
 
 	treeRoot.subscribe((root: TreeItem) => {
-		items = root.children;
+		items = root?.children ?? [];
 	});
 </script>
 
