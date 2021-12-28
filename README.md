@@ -48,6 +48,16 @@ Old Note: #dev #readme #2021/12/10 #status/abandoned
 #### Tag hierarchy of date
 
 ![](./images/respect-nestedtag-2.png)
+
+
+#### Search tags
+You can search tags. As like this:
+
+```
+sweet -red | food -sweet
+```
+When using this filter, this plugin shows only "Pear" (Sweet but not red) and "Tuna" (food but not sweet).
+
 ### Settings
 
 #### Always Open

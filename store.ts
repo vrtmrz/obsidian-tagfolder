@@ -5,3 +5,5 @@ export const treeRoot = writable<TreeItem>();
 export const currentFile = writable<string>("");
 
 export const maxDepth = writable<number>(0);
+
+export const filterString = writable<string>("");

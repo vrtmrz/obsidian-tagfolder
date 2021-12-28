@@ -15,3 +15,6 @@ export interface TreeItem {
 }
 
 export type TagFolderItem = TreeItem | ViewItem;
+
+export const SUBTREE_MARK= "→ ";
+export const SUBTREE_MARK_REGEX = /\/→ /g;

@@ -18,7 +18,13 @@ import {
 
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 
-import { TagFolderItem, TreeItem, ViewItem } from "types";
+import {
+	SUBTREE_MARK,
+	SUBTREE_MARK_REGEX,
+	TagFolderItem,
+	TreeItem,
+	ViewItem,
+} from "types";
 import { treeRoot, currentFile, maxDepth } from "store";
 
 type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
@@ -90,16 +96,16 @@ class TagFolderView extends ItemView {
 
 	newNote(evt: MouseEvent) {
 		//@ts-ignore
-		this.plugin.app.commands.executeCommandById("file-explorer:new-file");
+		this.app.commands.executeCommandById("file-explorer:new-file");
 	}
 	showOrder(evt: MouseEvent) {
-		const menu = new Menu(this.plugin.app);
+		const menu = new Menu(this.app);
 
 		menu.addItem((item) => {
 			item.setTitle("Tags")
 				.setIcon("hashtag")
 				.onClick(async (evt2) => {
-					const menu2 = new Menu(this.plugin.app);
+					const menu2 = new Menu(this.app);
 					for (const key in OrderKeyTag) {
 						for (const direction in OrderDirection) {
 							menu2.addItem((item) => {
@@ -134,7 +140,7 @@ class TagFolderView extends ItemView {
 			item.setTitle("Items")
 				.setIcon("document")
 				.onClick(async (evt2) => {
-					const menu2 = new Menu(this.plugin.app);
+					const menu2 = new Menu(this.app);
 					for (const key in OrderKeyItem) {
 						for (const direction in OrderDirection) {
 							menu2.addItem((item) => {
@@ -166,7 +172,7 @@ class TagFolderView extends ItemView {
 		menu.showAtMouseEvent(evt);
 	}
 	showLevelSelect(evt: MouseEvent) {
-		const menu = new Menu(this.plugin.app);
+		const menu = new Menu(this.app);
 		const setLevel = async (level: number) => {
 			this.plugin.settings.expandLimit = level;
 			await this.plugin.saveSettings();
@@ -212,11 +218,12 @@ class TagFolderView extends ItemView {
 			props: {
 				openfile: this.plugin.focusFile,
 				expandFolder: this.plugin.expandFolder,
-				vaultname: this.plugin.app.vault.getName(),
+				vaultname: this.app.vault.getName(),
 				showMenu: this.showMenu,
 				showLevelSelect: this.showLevelSelect,
 				showOrder: this.showOrder,
 				newNote: this.newNote,
+				setSearchString: this.plugin.setSearchString,
 			},
 		});
 	}
@@ -228,7 +235,7 @@ class TagFolderView extends ItemView {
 		treeRoot.set(root);
 	}
 	showMenu(evt: MouseEvent, path: string, entry: TagFolderItem) {
-		const x = path.replace(/\/→ /g, "###");
+		const x = path.replace(SUBTREE_MARK_REGEX, "###");
 		const expandedTags = x
 			.split("/")
 			.filter((e) => e.trim() != "")
@@ -236,7 +243,7 @@ class TagFolderView extends ItemView {
 			.map((e) => "#" + e)
 			.join(" ")
 			.trim();
-		const menu = new Menu(this.plugin.app);
+		const menu = new Menu(this.app);
 
 		if (navigator && navigator.clipboard) {
 			menu.addItem((item) =>
@@ -328,7 +335,7 @@ const splitTag = (entry: TreeItem): boolean => {
 				entry.children.remove(tempEntry);
 				const tagsArray = tempEntry.tag.split("/");
 				const tagCar = tagsArray.shift();
-				const tagCdr = "→ " + tagsArray.join("/");
+				const tagCdr = SUBTREE_MARK + tagsArray.join("/");
 				const parent = entry.children.find(
 					(e) => "tag" in e && e.tag == tagCar
 				) as TreeItem;
@@ -445,6 +452,8 @@ export default class TagFolderPlugin extends Plugin {
 	// The File that now opening
 	currentOpeningFile = "";
 
+	searchString = "";
+
 	compareItems: (a: ViewItem, b: ViewItem) => number;
 	compareTags: (a: TreeItem, b: TreeItem) => number;
 	// Called when item clicked in the tag folder pane.
@@ -463,6 +472,10 @@ export default class TagFolderPlugin extends Plugin {
 			leaf.openFile(targetFile);
 		}
 	};
+	setSearchString(search: string) {
+		this.searchString = search;
+		this.refreshAllTree(null);
+	}
 
 	expandLastExpandedFolders(entry: TagFolderItem) {
 		if ("tag" in entry) {
@@ -517,6 +530,7 @@ export default class TagFolderPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.sortChildren = this.sortChildren.bind(this);
+		this.setSearchString = this.setSearchString.bind(this);
 		this.registerView(VIEW_TYPE_TAGFOLDER, (leaf) => {
 			this.view = new TagFolderView(leaf, this);
 			this.loadFileInfo();
@@ -635,6 +649,9 @@ export default class TagFolderPlugin extends Plugin {
 			.replace(/\n| /g, "")
 			.split(",");
 
+		const searchItems = this.searchString
+			.split("|")
+			.map((ee) => ee.split(" ").map((e) => e.trim()));
 		for (const fileCache of this.fileCaches) {
 			const allTagsDocs = getAllTags(fileCache.metadata);
 			let allTags = allTagsDocs.map((e) => e.substring(1));
@@ -644,6 +661,29 @@ export default class TagFolderPlugin extends Plugin {
 			if (allTags.some((tag) => ignoreDocTags.contains(tag))) {
 				continue;
 			}
+
+			// filter the items
+			const w = searchItems.map((searchItem) => {
+				let bx = false;
+				for (const search of searchItem) {
+					if (search.startsWith("-")) {
+						bx =
+							bx ||
+							allTags.some((tag) =>
+								tag.contains(search.substring(1))
+							);
+						if (bx) continue;
+					} else {
+						bx =
+							bx || allTags.every((tag) => !tag.contains(search));
+						if (bx) continue;
+					}
+				}
+				return bx;
+			});
+
+			if (w.every((e) => e)) continue;
+
 			allTags = allTags.filter((tag) => !ignoreTags.contains(tag));
 
 			items.push({

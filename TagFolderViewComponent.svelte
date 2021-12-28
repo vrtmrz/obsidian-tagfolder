@@ -19,9 +19,27 @@
 
 	export let newNote: (evt: MouseEvent) => void;
 
+	export let setSearchString: (search: string) => void;
+
 	treeRoot.subscribe((root: TreeItem) => {
 		items = root.children;
 	});
+
+	let search = "";
+
+	$: {
+		// filterString.set(search);
+		if (setSearchString != null) {
+			setSearchString(search);
+		}
+	}
+	let showSearch = false;
+	function toggleSearch() {
+		showSearch = !showSearch;
+		if (!showSearch) {
+			search = "";
+		}
+	}
 </script>
 
 <div class="nav-header">
@@ -60,8 +78,8 @@
 			<svg
 				viewBox="0 0 100 100"
 				class="stacked-levels"
-				width="17"
-				height="17"
+				width="20"
+				height="20"
 				><path
 					fill="currentColor"
 					stroke="currentColor"
@@ -69,9 +87,38 @@
 				/></svg
 			>
 		</div>
+		<div
+			class="nav-action-button"
+			aria-label="Search"
+			on:click={toggleSearch}
+		>
+			<svg viewBox="0 0 100 100" class="search" width="20" height="20"
+				><path
+					fill="currentColor"
+					stroke="currentColor"
+					stroke-width="2"
+					d="M42,6C23.2,6,8,21.2,8,40s15.2,34,34,34c7.4,0,14.3-2.4,19.9-6.4l26.3,26.3l5.6-5.6l-26-26.1c5.1-6,8.2-13.7,8.2-22.1 C76,21.2,60.8,6,42,6z M42,10c16.6,0,30,13.4,30,30S58.6,70,42,70S12,56.6,12,40S25.4,10,42,10z"
+				/></svg
+			>
+		</div>
 	</div>
 </div>
 <div class="nav-files-container">
+	{#if showSearch}
+		<div class="search-input-container">
+			<input
+				type="text"
+				spellcheck="false"
+				placeholder="Type to start search..."
+				bind:value={search}
+			/>
+			<div
+				class="search-input-clear-button"
+				aria-label="Clear search"
+				style="display: none;"
+			/>
+		</div>
+	{/if}
 	<div class="nav-folder mod-root">
 		<div class="nav-folder-title">
 			<div class="nav-folder-collapse-indicator collapse-icon" />

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { currentFile, maxDepth } from "store";
-	import { TreeItem, TagFolderItem } from "./types";
+	import { TreeItem, TagFolderItem, SUBTREE_MARK_REGEX, SUBTREE_MARK } from "./types";
 	export let entry: TagFolderItem;
 	export let openfile: (path: string) => void;
 	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
@@ -13,7 +13,7 @@
 	let collapsed = true;
 	let isSelected = false;
 	const currentPath = path + ("tag" in entry ? entry.tag + "/" : "");
-	const currentDepth = path.replace(/\/→ /g, "###").split("/").length;
+	const currentDepth = path.replace(SUBTREE_MARK_REGEX, "###").split("/").length;
 	let _maxDepth = 0;
 
 	function toggleFolder(entry: TagFolderItem) {
@@ -63,7 +63,7 @@
 </script>
 
 <div class="nav-folder  {collapsed ? 'is-collapsed' : ''}">
-	{#if "tag" in entry && currentDepth <= _maxDepth}
+	{#if "tag" in entry && ((currentDepth <= _maxDepth) || entry.tag.startsWith(SUBTREE_MARK)) }
 		<div
 			class="nav-folder-title {entry.children && collapsed && isSelected
 				? 'is-active'
