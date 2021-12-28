@@ -441,7 +441,6 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 
 export default class TagFolderPlugin extends Plugin {
 	settings: TagFolderSettings;
-	view: TagFolderView;
 
 	// Folder opening status.
 	expandedFolders: string[] = ["root"];
@@ -456,6 +455,18 @@ export default class TagFolderPlugin extends Plugin {
 
 	compareItems: (a: ViewItem, b: ViewItem) => number;
 	compareTags: (a: TreeItem, b: TreeItem) => number;
+
+	getView(): TagFolderView {
+		for (const leaf of this.app.workspace.getLeavesOfType(
+			VIEW_TYPE_TAGFOLDER
+		)) {
+			const view = leaf.view;
+			if (view instanceof TagFolderView) {
+				return view;
+			}
+		}
+		return null;
+	}
 	// Called when item clicked in the tag folder pane.
 	readonly focusFile = (path: string): void => {
 		const targetFile = this.app.vault
@@ -531,11 +542,13 @@ export default class TagFolderPlugin extends Plugin {
 		await this.loadSettings();
 		this.sortChildren = this.sortChildren.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
-		this.registerView(VIEW_TYPE_TAGFOLDER, (leaf) => {
-			this.view = new TagFolderView(leaf, this);
-			this.loadFileInfo();
-			return this.view;
-		});
+		// Make loadFileInfo debonced .
+		this.loadFileInfo = debounce(this.loadFileInfo.bind(this), 2500, true);
+
+		this.registerView(
+			VIEW_TYPE_TAGFOLDER,
+			(leaf) => new TagFolderView(leaf, this)
+		);
 		this.app.workspace.onLayoutReady(async () => {
 			if (this.settings.alwaysOpen) {
 				this.activateView();
@@ -548,11 +561,7 @@ export default class TagFolderPlugin extends Plugin {
 				this.activateView();
 			},
 		});
-		this.metadataCacheChanged = debounce(
-			this.metadataCacheChanged.bind(this),
-			1000,
-			false
-		);
+		this.metadataCacheChanged = this.metadataCacheChanged.bind(this);
 		this.watchWorkspaceOpen = this.watchWorkspaceOpen.bind(this);
 		this.registerEvent(
 			this.app.metadataCache.on("changed", this.metadataCacheChanged)
@@ -578,9 +587,7 @@ export default class TagFolderPlugin extends Plugin {
 		currentFile.set(this.currentOpeningFile);
 	}
 	metadataCacheChanged(file: TFile) {
-		(async () => {
-			await this.loadFileInfo(file);
-		})();
+		this.loadFileInfo(file);
 	}
 	refreshAllTree(file: TFile | TFolder) {
 		this.loadFileInfo();
@@ -618,11 +625,10 @@ export default class TagFolderPlugin extends Plugin {
 		expandDecendants(root);
 		this.sortTree(root);
 		this.root = root;
-		this.view.setTreeRoot(root);
+		this.getView()?.setTreeRoot(root);
 	}
-	// Sweep updated file or all files to retrive tags.
-	async loadFileInfo(diff?: TFile) {
-		if (this.view == null) return;
+
+	updateFileCaches(diff?: TFile) {
 		if (this.fileCaches.length == 0 || !diff) {
 			const files = this.app.vault.getMarkdownFiles();
 			this.fileCaches = files.map((fileEntry) => {
@@ -640,7 +646,9 @@ export default class TagFolderPlugin extends Plugin {
 				metadata: this.app.metadataCache.getFileCache(diff),
 			});
 		}
+	}
 
+	getItemsList(): ViewItem[] {
 		const items: ViewItem[] = [];
 		const ignoreDocTags = this.settings.ignoreDocTags
 			.replace(/\n| /g, "")
@@ -695,6 +703,10 @@ export default class TagFolderPlugin extends Plugin {
 				filename: fileCache.file.basename,
 			});
 		}
+		return items;
+	}
+
+	buildUpTree(items: ViewItem[]): TreeItem {
 		const root: TreeItem = {
 			tag: "root",
 			children: [...items],
@@ -712,6 +724,16 @@ export default class TagFolderPlugin extends Plugin {
 
 		// restore opened folder
 		this.expandLastExpandedFolders(root);
+		return root;
+	}
+
+	// Sweep updated file or all files to retrive tags.
+	loadFileInfo(diff?: TFile) {
+		if (this.getView() == null) return;
+		this.updateFileCaches(diff);
+
+		const items = this.getItemsList();
+		const root = this.buildUpTree(items);
 
 		this.setRoot(root);
 	}
@@ -720,7 +742,7 @@ export default class TagFolderPlugin extends Plugin {
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_TAGFOLDER);
 	}
 	async activateView() {
-		await this.loadFileInfo();
+		this.loadFileInfo();
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_TAGFOLDER);
 
 		await this.app.workspace.getLeftLeaf(false).setViewState({

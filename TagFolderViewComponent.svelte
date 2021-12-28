@@ -22,7 +22,7 @@
 	export let setSearchString: (search: string) => void;
 
 	treeRoot.subscribe((root: TreeItem) => {
-		items = root.children;
+		items = root?.children ?? [];
 	});
 
 	let search = "";
