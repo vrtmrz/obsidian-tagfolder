@@ -543,7 +543,7 @@ export default class TagFolderPlugin extends Plugin {
 		this.sortChildren = this.sortChildren.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
 		// Make loadFileInfo debonced .
-		this.loadFileInfo = debounce(this.loadFileInfo.bind(this), 2500, true);
+		this.loadFileInfo = debounce(this.loadFileInfo.bind(this), 250, true);
 
 		this.registerView(
 			VIEW_TYPE_TAGFOLDER,
