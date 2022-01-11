@@ -296,16 +296,32 @@ const expandTree = (node: TreeItem) => {
 			node.children
 				.filter((e) => "tags" in e)
 				.map((e) => (e as ViewItem).tags)
+				.map((e) => e.map((ee) => ee.toLocaleString()))
 				.flat()
 		)
 	);
 
 	for (const tag of tags) {
-		if (ancestor.contains(tag)) continue;
+		if (
+			ancestor
+				.map((e) => e.toLocaleLowerCase())
+				.contains(tag.toLocaleLowerCase())
+		)
+			continue;
 		const newChildren = node.children.filter(
-			(e) => "tags" in e && e.tags.contains(tag)
+			(e) =>
+				"tags" in e &&
+				e.tags
+					.map((e) => e.toLocaleLowerCase())
+					.contains(tag.toLocaleLowerCase())
 		);
-		if (tree.find((e) => "tag" in e && e.tag == tag)) {
+		if (
+			tree.find(
+				(e) =>
+					"tag" in e &&
+					e.tag.toLocaleLowerCase() == tag.toLocaleLowerCase()
+			)
+		) {
 			continue;
 		}
 		const newLeaf: TreeItem = {
@@ -337,7 +353,9 @@ const splitTag = (entry: TreeItem): boolean => {
 				const tagCar = tagsArray.shift();
 				const tagCdr = SUBTREE_MARK + tagsArray.join("/");
 				const parent = entry.children.find(
-					(e) => "tag" in e && e.tag == tagCar
+					(e) =>
+						"tag" in e &&
+						e.tag.toLocaleLowerCase() == tagCar.toLocaleLowerCase()
 				) as TreeItem;
 				const tempChildren = tempEntry.children;
 				if (!parent) {
@@ -363,7 +381,10 @@ const splitTag = (entry: TreeItem): boolean => {
 					modified = true;
 				} else {
 					const oldIx = parent.children.find(
-						(e) => "tag" in e && e.tag == tagCdr
+						(e) =>
+							"tag" in e &&
+							e.tag.toLocaleLowerCase() ==
+								tagCdr.toLocaleLowerCase()
 					) as TreeItem;
 					if (oldIx != null) {
 						oldIx.children.push(
