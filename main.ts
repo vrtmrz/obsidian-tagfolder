@@ -495,12 +495,7 @@ export default class TagFolderPlugin extends Plugin {
 			.find((f) => f.path === path);
 
 		if (targetFile) {
-			let leaf = this.app.workspace.getMostRecentLeaf();
-
-			const createLeaf = leaf.getViewState().pinned;
-			if (createLeaf) {
-				leaf = this.app.workspace.createLeafBySplit(leaf);
-			}
+			const leaf = this.app.workspace.getLeaf(false);
 			leaf.openFile(targetFile);
 		}
 	};
