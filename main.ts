@@ -46,6 +46,7 @@ interface TagFolderSettings {
 		| "FULLPATH_DESC";
 	sortTypeTag: "NAME_ASC" | "NAME_DESC" | "ITEMS_ASC" | "ITEMS_DESC";
 	expandLimit: number;
+	disableNestedTags: boolean;
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -57,6 +58,7 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	sortType: "DISPNAME_ASC",
 	sortTypeTag: "NAME_ASC",
 	expandLimit: 0,
+	disableNestedTags: false,
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -679,6 +681,9 @@ export default class TagFolderPlugin extends Plugin {
 		for (const fileCache of this.fileCaches) {
 			const allTagsDocs = getAllTags(fileCache.metadata);
 			let allTags = allTagsDocs.map((e) => e.substring(1));
+			if (this.settings.disableNestedTags) {
+				allTags = allTags.map((e) => e.split("/")).flat();
+			}
 			if (allTags.length == 0) {
 				allTags = ["_untagged"];
 			}
@@ -877,6 +882,18 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.sortType.split("_")[1])
 					.onChange((order) => setOrderMethod(null, order));
 			});
+		new Setting(containerEl)
+			.setName("Do not treat nested tags as dedicated levels")
+			.setDesc("Treat nested tags as normal tags")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.disableNestedTags)
+					.onChange(async (value) => {
+						this.plugin.settings.disableNestedTags = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
 		new Setting(containerEl)
 			.setName("Ignore note Tag")
 			.setDesc(
