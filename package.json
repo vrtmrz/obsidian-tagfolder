@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-tagfolder",
-	"version": "0.7.0",
+	"version": "0.8.0",
 	"description": "Show tags as folder",
 	"main": "main.js",
 	"type": "module",

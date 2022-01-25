@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { currentFile, maxDepth } from "store";
-	import { TreeItem, TagFolderItem, SUBTREE_MARK_REGEX, SUBTREE_MARK } from "./types";
+	import {
+		TreeItem,
+		TagFolderItem,
+		SUBTREE_MARK_REGEX,
+		SUBTREE_MARK,
+	} from "./types";
 	export let entry: TagFolderItem;
 	export let openfile: (path: string) => void;
 	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
@@ -13,7 +18,9 @@
 	let collapsed = true;
 	let isSelected = false;
 	const currentPath = path + ("tag" in entry ? entry.tag + "/" : "");
-	const currentDepth = path.replace(SUBTREE_MARK_REGEX, "###").split("/").length;
+	const currentDepth = path
+		.replace(SUBTREE_MARK_REGEX, "###")
+		.split("/").length;
 	let _maxDepth = 0;
 
 	function toggleFolder(entry: TagFolderItem) {
@@ -23,17 +30,14 @@
 		}
 	}
 	function getFilenames(entry: TreeItem) {
-		if (entry.descendants == null) {
+		if (entry.allDescendants == null) {
 			return [];
 		} else {
-			const filenames = entry.descendants.map((e) => e.path);
+			const filenames = entry.allDescendants.map((e) => e.path);
 			return Array.from(new Set([...filenames]));
 		}
 	}
 
-	function countUnique(entry: TreeItem) {
-		return getFilenames(entry).length;
-	}
 	function openfileLocal(entry: TagFolderItem) {
 		if ("path" in entry) openfile(entry.path);
 	}
@@ -63,7 +67,7 @@
 </script>
 
 <div class="nav-folder  {collapsed ? 'is-collapsed' : ''}">
-	{#if "tag" in entry && ((currentDepth <= _maxDepth) || entry.tag.startsWith(SUBTREE_MARK)) }
+	{#if "tag" in entry && (currentDepth <= _maxDepth || entry.tag.startsWith(SUBTREE_MARK))}
 		<div
 			class="nav-folder-title {entry.children && collapsed && isSelected
 				? 'is-active'
@@ -88,7 +92,7 @@
 				<div class="tagfolder-titletagname">
 					{entry.tag}
 				</div>
-				<div class="tagfolder-quantity">{countUnique(entry)}</div>
+				<div class="tagfolder-quantity">{entry.itemsCount}</div>
 			</div>
 		</div>
 		{#if entry.children && !collapsed}

@@ -29,6 +29,13 @@ import { treeRoot, currentFile, maxDepth } from "store";
 
 type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
 
+type HIDE_ITEMS_TYPE = "NONE" | "DEDICATED_INTERMIDIATES" | "ALL_EXCEPT_BOTTOM";
+
+const HideItemsType: Record<string, string> = {
+	NONE: "Hide nothing",
+	DEDICATED_INTERMIDIATES: "Only intermediates of nested tags",
+	ALL_EXCEPT_BOTTOM: "All intermediates",
+};
 interface TagFolderSettings {
 	displayMethod: DISPLAY_METHOD;
 	alwaysOpen: boolean;
@@ -47,6 +54,8 @@ interface TagFolderSettings {
 	sortTypeTag: "NAME_ASC" | "NAME_DESC" | "ITEMS_ASC" | "ITEMS_DESC";
 	expandLimit: number;
 	disableNestedTags: boolean;
+
+	hideItems: HIDE_ITEMS_TYPE;
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -59,6 +68,7 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	sortTypeTag: "NAME_ASC",
 	expandLimit: 0,
 	disableNestedTags: false,
+	hideItems: "NONE",
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -263,31 +273,77 @@ class TagFolderView extends ItemView {
 }
 
 const rippleDirty = (entry: TreeItem): boolean => {
+	// Mark "needs rebuild" itself if the children need to rebuild.
 	for (const child of entry.children) {
 		if ("tag" in child) {
 			if (rippleDirty(child)) {
 				entry.descendants = null;
+				entry.allDescendants = null;
+				entry.descendantsMemo = null;
 			}
 		}
 	}
 	if (entry.descendants == null) return true;
 };
-const expandDecendants = (entry: TreeItem): ViewItem[] => {
+const retriveAllDecendants = (entry: TagFolderItem): ViewItem[] => {
+	return (
+		"tag" in entry
+			? entry.children.map(
+					(e) =>
+						"tag" in e
+							? [...e.descendants, ...retriveAllDecendants(e)]
+							: [e]
+					// eslint-disable-next-line no-mixed-spaces-and-tabs
+			  )
+			: [entry]
+	).flat() as ViewItem[];
+};
+const expandDecendants = (
+	entry: TreeItem,
+	hideItems: HIDE_ITEMS_TYPE
+): ViewItem[] => {
 	const ret: ViewItem[] = [];
 	for (const v of entry.children) {
 		if ("tag" in v) {
 			if (v.descendants == null) {
-				ret.push(
-					...expandDecendants(v).filter((e) => !ret.contains(e))
+				const w = expandDecendants(v, hideItems).filter(
+					(e) => !ret.contains(e)
 				);
+				ret.push(...w);
 			} else {
-				ret.push(...v.descendants.filter((e) => !ret.contains(e)));
+				const w = v.descendants.filter((e) => !ret.contains(e));
+				ret.push(...w);
 			}
 		} else {
 			if (!ret.contains(v)) ret.push(v);
 		}
 	}
-	entry.descendants = ret;
+
+	// Find descendants with skipping over children.
+	const leafs =
+		entry.descendantsMemo != null
+			? entry.descendantsMemo // if memo is exists, use it.
+			: (entry.descendantsMemo = entry.children // or retrive all and memorize
+					.map((e) =>
+						"tag" in e
+							? e.children
+									.map((ee) =>
+										retriveAllDecendants(ee).flat()
+									)
+									.flat()
+							: []
+					)
+					.flat());
+	if (
+		(hideItems == "DEDICATED_INTERMIDIATES" && entry.isDedicatedTree) ||
+		hideItems == "ALL_EXCEPT_BOTTOM"
+	) {
+		entry.descendants = ret.filter((e) => !leafs.contains(e));
+	} else {
+		entry.descendants = ret;
+	}
+	entry.allDescendants = ret;
+	entry.itemsCount = new Set([...ret, ...leafs]).size;
 	return ret;
 };
 const expandTree = (node: TreeItem) => {
@@ -331,6 +387,9 @@ const expandTree = (node: TreeItem) => {
 			children: newChildren,
 			ancestors: [...ancestor, tag],
 			descendants: null,
+			isDedicatedTree: false,
+			itemsCount: newChildren.length,
+			allDescendants: null,
 		};
 		tree.push(newLeaf);
 		splitTag(newLeaf);
@@ -369,13 +428,19 @@ const splitTag = (entry: TreeItem): boolean => {
 							tempEntry.tag,
 							tagCdr,
 						],
+						itemsCount: 0,
 						descendants: null,
+						allDescendants: null,
+						isDedicatedTree: false,
 					};
 					const x: TreeItem = {
 						tag: tagCar,
 						children: [xchild],
 						ancestors: [...tempEntry.ancestors, tempEntry.tag],
 						descendants: null,
+						allDescendants: null,
+						isDedicatedTree: true,
+						itemsCount: 0,
 					};
 					x.children = [xchild];
 					entry.children.push(x);
@@ -405,8 +470,13 @@ const splitTag = (entry: TreeItem): boolean => {
 								tagCdr,
 							],
 							descendants: null,
+							allDescendants: null,
+							isDedicatedTree: false,
+							itemsCount: 0,
 						};
 						parent.children.push(x);
+						if (!parent.isDedicatedTree)
+							parent.isDedicatedTree = true;
 						splitTag(parent);
 					}
 					modified = true;
@@ -425,7 +495,7 @@ function getCompareMethodTags(settings: TagFolderSettings) {
 		case "ITEMS_ASC":
 		case "ITEMS_DESC":
 			return (a: TreeItem, b: TreeItem) =>
-				(a.descendants.length - b.descendants.length) * invert;
+				(a.itemsCount - b.itemsCount) * invert;
 		case "NAME_ASC":
 		case "NAME_DESC":
 			return (a: TreeItem, b: TreeItem) =>
@@ -640,7 +710,7 @@ export default class TagFolderPlugin extends Plugin {
 	}
 	setRoot(root: TreeItem) {
 		rippleDirty(root);
-		expandDecendants(root);
+		expandDecendants(root, this.settings.hideItems);
 		this.sortTree(root);
 		this.root = root;
 		this.getView()?.setTreeRoot(root);
@@ -733,6 +803,9 @@ export default class TagFolderPlugin extends Plugin {
 			children: [...items],
 			ancestors: [],
 			descendants: null,
+			allDescendants: null,
+			itemsCount: 0,
+			isDedicatedTree: false,
 		};
 
 		expandTree(root);
@@ -893,7 +966,23 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-
+		new Setting(containerEl)
+			.setName("Hide Items")
+			.setDesc("Hide items on the landing or nested tags")
+			.addDropdown((dd) => {
+				dd.addOptions(HideItemsType)
+					.setValue(this.plugin.settings.hideItems)
+					.onChange(async (key) => {
+						if (
+							key == "NONE" ||
+							key == "DEDICATED_INTERMIDIATES" ||
+							key == "ALL_EXCEPT_BOTTOM"
+						) {
+							this.plugin.settings.hideItems = key;
+						}
+						await this.plugin.saveSettings();
+					});
+			});
 		new Setting(containerEl)
 			.setName("Ignore note Tag")
 			.setDesc(

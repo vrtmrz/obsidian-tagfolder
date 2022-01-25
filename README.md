@@ -77,6 +77,91 @@ You can order items by:
 - Modified time
 - Fullpath of the file
 
+#### Do not treat nested tags as dedicated levels
+
+If you enable this option, every nested tag is split into normal tags.
+
+`#dev/TagFolder` will be treated as like `#dev` and `#TagFolder`.
+
+#### Hide Items
+
+Configure hiding items.
+- Hide nothing
+- Only intermediates of nested tags
+- All intermediates
+
+If you have these items:
+```
+2021-11-01 : #daily/2021/11 #status/summarized
+2021-11-02 : #daily/2021/11 #status/summarized
+2021-11-03 : #daily/2021/11 #status/jot
+2021-12-01 : #daily/2021/12 #status/jot
+```
+
+This setting affects as like below.
+##### Hide nothing
+```
+daily
+    → 2021
+        → 11
+            status
+                → jot
+                    2021-11-03
+                → summarized
+                    2021-11-01
+                    2021-11-02
+                2021-11-01
+                2021-11-02
+                2021-11-03
+            2021-11-01
+            2021-11-02
+            2021-11-03
+        2021-11-01
+        2021-11-02
+        2021-11-03
+        2021-12-01
+        → 12
+            :
+    2021-11-01
+    2021-11-02
+    2021-11-03
+    2021-12-01
+```
+
+##### Only intermediates of nested tags
+Hide only intermediates of nested tags, so show items only on the last or break of the nested tags.
+```
+daily
+    → 2021
+        → 11
+            status
+                → jot
+                    2021-11-03
+                → summarized
+                    2021-11-01
+                    2021-11-02
+            2021-11-01
+            2021-11-02
+            2021-11-03
+        → 12
+            :
+```
+##### All intermediates
+Hide all intermediates, so show items only deepest.
+```
+daily
+    → 2021
+        → 11
+            status
+                → jot
+                    2021-11-03
+                → summarized
+                    2021-11-01
+                    2021-11-02
+        → 12
+            :
+```
+
 #### Ignore note Tag
 
 If the note has the tag that is set in here, the note would be treated as there was not.
