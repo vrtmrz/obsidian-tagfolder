@@ -739,13 +739,16 @@ export default class TagFolderPlugin extends Plugin {
 	getItemsList(): ViewItem[] {
 		const items: ViewItem[] = [];
 		const ignoreDocTags = this.settings.ignoreDocTags
+			.toLocaleLowerCase()
 			.replace(/\n| /g, "")
 			.split(",");
 		const ignoreTags = this.settings.ignoreTags
+			.toLocaleLowerCase()
 			.replace(/\n| /g, "")
 			.split(",");
 
 		const searchItems = this.searchString
+			.toLocaleLowerCase()
 			.split("|")
 			.map((ee) => ee.split(" ").map((e) => e.trim()));
 		for (const fileCache of this.fileCaches) {
@@ -757,7 +760,11 @@ export default class TagFolderPlugin extends Plugin {
 			if (allTags.length == 0) {
 				allTags = ["_untagged"];
 			}
-			if (allTags.some((tag) => ignoreDocTags.contains(tag))) {
+			if (
+				allTags.some((tag) =>
+					ignoreDocTags.contains(tag.toLocaleLowerCase())
+				)
+			) {
 				continue;
 			}
 
@@ -769,12 +776,18 @@ export default class TagFolderPlugin extends Plugin {
 						bx =
 							bx ||
 							allTags.some((tag) =>
-								tag.contains(search.substring(1))
+								tag
+									.toLocaleLowerCase()
+									.contains(search.substring(1))
 							);
 						if (bx) continue;
 					} else {
 						bx =
-							bx || allTags.every((tag) => !tag.contains(search));
+							bx ||
+							allTags.every(
+								(tag) =>
+									!tag.toLocaleLowerCase().contains(search)
+							);
 						if (bx) continue;
 					}
 				}
@@ -783,7 +796,9 @@ export default class TagFolderPlugin extends Plugin {
 
 			if (w.every((e) => e)) continue;
 
-			allTags = allTags.filter((tag) => !ignoreTags.contains(tag));
+			allTags = allTags.filter(
+				(tag) => !ignoreTags.contains(tag.toLocaleLowerCase())
+			);
 
 			items.push({
 				tags: allTags,
