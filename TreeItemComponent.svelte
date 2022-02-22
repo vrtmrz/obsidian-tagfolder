@@ -111,7 +111,21 @@
 					{/each}
 				</div>
 			{/if}
-			{#if entry.descendants && !collapsed}
+			{#if _maxDepth != 1 && currentDepth > _maxDepth}
+				{#if entry.allDescendants && !collapsed}
+					<div class="nav-folder-children">
+						{#each entry.allDescendants as item}
+							<svelte:self
+								entry={item}
+								{openfile}
+								{expandFolder}
+								{showMenu}
+								path={currentPath}
+							/>
+						{/each}
+					</div>
+				{/if}
+			{:else if entry.descendants && !collapsed}
 				<div class="nav-folder-children">
 					{#each entry.descendants as item}
 						<svelte:self
