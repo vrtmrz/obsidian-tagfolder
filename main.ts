@@ -41,6 +41,7 @@ interface TagFolderSettings {
 	alwaysOpen: boolean;
 	ignoreDocTags: string;
 	ignoreTags: string;
+	ignoreFolders: string;
 	hideOnRootTags: string;
 	sortType:
 		| "DISPNAME_ASC"
@@ -49,6 +50,8 @@ interface TagFolderSettings {
 		| "NAME_DESC"
 		| "MTIME_ASC"
 		| "MTIME_DESC"
+		| "CTIME_ASC"
+		| "CTIME_DESC"
 		| "FULLPATH_ASC"
 		| "FULLPATH_DESC";
 	sortTypeTag: "NAME_ASC" | "NAME_DESC" | "ITEMS_ASC" | "ITEMS_DESC";
@@ -69,6 +72,7 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	expandLimit: 0,
 	disableNestedTags: false,
 	hideItems: "NONE",
+	ignoreFolders: "",
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -85,6 +89,7 @@ const OrderKeyItem: Record<string, string> = {
 	DISPNAME: "Displaying name",
 	NAME: "File name",
 	MTIME: "Modified time",
+	CTIME: "Created time",
 	FULLPATH: "Fullpath of the file",
 };
 
@@ -521,6 +526,9 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 		case "MTIME_ASC":
 		case "MTIME_DESC":
 			return (a: ViewItem, b: ViewItem) => (a.mtime - b.mtime) * invert;
+		case "CTIME_ASC":
+		case "CTIME_DESC":
+			return (a: ViewItem, b: ViewItem) => (a.ctime - b.ctime) * invert;
 		case "NAME_ASC":
 		case "NAME_DESC":
 			return (a: ViewItem, b: ViewItem) =>
@@ -747,11 +755,28 @@ export default class TagFolderPlugin extends Plugin {
 			.replace(/\n| /g, "")
 			.split(",");
 
+		const ignoreFolders = this.settings.ignoreFolders
+			.toLocaleLowerCase()
+			.replace(/\n| /g, "")
+			.split(",")
+			.map((e) => e.trim())
+			.filter((e) => !!e);
+
 		const searchItems = this.searchString
 			.toLocaleLowerCase()
 			.split("|")
 			.map((ee) => ee.split(" ").map((e) => e.trim()));
 		for (const fileCache of this.fileCaches) {
+			if (
+				ignoreFolders.find(
+					(e) =>
+						e != "" &&
+						fileCache.file.path.toLocaleLowerCase().startsWith(e)
+				)
+			) {
+				continue;
+			}
+
 			const allTagsDocs = getAllTags(fileCache.metadata);
 			let allTags = allTagsDocs.map((e) => e.substring(1));
 			if (this.settings.disableNestedTags) {
@@ -806,6 +831,7 @@ export default class TagFolderPlugin extends Plugin {
 				displayName: this.getDisplayName(fileCache.file),
 				ancestors: [],
 				mtime: fileCache.file.stat.mtime,
+				ctime: fileCache.file.stat.ctime,
 				filename: fileCache.file.basename,
 			});
 		}
@@ -1021,6 +1047,19 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setPlaceholder("test,test1,test2")
 					.onChange(async (value) => {
 						this.plugin.settings.ignoreTags = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Ignore Folders")
+			.setDesc("Ignore documents in specific folders.")
+			.addTextArea((text) =>
+				text
+					.setValue(this.plugin.settings.ignoreFolders)
+					.setPlaceholder("template,list/standard_tags")
+					.onChange(async (value) => {
+						this.plugin.settings.ignoreFolders = value;
 						await this.plugin.saveSettings();
 					})
 			);
