@@ -757,7 +757,7 @@ export default class TagFolderPlugin extends Plugin {
 
 		const ignoreFolders = this.settings.ignoreFolders
 			.toLocaleLowerCase()
-			.replace(/\n| /g, "")
+			.replace(/\n/g, "")
 			.split(",")
 			.map((e) => e.trim())
 			.filter((e) => !!e);
