@@ -68,13 +68,10 @@
 
 <slot>
 	{#if "tag" in entry && (currentDepth <= _maxDepth || entry.tag.startsWith(SUBTREE_MARK))}
-		<div class="nav-folder  {collapsed ? 'is-collapsed' : ''}">
+		<div class="nav-folder" class:is-collapsed={collapsed}>
 			<div
-				class="nav-folder-title {entry.children &&
-				collapsed &&
-				isSelected
-					? 'is-active'
-					: ''}"
+				class="nav-folder-title"
+				class:is-active={entry.children && collapsed && isSelected}
 				on:click={() => toggleFolder(entry)}
 				on:contextmenu={(e) => handleContextMenu(e, currentPath, entry)}
 			>
@@ -140,13 +137,16 @@
 			{/if}
 		</div>
 	{:else if "path" in entry}
-		<div
-			class="nav-file-title {isSelected ? 'is-active' : ''}"
-			on:click={() => openfileLocal(entry)}
-			on:contextmenu={(e) => handleContextMenu(e, currentPath, entry)}
-		>
-			<div class="nav-file-title-content">
-				{entry.displayName}
+		<div class="nav-file">
+			<div
+				class="nav-file-title"
+				class:is-active={isSelected}
+				on:click={() => openfileLocal(entry)}
+				on:contextmenu={(e) => handleContextMenu(e, currentPath, entry)}
+			>
+				<div class="nav-file-title-content">
+					{entry.displayName}
+				</div>
 			</div>
 		</div>
 	{/if}
