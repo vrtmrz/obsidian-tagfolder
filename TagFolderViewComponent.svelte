@@ -4,6 +4,7 @@
 	import TreeItemComponent from "./TreeItemComponent.svelte";
 
 	export let items: Array<TagFolderItem> = [];
+	export let hoverPreview: (e: MouseEvent, path: string) => void;
 	export let openfile: (path: string) => void;
 	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
 	export let vaultname: string = "";
@@ -128,6 +129,7 @@
 			{#each items as entry}
 				<TreeItemComponent
 					{entry}
+					{hoverPreview}
 					{openfile}
 					{expandFolder}
 					{showMenu}
