@@ -234,6 +234,7 @@ class TagFolderView extends ItemView {
 			target: this.contentEl,
 			props: {
 				openfile: this.plugin.focusFile,
+				hoverPreview: this.plugin.hoverPreview,
 				expandFolder: this.plugin.expandFolder,
 				vaultname: this.app.vault.getName(),
 				showMenu: this.showMenu,
@@ -579,6 +580,16 @@ export default class TagFolderPlugin extends Plugin {
 			leaf.openFile(targetFile);
 		}
 	};
+	hoverPreview(e: MouseEvent, path: string) {
+		this.app.workspace.trigger("hover-link", {
+			event: e,
+			source: "editor",
+			hoverParent: this,
+			targetEl: e.target,
+			linktext: path,
+		})
+
+	}
 	setSearchString(search: string) {
 		this.searchString = search;
 		this.refreshAllTree(null);
@@ -636,6 +647,7 @@ export default class TagFolderPlugin extends Plugin {
 	}
 	async onload() {
 		await this.loadSettings();
+		this.hoverPreview = this.hoverPreview.bind(this);
 		this.sortChildren = this.sortChildren.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
 		// Make loadFileInfo debonced .

@@ -7,6 +7,7 @@
 		SUBTREE_MARK,
 	} from "./types";
 	export let entry: TagFolderItem;
+	export let hoverPreview: (e: MouseEvent, path: string) => void;
 	export let openfile: (path: string) => void;
 	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
 	export let showMenu: (
@@ -47,6 +48,10 @@
 		entry: TagFolderItem
 	) {
 		showMenu(e, path, entry);
+	}
+
+	function handleMouseover(e: MouseEvent, entry: TagFolderItem) {
+		if ("path" in entry) hoverPreview(e, entry.path);
 	}
 
 	currentFile.subscribe((path: string) => {
@@ -101,6 +106,7 @@
 						<svelte:self
 							entry={item}
 							{openfile}
+							{hoverPreview}
 							{expandFolder}
 							{showMenu}
 							path={currentPath}
@@ -116,6 +122,7 @@
 								entry={item}
 								{openfile}
 								{expandFolder}
+								{hoverPreview}
 								{showMenu}
 								path={currentPath}
 							/>
@@ -128,6 +135,7 @@
 						<svelte:self
 							entry={item}
 							{openfile}
+							{hoverPreview}
 							{expandFolder}
 							{showMenu}
 							path={currentPath}
@@ -142,6 +150,8 @@
 				class="nav-file-title"
 				class:is-active={isSelected}
 				on:click={() => openfileLocal(entry)}
+				on:mouseover={(e) => handleMouseover(e, entry)}
+				on:focus={() => {/* TODO add hover preview */}}
 				on:contextmenu={(e) => handleContextMenu(e, currentPath, entry)}
 			>
 				<div class="nav-file-title-content">
