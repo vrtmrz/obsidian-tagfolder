@@ -583,7 +583,7 @@ export default class TagFolderPlugin extends Plugin {
 	hoverPreview(e: MouseEvent, path: string) {
 		this.app.workspace.trigger("hover-link", {
 			event: e,
-			source: "editor",
+			source: "file-explorer",
 			hoverParent: this,
 			targetEl: e.target,
 			linktext: path,
