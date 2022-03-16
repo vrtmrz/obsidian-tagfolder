@@ -59,6 +59,7 @@ interface TagFolderSettings {
 	disableNestedTags: boolean;
 
 	hideItems: HIDE_ITEMS_TYPE;
+	scanDelay: number;
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -73,6 +74,7 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	disableNestedTags: false,
 	hideItems: "NONE",
 	ignoreFolders: "",
+	scanDelay: 250,
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -587,8 +589,7 @@ export default class TagFolderPlugin extends Plugin {
 			hoverParent: this,
 			targetEl: e.target,
 			linktext: path,
-		})
-
+		});
 	}
 	setSearchString(search: string) {
 		this.searchString = search;
@@ -651,7 +652,11 @@ export default class TagFolderPlugin extends Plugin {
 		this.sortChildren = this.sortChildren.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
 		// Make loadFileInfo debonced .
-		this.loadFileInfo = debounce(this.loadFileInfo.bind(this), 250, true);
+		this.loadFileInfo = debounce(
+			this.loadFileInfo.bind(this),
+			this.settings.scanDelay,
+			true
+		);
 
 		this.registerView(
 			VIEW_TYPE_TAGFOLDER,
@@ -1075,5 +1080,25 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+		new Setting(containerEl)
+			.setName("Tag scanning delay")
+			.setDesc(
+				"Sets the delay for reflecting metadata changes to the tag tree. (Plugin reload is required.)"
+			)
+			.addText((text) => {
+				text = text
+					.setValue(this.plugin.settings.scanDelay + "")
+
+					.onChange(async (value) => {
+						const newDelay = Number.parseInt(value, 10);
+						if (newDelay) {
+							this.plugin.settings.scanDelay = newDelay;
+							await this.plugin.saveSettings();
+						}
+					});
+				text.inputEl.setAttribute("type", "number");
+				text.inputEl.setAttribute("min", "250");
+				return text;
+			});
 	}
 }

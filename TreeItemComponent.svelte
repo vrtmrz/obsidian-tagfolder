@@ -151,7 +151,9 @@
 				class:is-active={isSelected}
 				on:click={() => openfileLocal(entry)}
 				on:mouseover={(e) => handleMouseover(e, entry)}
-				on:focus={() => {/* ignore aria complaint */}}
+				on:focus={() => {
+					/* ignore aria complaint */
+				}}
 				on:contextmenu={(e) => handleContextMenu(e, currentPath, entry)}
 			>
 				<div class="nav-file-title-content">
