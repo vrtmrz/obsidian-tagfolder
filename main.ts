@@ -95,6 +95,23 @@ const OrderKeyItem: Record<string, string> = {
 	FULLPATH: "Fullpath of the file",
 };
 
+let lastSkipped = 0;
+// The messagepump having ancient name.
+const doevents = () => {
+	const n = performance.now();
+	// keep intact the microtask while 20ms
+	if (n - lastSkipped < 20) {
+		return Promise.resolve();
+	}
+	// otherwise, run next process after some microtask.
+	return new Promise<void>((res) => {
+		window.requestAnimationFrame(() => {
+			lastSkipped = performance.now();
+			res();
+		});
+	});
+};
+
 class TagFolderView extends ItemView {
 	component: TagFolderViewComponent;
 	plugin: TagFolderPlugin;
@@ -354,7 +371,7 @@ const expandDecendants = (
 	entry.itemsCount = new Set([...ret, ...leafs]).size;
 	return ret;
 };
-const expandTree = (node: TreeItem) => {
+const expandTree = async (node: TreeItem) => {
 	const tree = node.children;
 	const ancestor = [...node.ancestors, node.tag];
 	const tags = Array.from(
@@ -400,11 +417,12 @@ const expandTree = (node: TreeItem) => {
 			allDescendants: null,
 		};
 		tree.push(newLeaf);
-		splitTag(newLeaf);
+		await splitTag(newLeaf);
 	}
 };
-const splitTag = (entry: TreeItem): boolean => {
+const splitTag = async (entry: TreeItem): Promise<boolean> => {
 	let modified = false;
+	await doevents();
 	entry.children = entry.children.sort((a, b) => {
 		if ("tag" in a && "tag" in b) {
 			return a.tag.split("/").length - b.tag.split("/").length;
@@ -414,7 +432,7 @@ const splitTag = (entry: TreeItem): boolean => {
 	});
 	for (const curEntry of entry.children) {
 		if ("tag" in curEntry) {
-			modified = splitTag(curEntry) || modified;
+			modified = (await splitTag(curEntry)) || modified;
 			if (curEntry.tag.contains("/")) {
 				const tempEntry = curEntry;
 				entry.children.remove(tempEntry);
@@ -452,7 +470,7 @@ const splitTag = (entry: TreeItem): boolean => {
 					};
 					x.children = [xchild];
 					entry.children.push(x);
-					splitTag(entry);
+					await splitTag(entry);
 					modified = true;
 				} else {
 					const oldIx = parent.children.find(
@@ -467,7 +485,7 @@ const splitTag = (entry: TreeItem): boolean => {
 								(e) => !oldIx.children.contains(e)
 							)
 						);
-						splitTag(oldIx);
+						await splitTag(oldIx);
 					} else {
 						const x: TreeItem = {
 							tag: tagCdr,
@@ -485,7 +503,7 @@ const splitTag = (entry: TreeItem): boolean => {
 						parent.children.push(x);
 						if (!parent.isDedicatedTree)
 							parent.isDedicatedTree = true;
-						splitTag(parent);
+						await splitTag(parent);
 					}
 					modified = true;
 				}
@@ -493,7 +511,7 @@ const splitTag = (entry: TreeItem): boolean => {
 		}
 	}
 	if (modified) {
-		splitTag(entry);
+		await splitTag(entry);
 	}
 	return modified;
 };
@@ -596,20 +614,20 @@ export default class TagFolderPlugin extends Plugin {
 		this.refreshAllTree(null);
 	}
 
-	expandLastExpandedFolders(entry: TagFolderItem) {
+	async expandLastExpandedFolders(entry: TagFolderItem) {
 		if ("tag" in entry) {
 			const key = [...entry.ancestors, entry.tag].join("/");
 			if (this.expandedFolders.contains(key)) {
-				expandTree(entry);
-				splitTag(entry);
+				await expandTree(entry);
+				await splitTag(entry);
 				for (const child of entry.children) {
-					this.expandLastExpandedFolders(child);
+					await this.expandLastExpandedFolders(child);
 				}
 			}
 		}
 	}
 	// Expand the folder (called from Tag pane.)
-	readonly expandFolder = (entry: TagFolderItem, expanded: boolean) => {
+	readonly expandFolder = async (entry: TagFolderItem, expanded: boolean) => {
 		if ("tag" in entry) {
 			const key = [...entry.ancestors, entry.tag].join("/");
 			if (expanded) {
@@ -625,7 +643,7 @@ export default class TagFolderPlugin extends Plugin {
 				);
 			}
 			// apply to tree opened status.
-			this.expandLastExpandedFolders(entry);
+			await this.expandLastExpandedFolders(entry);
 			// apply to pane.
 			this.setRoot(this.root);
 		}
@@ -741,6 +759,7 @@ export default class TagFolderPlugin extends Plugin {
 		this.getView()?.setTreeRoot(root);
 	}
 
+	oldFileCache = "";
 	updateFileCaches(diff?: TFile) {
 		if (this.fileCaches.length == 0 || !diff) {
 			const files = this.app.vault.getMarkdownFiles();
@@ -759,9 +778,22 @@ export default class TagFolderPlugin extends Plugin {
 				metadata: this.app.metadataCache.getFileCache(diff),
 			});
 		}
+		const fileCacheDump = JSON.stringify(
+			this.fileCaches.map((e) => ({
+				path: e.file.path,
+				tags: (e.metadata.tags ?? []).map((e) => e.tag),
+			}))
+		);
+		if (this.oldFileCache == fileCacheDump) {
+			return false;
+		} else {
+			this.oldFileCache = fileCacheDump;
+			return true;
+		}
 	}
+	lastTags = "";
 
-	getItemsList(): ViewItem[] {
+	async getItemsList(): Promise<ViewItem[]> {
 		const items: ViewItem[] = [];
 		const ignoreDocTags = this.settings.ignoreDocTags
 			.toLocaleLowerCase()
@@ -793,8 +825,8 @@ export default class TagFolderPlugin extends Plugin {
 			) {
 				continue;
 			}
-
-			const allTagsDocs = getAllTags(fileCache.metadata);
+			await doevents();
+			const allTagsDocs = getAllTags(fileCache.metadata) ?? [];
 			let allTags = allTagsDocs.map((e) => e.substring(1));
 			if (this.settings.disableNestedTags) {
 				allTags = allTags.map((e) => e.split("/")).flat();
@@ -855,7 +887,7 @@ export default class TagFolderPlugin extends Plugin {
 		return items;
 	}
 
-	buildUpTree(items: ViewItem[]): TreeItem {
+	async buildUpTree(items: ViewItem[]): Promise<TreeItem> {
 		const root: TreeItem = {
 			tag: "root",
 			children: [...items],
@@ -866,27 +898,48 @@ export default class TagFolderPlugin extends Plugin {
 			isDedicatedTree: false,
 		};
 
-		expandTree(root);
+		await expandTree(root);
 
 		// Omit items on root
 		root.children = root.children.filter((e) => "tag" in e);
 
 		// Split tag that having slashes.
-		splitTag(root);
+		await splitTag(root);
 
 		// restore opened folder
-		this.expandLastExpandedFolders(root);
+		await this.expandLastExpandedFolders(root);
 		return root;
 	}
 
-	// Sweep updated file or all files to retrive tags.
+	lastSettings = "";
+	lastSearchString = "";
 	loadFileInfo(diff?: TFile) {
+		this.loadFileInfoAsync(diff);
+	}
+	// Sweep updated file or all files to retrive tags.
+	async loadFileInfoAsync(diff?: TFile) {
 		if (this.getView() == null) return;
-		this.updateFileCaches(diff);
+		const strSetting = JSON.stringify(this.settings);
+		const isSettingChanged = strSetting != this.lastSettings;
+		const isSearchStringModified =
+			this.searchString != this.lastSearchString;
+		if (isSettingChanged) {
+			this.lastSettings = strSetting;
+		}
+		if (isSearchStringModified) {
+			this.lastSearchString = this.searchString;
+		}
+		if (
+			!this.updateFileCaches(diff) &&
+			!isSearchStringModified &&
+			!isSettingChanged
+		) {
+			// If any conditions are not changed, skip processing.
+			return;
+		}
 
-		const items = this.getItemsList();
-		const root = this.buildUpTree(items);
-
+		const items = await this.getItemsList();
+		const root = await this.buildUpTree(items);
 		this.setRoot(root);
 	}
 
