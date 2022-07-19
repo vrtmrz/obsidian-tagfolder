@@ -781,7 +781,7 @@ export default class TagFolderPlugin extends Plugin {
 		const fileCacheDump = JSON.stringify(
 			this.fileCaches.map((e) => ({
 				path: e.file.path,
-				tags: (e.metadata.tags ?? []).map((e) => e.tag),
+				tags: (e.metadata?.tags ?? []).map((e) => e.tag),
 			}))
 		);
 		if (this.oldFileCache == fileCacheDump) {
