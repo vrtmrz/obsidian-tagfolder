@@ -63,6 +63,11 @@ Open Tag Folder when obsidian launched automatically.
 #### Display Method
 
 You can configure how the entry shows.
+
+#### Use title
+
+When you enable this option, the title in the frontmatter or first level one heading will be shown instead of `NAME`.
+
 #### Order method (Tags)
 
 You can order tags by:

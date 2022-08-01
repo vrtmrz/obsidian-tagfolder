@@ -18,7 +18,10 @@
 	export let path: string;
 	let collapsed = true;
 	let isSelected = false;
-	const currentPath = path + ("tag" in entry ? entry.tag + "/" : "");
+	function getPath(entry: TagFolderItem) {
+		return path + ("tag" in entry ? entry.tag + "/" : "");
+	}
+	const currentPath = getPath(entry);
 	const currentDepth = path
 		.replace(SUBTREE_MARK_REGEX, "###")
 		.split("/").length;
@@ -49,6 +52,13 @@
 	) {
 		showMenu(e, path, entry);
 	}
+	function contextMenuFunc(entry: TagFolderItem) {
+		const _path = currentPath;
+		const _entry = entry;
+		return (e:MouseEvent) => {
+			handleContextMenu(e, _path, _entry);
+		}
+	}
 
 	function handleMouseover(e: MouseEvent, entry: TagFolderItem) {
 		if ("path" in entry) hoverPreview(e, entry.path);
@@ -78,7 +88,7 @@
 				class="nav-folder-title"
 				class:is-active={entry.children && collapsed && isSelected}
 				on:click={() => toggleFolder(entry)}
-				on:contextmenu={(e) => handleContextMenu(e, currentPath, entry)}
+				on:contextmenu={contextMenuFunc(entry)}
 			>
 				<div class="nav-folder-collapse-indicator collapse-icon">
 					<svg
@@ -154,7 +164,7 @@
 				on:focus={() => {
 					/* ignore aria complaint */
 				}}
-				on:contextmenu={(e) => handleContextMenu(e, currentPath, entry)}
+				on:contextmenu={contextMenuFunc(entry)}
 			>
 				<div class="nav-file-title-content">
 					{entry.displayName}

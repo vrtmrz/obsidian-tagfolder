@@ -60,6 +60,7 @@ interface TagFolderSettings {
 
 	hideItems: HIDE_ITEMS_TYPE;
 	scanDelay: number;
+	useTitle: boolean;
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -75,6 +76,7 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	hideItems: "NONE",
 	ignoreFolders: "",
 	scanDelay: 250,
+	useTitle: true,
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -285,7 +287,7 @@ class TagFolderView extends ItemView {
 		if (navigator && navigator.clipboard) {
 			menu.addItem((item) =>
 				item
-					.setTitle("Copy tags")
+					.setTitle(`Copy tags:${expandedTags}`)
 					.setIcon("hashtag")
 					.onClick(async () => {
 						await navigator.clipboard.writeText(expandedTags);
@@ -293,7 +295,29 @@ class TagFolderView extends ItemView {
 					})
 			);
 		}
-		menu.showAtMouseEvent(evt);
+		if ("path" in entry) {
+			const path = entry.path;
+			const file = this.app.vault.getAbstractFileByPath(path);
+			// Trigger
+			this.app.workspace.trigger(
+				"file-menu",
+				menu,
+				file,
+				"file-explorer"
+			);
+		}
+
+		if ("screenX" in evt) {
+			menu.showAtPosition({ x: evt.pageX, y: evt.pageY });
+		} else {
+			menu.showAtPosition({
+				// @ts-ignore
+				x: evt.nativeEvent.locationX,
+				// @ts-ignore
+				y: evt.nativeEvent.locationY,
+			});
+		}
+		// menu.showAtMouseEvent(evt);
 	}
 }
 
@@ -648,20 +672,36 @@ export default class TagFolderPlugin extends Plugin {
 			this.setRoot(this.root);
 		}
 	};
+	getFileTitle(file: TFile): string {
+		if (!this.settings.useTitle) return file.basename;
+		this.app.metadataCache.getFileCache;
+		const metadata = this.app.metadataCache.getCache(file.path);
+		if (metadata.frontmatter?.title) {
+			return metadata.frontmatter.title;
+		}
+		if (metadata.headings) {
+			const h1 = metadata.headings.find((e) => e.level == 1);
+			if (h1) {
+				return h1.heading;
+			}
+		}
+		return file.basename;
+	}
 
 	getDisplayName(file: TFile): string {
+		const filename = this.getFileTitle(file);
 		if (this.settings.displayMethod == "NAME") {
-			return file.basename;
+			return filename;
 		}
 		const path = file.path.split("/");
 		path.pop();
 		const dpath = path.join("/");
 
 		if (this.settings.displayMethod == "NAME : PATH") {
-			return `${file.basename} : ${dpath}`;
+			return `${filename} : ${dpath}`;
 		}
 		if (this.settings.displayMethod == "PATH/NAME") {
-			return `${dpath}/${file.basename}`;
+			return `${dpath}/${filename}`;
 		}
 	}
 	async onload() {
@@ -1022,6 +1062,19 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+		new Setting(containerEl)
+			.setName("Use title")
+			.setDesc(
+				"Use the title in the frontmatter or first level one heading for `NAME`."
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.disableNestedTags)
+					.onChange(async (value) => {
+						this.plugin.settings.disableNestedTags = value;
+						await this.plugin.saveSettings();
+					});
+			});
 		const setOrderMethod = async (key: string, order: string) => {
 			const oldSetting = this.plugin.settings.sortType.split("_");
 			if (!key) key = oldSetting[0];
