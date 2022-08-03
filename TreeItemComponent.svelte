@@ -55,9 +55,9 @@
 	function contextMenuFunc(entry: TagFolderItem) {
 		const _path = currentPath;
 		const _entry = entry;
-		return (e:MouseEvent) => {
+		return (e: MouseEvent) => {
 			handleContextMenu(e, _path, _entry);
-		}
+		};
 	}
 
 	function handleMouseover(e: MouseEvent, entry: TagFolderItem) {

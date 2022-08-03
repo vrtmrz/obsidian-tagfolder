@@ -36,6 +36,7 @@ const HideItemsType: Record<string, string> = {
 	DEDICATED_INTERMIDIATES: "Only intermediates of nested tags",
 	ALL_EXCEPT_BOTTOM: "All intermediates",
 };
+
 interface TagFolderSettings {
 	displayMethod: DISPLAY_METHOD;
 	alwaysOpen: boolean;
@@ -44,16 +45,16 @@ interface TagFolderSettings {
 	ignoreFolders: string;
 	hideOnRootTags: string;
 	sortType:
-		| "DISPNAME_ASC"
-		| "DISPNAME_DESC"
-		| "NAME_ASC"
-		| "NAME_DESC"
-		| "MTIME_ASC"
-		| "MTIME_DESC"
-		| "CTIME_ASC"
-		| "CTIME_DESC"
-		| "FULLPATH_ASC"
-		| "FULLPATH_DESC";
+	| "DISPNAME_ASC"
+	| "DISPNAME_DESC"
+	| "NAME_ASC"
+	| "NAME_DESC"
+	| "MTIME_ASC"
+	| "MTIME_DESC"
+	| "CTIME_ASC"
+	| "CTIME_DESC"
+	| "FULLPATH_ASC"
+	| "FULLPATH_DESC";
 	sortTypeTag: "NAME_ASC" | "NAME_DESC" | "ITEMS_ASC" | "ITEMS_DESC";
 	expandLimit: number;
 	disableNestedTags: boolean;
@@ -61,6 +62,7 @@ interface TagFolderSettings {
 	hideItems: HIDE_ITEMS_TYPE;
 	scanDelay: number;
 	useTitle: boolean;
+	reduceNestedParent: boolean;
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -77,6 +79,7 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	ignoreFolders: "",
 	scanDelay: 250,
 	useTitle: true,
+	reduceNestedParent: true,
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -118,6 +121,7 @@ class TagFolderView extends ItemView {
 	component: TagFolderViewComponent;
 	plugin: TagFolderPlugin;
 	icon: "stacked-levels";
+
 	getIcon(): string {
 		return "stacked-levels";
 	}
@@ -136,6 +140,7 @@ class TagFolderView extends ItemView {
 		//@ts-ignore
 		this.app.commands.executeCommandById("file-explorer:new-file");
 	}
+
 	showOrder(evt: MouseEvent) {
 		const menu = new Menu(this.app);
 
@@ -150,8 +155,8 @@ class TagFolderView extends ItemView {
 								const newSetting = `${key}_${direction}`;
 								item.setTitle(
 									OrderKeyTag[key] +
-										" " +
-										OrderDirection[direction]
+									" " +
+									OrderDirection[direction]
 								).onClick(async () => {
 									//@ts-ignore
 									this.plugin.settings.sortTypeTag =
@@ -185,8 +190,8 @@ class TagFolderView extends ItemView {
 								const newSetting = `${key}_${direction}`;
 								item.setTitle(
 									OrderKeyItem[key] +
-										" " +
-										OrderDirection[direction]
+									" " +
+									OrderDirection[direction]
 								).onClick(async () => {
 									//@ts-ignore
 									this.plugin.settings.sortType = newSetting;
@@ -209,6 +214,7 @@ class TagFolderView extends ItemView {
 		});
 		menu.showAtMouseEvent(evt);
 	}
+
 	showLevelSelect(evt: MouseEvent) {
 		const menu = new Menu(this.app);
 		const setLevel = async (level: number) => {
@@ -270,9 +276,11 @@ class TagFolderView extends ItemView {
 	async onClose() {
 		this.component.$destroy();
 	}
+
 	setTreeRoot(root: TreeItem) {
 		treeRoot.set(root);
 	}
+
 	showMenu(evt: MouseEvent, path: string, entry: TagFolderItem) {
 		const x = path.replace(SUBTREE_MARK_REGEX, "###");
 		const expandedTags = x
@@ -338,12 +346,12 @@ const retriveAllDecendants = (entry: TagFolderItem): ViewItem[] => {
 	return (
 		"tag" in entry
 			? entry.children.map(
-					(e) =>
-						"tag" in e
-							? [...e.descendants, ...retriveAllDecendants(e)]
-							: [e]
-					// eslint-disable-next-line no-mixed-spaces-and-tabs
-			  )
+				(e) =>
+					"tag" in e
+						? [...e.descendants, ...retriveAllDecendants(e)]
+						: [e]
+				// eslint-disable-next-line no-mixed-spaces-and-tabs
+			)
 			: [entry]
 	).flat() as ViewItem[];
 };
@@ -373,16 +381,16 @@ const expandDecendants = (
 		entry.descendantsMemo != null
 			? entry.descendantsMemo // if memo is exists, use it.
 			: (entry.descendantsMemo = entry.children // or retrive all and memorize
-					.map((e) =>
-						"tag" in e
-							? e.children
-									.map((ee) =>
-										retriveAllDecendants(ee).flat()
-									)
-									.flat()
-							: []
-					)
-					.flat());
+				.map((e) =>
+					"tag" in e
+						? e.children
+							.map((ee) =>
+								retriveAllDecendants(ee).flat()
+							)
+							.flat()
+						: []
+				)
+				.flat());
 	if (
 		(hideItems == "DEDICATED_INTERMIDIATES" && entry.isDedicatedTree) ||
 		hideItems == "ALL_EXCEPT_BOTTOM"
@@ -395,7 +403,7 @@ const expandDecendants = (
 	entry.itemsCount = new Set([...ret, ...leafs]).size;
 	return ret;
 };
-const expandTree = async (node: TreeItem) => {
+const expandTree = async (node: TreeItem, reduceNestedParent: boolean) => {
 	const tree = node.children;
 	const ancestor = [...node.ancestors, node.tag];
 	const tags = Array.from(
@@ -415,6 +423,8 @@ const expandTree = async (node: TreeItem) => {
 				.contains(tag.toLocaleLowerCase())
 		)
 			continue;
+		const isSatisfied = ancestor.length == [...new Set([...ancestor, ...tags])].length;
+		if (isSatisfied) continue;
 		const newChildren = node.children.filter(
 			(e) =>
 				"tags" in e &&
@@ -434,18 +444,20 @@ const expandTree = async (node: TreeItem) => {
 		const newLeaf: TreeItem = {
 			tag: tag,
 			children: newChildren,
-			ancestors: [...ancestor, tag],
+			ancestors: [...new Set([...ancestor, tag])],
 			descendants: null,
 			isDedicatedTree: false,
 			itemsCount: newChildren.length,
 			allDescendants: null,
 		};
 		tree.push(newLeaf);
-		await splitTag(newLeaf);
+		await splitTag(newLeaf, reduceNestedParent);
 	}
 };
-const splitTag = async (entry: TreeItem): Promise<boolean> => {
+
+const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: TreeItem): Promise<boolean> => {
 	let modified = false;
+	const xRoot = root || entry;
 	await doevents();
 	entry.children = entry.children.sort((a, b) => {
 		if ("tag" in a && "tag" in b) {
@@ -456,13 +468,50 @@ const splitTag = async (entry: TreeItem): Promise<boolean> => {
 	});
 	for (const curEntry of entry.children) {
 		if ("tag" in curEntry) {
-			modified = (await splitTag(curEntry)) || modified;
+			modified = (await splitTag(curEntry, reduceNestedParent, xRoot)) || modified;
 			if (curEntry.tag.contains("/")) {
 				const tempEntry = curEntry;
 				entry.children.remove(tempEntry);
 				const tagsArray = tempEntry.tag.split("/");
 				const tagCar = tagsArray.shift();
 				const tagCdr = SUBTREE_MARK + tagsArray.join("/");
+
+				const ancestors = curEntry.ancestors.map(e => e.toLocaleLowerCase());
+				const newAncestorsBase = tempEntry.ancestors.filter(e => e != tempEntry.tag);
+				const idxCar = ancestors.indexOf(tagCar.toLocaleLowerCase());
+				const idxCdr = ancestors.indexOf(tagCdr.toLocaleLowerCase());
+				if (idxCar != -1) {
+
+					if (idxCar < idxCdr) {
+						// Same condition found.
+						modified = true;
+						continue;
+					} else {
+						if (reduceNestedParent) {
+							// Skip to make parent and expand this immediately.
+							modified = true;
+							const w: TreeItem = {
+								...tempEntry,
+								tag: tagCdr,
+								ancestors: [
+									...newAncestorsBase,
+									tagCar,
+									tagCdr,
+								],
+								itemsCount: 0,
+								descendants: null,
+								allDescendants: null,
+								isDedicatedTree: false,
+							}
+							const old = entry.children.find(e => "tag" in e && e.tag == tagCdr);
+							if (old) {
+								entry.children.remove(old);
+							}
+							entry.children.push(w);
+							continue;
+						}
+					}
+				}
 				const parent = entry.children.find(
 					(e) =>
 						"tag" in e &&
@@ -474,8 +523,8 @@ const splitTag = async (entry: TreeItem): Promise<boolean> => {
 						tag: tagCdr,
 						children: [...tempChildren],
 						ancestors: [
-							...tempEntry.ancestors,
-							tempEntry.tag,
+							...newAncestorsBase,
+							tagCar,
 							tagCdr,
 						],
 						itemsCount: 0,
@@ -486,7 +535,7 @@ const splitTag = async (entry: TreeItem): Promise<boolean> => {
 					const x: TreeItem = {
 						tag: tagCar,
 						children: [xchild],
-						ancestors: [...tempEntry.ancestors, tempEntry.tag],
+						ancestors: [...new Set([...newAncestorsBase, tagCar])],
 						descendants: null,
 						allDescendants: null,
 						isDedicatedTree: true,
@@ -494,14 +543,14 @@ const splitTag = async (entry: TreeItem): Promise<boolean> => {
 					};
 					x.children = [xchild];
 					entry.children.push(x);
-					await splitTag(entry);
+					await splitTag(entry, reduceNestedParent, xRoot);
 					modified = true;
 				} else {
 					const oldIx = parent.children.find(
 						(e) =>
 							"tag" in e &&
 							e.tag.toLocaleLowerCase() ==
-								tagCdr.toLocaleLowerCase()
+							tagCdr.toLocaleLowerCase()
 					) as TreeItem;
 					if (oldIx != null) {
 						oldIx.children.push(
@@ -509,14 +558,15 @@ const splitTag = async (entry: TreeItem): Promise<boolean> => {
 								(e) => !oldIx.children.contains(e)
 							)
 						);
-						await splitTag(oldIx);
+						await splitTag(oldIx, reduceNestedParent, xRoot);
 					} else {
 						const x: TreeItem = {
 							tag: tagCdr,
 							children: [...tempChildren],
 							ancestors: [
-								...tempEntry.ancestors,
-								tempEntry.tag,
+								...newAncestorsBase,
+								// tempEntry.tag,
+								tagCar,
 								tagCdr,
 							],
 							descendants: null,
@@ -527,7 +577,7 @@ const splitTag = async (entry: TreeItem): Promise<boolean> => {
 						parent.children.push(x);
 						if (!parent.isDedicatedTree)
 							parent.isDedicatedTree = true;
-						await splitTag(parent);
+						await splitTag(parent, reduceNestedParent, xRoot);
 					}
 					modified = true;
 				}
@@ -535,10 +585,11 @@ const splitTag = async (entry: TreeItem): Promise<boolean> => {
 		}
 	}
 	if (modified) {
-		await splitTag(entry);
+		await splitTag(entry, reduceNestedParent, xRoot);
 	}
 	return modified;
 };
+
 function getCompareMethodTags(settings: TagFolderSettings) {
 	const invert = settings.sortTypeTag.contains("_DESC") ? -1 : 1;
 	switch (settings.sortTypeTag) {
@@ -613,6 +664,7 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		return null;
 	}
+
 	// Called when item clicked in the tag folder pane.
 	readonly focusFile = (path: string): void => {
 		const targetFile = this.app.vault
@@ -624,6 +676,7 @@ export default class TagFolderPlugin extends Plugin {
 			leaf.openFile(targetFile);
 		}
 	};
+
 	hoverPreview(e: MouseEvent, path: string) {
 		this.app.workspace.trigger("hover-link", {
 			event: e,
@@ -633,6 +686,7 @@ export default class TagFolderPlugin extends Plugin {
 			linktext: path,
 		});
 	}
+
 	setSearchString(search: string) {
 		this.searchString = search;
 		this.refreshAllTree(null);
@@ -642,14 +696,15 @@ export default class TagFolderPlugin extends Plugin {
 		if ("tag" in entry) {
 			const key = [...entry.ancestors, entry.tag].join("/");
 			if (this.expandedFolders.contains(key)) {
-				await expandTree(entry);
-				await splitTag(entry);
+				await expandTree(entry, this.settings.reduceNestedParent);
+				await splitTag(entry, this.settings.reduceNestedParent);
 				for (const child of entry.children) {
 					await this.expandLastExpandedFolders(child);
 				}
 			}
 		}
 	}
+
 	// Expand the folder (called from Tag pane.)
 	readonly expandFolder = async (entry: TagFolderItem, expanded: boolean) => {
 		if ("tag" in entry) {
@@ -672,9 +727,9 @@ export default class TagFolderPlugin extends Plugin {
 			this.setRoot(this.root);
 		}
 	};
+
 	getFileTitle(file: TFile): string {
 		if (!this.settings.useTitle) return file.basename;
-		this.app.metadataCache.getFileCache;
 		const metadata = this.app.metadataCache.getCache(file.path);
 		if (metadata.frontmatter?.title) {
 			return metadata.frontmatter.title;
@@ -689,7 +744,7 @@ export default class TagFolderPlugin extends Plugin {
 	}
 
 	getDisplayName(file: TFile): string {
-		const filename = this.getFileTitle(file);
+		const filename = this.getFileTitle(file) || file.basename;
 		if (this.settings.displayMethod == "NAME") {
 			return filename;
 		}
@@ -703,7 +758,9 @@ export default class TagFolderPlugin extends Plugin {
 		if (this.settings.displayMethod == "PATH/NAME") {
 			return `${dpath}/${filename}`;
 		}
+		return filename;
 	}
+
 	async onload() {
 		await this.loadSettings();
 		this.hoverPreview = this.hoverPreview.bind(this);
@@ -757,16 +814,20 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		currentFile.set(this.currentOpeningFile);
 	}
+
 	metadataCacheChanged(file: TFile) {
 		this.loadFileInfo(file);
 	}
+
 	refreshAllTree(file: TFile | TFolder) {
 		this.loadFileInfo();
 	}
+
 	fileCaches: {
 		file: TFile;
 		metadata: CachedMetadata;
 	}[] = [];
+
 	sortChildren(a: TreeItem | ViewItem, b: TreeItem | ViewItem) {
 		if ("tag" in a && !("tag" in b)) {
 			return -1;
@@ -782,6 +843,7 @@ export default class TagFolderPlugin extends Plugin {
 			}
 		}
 	}
+
 	sortTree(entry: TreeItem) {
 		entry.children = entry.children.sort(this.sortChildren);
 		for (const child of entry.children) {
@@ -791,6 +853,7 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		entry.descendants = entry.descendants.sort(this.sortChildren);
 	}
+
 	setRoot(root: TreeItem) {
 		rippleDirty(root);
 		expandDecendants(root, this.settings.hideItems);
@@ -800,6 +863,7 @@ export default class TagFolderPlugin extends Plugin {
 	}
 
 	oldFileCache = "";
+
 	updateFileCaches(diff?: TFile) {
 		if (this.fileCaches.length == 0 || !diff) {
 			const files = this.app.vault.getMarkdownFiles();
@@ -831,6 +895,7 @@ export default class TagFolderPlugin extends Plugin {
 			return true;
 		}
 	}
+
 	lastTags = "";
 
 	async getItemsList(): Promise<ViewItem[]> {
@@ -938,24 +1003,26 @@ export default class TagFolderPlugin extends Plugin {
 			isDedicatedTree: false,
 		};
 
-		await expandTree(root);
+		await expandTree(root, this.settings.reduceNestedParent);
 
 		// Omit items on root
 		root.children = root.children.filter((e) => "tag" in e);
 
 		// Split tag that having slashes.
-		await splitTag(root);
-
+		await splitTag(root, this.settings.reduceNestedParent);
 		// restore opened folder
 		await this.expandLastExpandedFolders(root);
 		return root;
 	}
 
+
 	lastSettings = "";
 	lastSearchString = "";
+
 	loadFileInfo(diff?: TFile) {
 		this.loadFileInfoAsync(diff);
 	}
+
 	// Sweep updated file or all files to retrive tags.
 	async loadFileInfoAsync(diff?: TFile) {
 		if (this.getView() == null) return;
@@ -986,6 +1053,7 @@ export default class TagFolderPlugin extends Plugin {
 	onunload() {
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_TAGFOLDER);
 	}
+
 	async activateView() {
 		this.loadFileInfo();
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_TAGFOLDER);
@@ -1024,9 +1092,11 @@ class TagFolderSettingTab extends PluginSettingTab {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
+
 	hide() {
 		this.plugin.loadFileInfo();
 	}
+
 	display(): void {
 		const { containerEl } = this;
 
@@ -1069,9 +1139,9 @@ class TagFolderSettingTab extends PluginSettingTab {
 			)
 			.addToggle((toggle) => {
 				toggle
-					.setValue(this.plugin.settings.disableNestedTags)
+					.setValue(this.plugin.settings.useTitle)
 					.onChange(async (value) => {
-						this.plugin.settings.disableNestedTags = value;
+						this.plugin.settings.useTitle = value;
 						await this.plugin.saveSettings();
 					});
 			});
@@ -1127,6 +1197,16 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.disableNestedTags)
 					.onChange(async (value) => {
 						this.plugin.settings.disableNestedTags = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Reduce duplicated parents in nested tags")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.reduceNestedParent)
+					.onChange(async (value) => {
+						this.plugin.settings.reduceNestedParent = value;
 						await this.plugin.saveSettings();
 					});
 			});

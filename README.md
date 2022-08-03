@@ -88,6 +88,28 @@ If you enable this option, every nested tag is split into normal tags.
 
 `#dev/TagFolder` will be treated as like `#dev` and `#TagFolder`.
 
+#### Reduce duplicated parents in nested tags
+
+If we have the doc (e.g., `example note`) with nested tags which have same parents, as like `#topic/calculus`, `#topic/electromagnetics`:
+
+- Disabled
+```
+topic
+     - > calculus
+         topic
+               - > electromagnetics
+                   example note
+         example note 
+```
+- Enabled
+```
+topic
+     - > calculus
+          - > electromagnetics
+              example note
+         example note 
+```
+
 #### Hide Items
 
 Configure hiding items.
