@@ -411,7 +411,7 @@ const expandTree = async (node: TreeItem, reduceNestedParent: boolean) => {
 			node.children
 				.filter((e) => "tags" in e)
 				.map((e) => (e as ViewItem).tags)
-				.map((e) => e.map((ee) => ee.toLocaleString()))
+				.map((e) => e.map((ee) => ee.toLocaleLowerCase()))
 				.flat()
 		)
 	);
@@ -453,6 +453,7 @@ const expandTree = async (node: TreeItem, reduceNestedParent: boolean) => {
 		tree.push(newLeaf);
 		await splitTag(newLeaf, reduceNestedParent);
 	}
+	await splitTag(node, reduceNestedParent)
 };
 
 const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: TreeItem): Promise<boolean> => {
@@ -935,6 +936,12 @@ export default class TagFolderPlugin extends Plugin {
 			let allTags = allTagsDocs.map((e) => e.substring(1));
 			if (this.settings.disableNestedTags) {
 				allTags = allTags.map((e) => e.split("/")).flat();
+			} else {
+				// If the circumstance like below:
+				// #test
+				// #test/child
+				// This may make complicated situation. so we have to skip this.
+				allTags = allTags.filter(e => !allTags.some(ae => ae.startsWith(e + "/")));
 			}
 			if (allTags.length == 0) {
 				allTags = ["_untagged"];
