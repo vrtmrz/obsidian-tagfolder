@@ -132,6 +132,9 @@ const dotted = (object: any, notation: string) => {
 	return notation.split('.').reduce((a, b) => (a && (b in a)) ? a[b] : null, object);
 }
 
+const compare = (Intl && Intl.Collator) ? (new Intl.Collator().compare) :
+	(x: string, y: string) => (`${x ?? ""}`).localeCompare(`${y ?? ""}`);
+
 class TagFolderView extends ItemView {
 	component: TagFolderViewComponent;
 	plugin: TagFolderPlugin;
@@ -665,11 +668,11 @@ function getCompareMethodTags(settings: TagFolderSettings) {
 		case "NAME_ASC":
 		case "NAME_DESC":
 			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) =>
-				getTagName(a.tag, settings.useTagInfo ? tagInfo : null, invert).localeCompare(getTagName(b.tag, settings.useTagInfo ? tagInfo : null, invert)) * invert;
+				compare(getTagName(a.tag, settings.useTagInfo ? tagInfo : null, invert), getTagName(b.tag, settings.useTagInfo ? tagInfo : null, invert)) * invert;
 		default:
 			console.warn("Compare method (tags) corrupted");
 			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) =>
-				a.tag.localeCompare(b.tag) * invert;
+				compare(a.tag, b.tag) * invert;
 	}
 }
 
@@ -679,11 +682,11 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 		case "DISPNAME_ASC":
 		case "DISPNAME_DESC":
 			return (a: ViewItem, b: ViewItem) =>
-				a.displayName.localeCompare(b.displayName) * invert;
+				compare(a.displayName, b.displayName) * invert;
 		case "FULLPATH_ASC":
 		case "FULLPATH_DESC":
 			return (a: ViewItem, b: ViewItem) =>
-				a.path.localeCompare(b.path) * invert;
+				compare(a.path, b.path) * invert;
 		case "MTIME_ASC":
 		case "MTIME_DESC":
 			return (a: ViewItem, b: ViewItem) => (a.mtime - b.mtime) * invert;
@@ -693,11 +696,11 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 		case "NAME_ASC":
 		case "NAME_DESC":
 			return (a: ViewItem, b: ViewItem) =>
-				a.filename.localeCompare(b.filename) * invert;
+				compare(a.filename, b.filename) * invert;
 		default:
 			console.warn("Compare method (items) corrupted");
 			return (a: ViewItem, b: ViewItem) =>
-				a.displayName.localeCompare(b.displayName) * invert;
+				compare(a.displayName, b.displayName) * invert;
 	}
 }
 
