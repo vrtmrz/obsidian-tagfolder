@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { currentFile, maxDepth } from "store";
+	import { currentFile, maxDepth, tagInfo } from "store";
 	import {
+		tagInfoDict,
 		TreeItem,
 		TagFolderItem,
 		SUBTREE_MARK_REGEX,
@@ -18,10 +19,13 @@
 	export let path: string;
 	let collapsed = true;
 	let isSelected = false;
-	function getPath(entry: TagFolderItem) {
-		return path + ("tag" in entry ? entry.tag + "/" : "");
+	function getItemPath(item: TagFolderItem, basepath?: string) {
+		if ("tag" in item) {
+			return basepath + item.tag + "/";
 	}
-	const currentPath = getPath(entry);
+		return basepath;
+	}
+	$: currentPath = getItemPath(entry, path);
 	const currentDepth = path
 		.replace(SUBTREE_MARK_REGEX, "###")
 		.split("/").length;
@@ -73,16 +77,40 @@
 			isSelected = true;
 		}
 	});
+	let _tagInfo :tagInfoDict = {};
 	maxDepth.subscribe((depth: number) => {
 		_maxDepth = depth;
 		if (depth == 0) {
 			_maxDepth = currentDepth + 1;
 		}
 	});
+	tagInfo.subscribe((info:tagInfoDict)=>{
+		_tagInfo = info;
+	})
+	$: curTaginfo = "tag" in entry && (entry.tag in  _tagInfo) ? _tagInfo[entry.tag] : null;
+	$: tagMark = (!curTaginfo) ? "" : (
+			("mark" in curTaginfo&&curTaginfo.mark) ? curTaginfo.mark : "📌"
+		);
+	let children: TagFolderItem[] = [];
+	$: {
+		let cx :TagFolderItem[] =[];
+		if ("tag" in entry) {
+			if (entry.children && !collapsed) {
+				cx = [...cx,...entry.children.filter((e) => "tag" in e)];
+			}
+			if(_maxDepth != 1 && currentDepth > _maxDepth && (entry.allDescendants && !collapsed)){
+				cx = [...cx,...entry.allDescendants];
+			}
+			if(entry.descendants && !collapsed){
+				cx = [...cx,...entry.descendants];
+			}
+			children = cx;
+		}
+	}
 </script>
 
 <slot>
-	{#if "tag" in entry && (currentDepth <= _maxDepth || entry.tag.startsWith(SUBTREE_MARK))}
+	{#if "tag" in entry && (currentDepth <= _maxDepth || entry.tag.startsWith(SUBTREE_MARK)) && entry.itemsCount>0}
 		<div class="nav-folder" class:is-collapsed={collapsed}>
 			<div
 				class="nav-folder-title"
@@ -105,43 +133,14 @@
 				</div>
 				<div class="nav-folder-title-content lsl-f">
 					<div class="tagfolder-titletagname">
-						{entry.tag}
+						{tagMark}{entry.tag}
 					</div>
 					<div class="tagfolder-quantity">{entry.itemsCount}</div>
 				</div>
 			</div>
-			{#if entry.children && !collapsed}
+			{#if children.length>0}
 				<div class="nav-folder-children">
-					{#each entry.children.filter((e) => "tag" in e) as item}
-						<svelte:self
-							entry={item}
-							{openfile}
-							{hoverPreview}
-							{expandFolder}
-							{showMenu}
-							path={currentPath}
-						/>
-					{/each}
-				</div>
-			{/if}
-			{#if _maxDepth != 1 && currentDepth > _maxDepth}
-				{#if entry.allDescendants && !collapsed}
-					<div class="nav-folder-children">
-						{#each entry.allDescendants as item}
-							<svelte:self
-								entry={item}
-								{openfile}
-								{expandFolder}
-								{hoverPreview}
-								{showMenu}
-								path={currentPath}
-							/>
-						{/each}
-					</div>
-				{/if}
-			{:else if entry.descendants && !collapsed}
-				<div class="nav-folder-children">
-					{#each entry.descendants as item}
+					{#each children as item}
 						<svelte:self
 							entry={item}
 							{openfile}

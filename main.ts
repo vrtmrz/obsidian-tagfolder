@@ -14,6 +14,9 @@ import {
 	TFolder,
 	Menu,
 	Notice,
+	normalizePath,
+	parseYaml,
+	stringifyYaml,
 } from "obsidian";
 
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
@@ -24,8 +27,10 @@ import {
 	TagFolderItem,
 	TreeItem,
 	ViewItem,
+	TagInfoDict,
+	TagInfo,
 } from "types";
-import { treeRoot, currentFile, maxDepth } from "store";
+import { treeRoot, currentFile, maxDepth, tagInfo } from "store";
 
 type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
 
@@ -63,6 +68,9 @@ interface TagFolderSettings {
 	scanDelay: number;
 	useTitle: boolean;
 	reduceNestedParent: boolean;
+	frontmatterKey: string;
+	useTagInfo: boolean;
+	tagInfo: string;
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -80,6 +88,9 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	scanDelay: 250,
 	useTitle: true,
 	reduceNestedParent: true,
+	frontmatterKey: "title",
+	useTagInfo: false,
+	tagInfo: "pininfo.md"
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -116,6 +127,10 @@ const doevents = () => {
 		});
 	});
 };
+
+const dotted = (object: any, notation: string) => {
+	return notation.split('.').reduce((a, b) => (a && (b in a)) ? a[b] : null, object);
+}
 
 class TagFolderView extends ItemView {
 	component: TagFolderViewComponent;
@@ -303,6 +318,44 @@ class TagFolderView extends ItemView {
 					})
 			);
 		}
+		if ("tag" in entry) {
+			if (this.plugin.settings.useTagInfo && this.plugin.tagInfo != null) {
+				const tag = entry.ancestors[entry.ancestors.length - 1];
+
+				if (tag in this.plugin.tagInfo && this.plugin.tagInfo[tag]) {
+					menu.addItem((item) =>
+						item.setTitle(`Unpin`)
+							.setIcon("pin")
+							.onClick(async () => {
+								this.plugin.tagInfo =
+								{
+									...this.plugin.tagInfo,
+									[tag]: undefined
+								};
+								this.plugin.applyTagInfo();
+								await this.plugin.saveTagInfo();
+							})
+					)
+
+				} else {
+					menu.addItem((item) => {
+						item.setTitle(`Pin`)
+							.setIcon("pin")
+							.onClick(async () => {
+								this.plugin.tagInfo =
+								{
+									...this.plugin.tagInfo,
+									[tag]: { key: "" }
+								};
+								this.plugin.applyTagInfo();
+								await this.plugin.saveTagInfo();
+							})
+					})
+				}
+				// menu.addItem((item) =>
+				// 	item.setTitle(`Pin`))
+			}
+		}
 		if ("path" in entry) {
 			const path = entry.path;
 			const file = this.app.vault.getAbstractFileByPath(path);
@@ -476,7 +529,6 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 				const tagsArray = tempEntry.tag.split("/");
 				const tagCar = tagsArray.shift();
 				const tagCdr = SUBTREE_MARK + tagsArray.join("/");
-
 				const ancestors = curEntry.ancestors.map(e => e.toLocaleLowerCase());
 				const newAncestorsBase = tempEntry.ancestors.filter(e => e != tempEntry.tag);
 				const idxCar = ancestors.indexOf(tagCar.toLocaleLowerCase());
@@ -590,21 +642,33 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 	}
 	return modified;
 };
+function getTagName(tagName: string, tagInfo: TagInfoDict, invert: number) {
+	if (tagInfo == null) return tagName;
+	const prefix = invert == -1 ? `\uffff` : `\u0001`;
+	const unpinned = invert == 1 ? `\uffff` : `\u0001`;
 
+	if (tagName in tagInfo && tagInfo[tagName]) {
+		if ("key" in tagInfo[tagName]) {
+			const k = `${prefix}_-${tagInfo[tagName].key}__${tagName}`;
+			return k;
+		}
+	}
+	return `${prefix}_${unpinned}_${tagName}`
+}
 function getCompareMethodTags(settings: TagFolderSettings) {
 	const invert = settings.sortTypeTag.contains("_DESC") ? -1 : 1;
 	switch (settings.sortTypeTag) {
 		case "ITEMS_ASC":
 		case "ITEMS_DESC":
-			return (a: TreeItem, b: TreeItem) =>
+			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) =>
 				(a.itemsCount - b.itemsCount) * invert;
 		case "NAME_ASC":
 		case "NAME_DESC":
-			return (a: TreeItem, b: TreeItem) =>
-				a.tag.localeCompare(b.tag) * invert;
+			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) =>
+				getTagName(a.tag, settings.useTagInfo ? tagInfo : null, invert).localeCompare(getTagName(b.tag, settings.useTagInfo ? tagInfo : null, invert)) * invert;
 		default:
 			console.warn("Compare method (tags) corrupted");
-			return (a: TreeItem, b: TreeItem) =>
+			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) =>
 				a.tag.localeCompare(b.tag) * invert;
 	}
 }
@@ -652,7 +716,7 @@ export default class TagFolderPlugin extends Plugin {
 	searchString = "";
 
 	compareItems: (a: ViewItem, b: ViewItem) => number;
-	compareTags: (a: TreeItem, b: TreeItem) => number;
+	compareTags: (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) => number;
 
 	getView(): TagFolderView {
 		for (const leaf of this.app.workspace.getLeavesOfType(
@@ -732,8 +796,9 @@ export default class TagFolderPlugin extends Plugin {
 	getFileTitle(file: TFile): string {
 		if (!this.settings.useTitle) return file.basename;
 		const metadata = this.app.metadataCache.getCache(file.path);
-		if (metadata.frontmatter?.title) {
-			return metadata.frontmatter.title;
+		if (metadata.frontmatter && (this.settings.frontmatterKey)) {
+			const d = dotted(metadata.frontmatter, this.settings.frontmatterKey);
+			if (d) return d;
 		}
 		if (metadata.headings) {
 			const h1 = metadata.headings.find((e) => e.level == 1);
@@ -766,6 +831,7 @@ export default class TagFolderPlugin extends Plugin {
 		await this.loadSettings();
 		this.hoverPreview = this.hoverPreview.bind(this);
 		this.sortChildren = this.sortChildren.bind(this);
+		this.modifyFile = this.modifyFile.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
 		// Make loadFileInfo debonced .
 		this.loadFileInfo = debounce(
@@ -798,6 +864,8 @@ export default class TagFolderPlugin extends Plugin {
 		this.refreshAllTree = this.refreshAllTree.bind(this);
 		this.registerEvent(this.app.vault.on("rename", this.refreshAllTree));
 		this.registerEvent(this.app.vault.on("delete", this.refreshAllTree));
+		this.registerEvent(this.app.vault.on("modify", this.modifyFile));
+
 		this.registerEvent(
 			this.app.workspace.on("file-open", this.watchWorkspaceOpen)
 		);
@@ -805,6 +873,11 @@ export default class TagFolderPlugin extends Plugin {
 
 		this.addSettingTab(new TagFolderSettingTab(this.app, this));
 		maxDepth.set(this.settings.expandLimit);
+		if (this.settings.useTagInfo) {
+			this.app.workspace.onLayoutReady(async () => {
+				await this.loadTagInfo();
+			});
+		}
 	}
 
 	watchWorkspaceOpen(file: TFile) {
@@ -836,7 +909,7 @@ export default class TagFolderPlugin extends Plugin {
 			return 1;
 		} else {
 			if ("tag" in a && "tag" in b) {
-				return this.compareTags(a, b);
+				return this.compareTags(a, b, this.tagInfo);
 			} else if ("tags" in a && "tags" in b) {
 				return this.compareItems(a, b);
 			} else {
@@ -1074,19 +1147,109 @@ export default class TagFolderPlugin extends Plugin {
 			this.app.workspace.getLeavesOfType(VIEW_TYPE_TAGFOLDER)[0]
 		);
 	}
+	tagInfo: TagInfoDict = null;
+	tagInfoFrontMatterBuffrer: any = {};
+	skipOnce: boolean;
+	tagInfoBody = "";
+	async modifyFile(file: TFile | TFolder) {
+		if (!this.settings.useTagInfo) return;
+		if (this.skipOnce) {
+			this.skipOnce = false;
+			return;
+		}
+		if (file.name == this.getTagInfoFilename()) {
+			await this.loadTagInfo();
+		}
+	}
 
+	getTagInfoFilename() {
+		return normalizePath(this.settings.tagInfo);
+	}
+	getTagInfoFile() {
+		const file = this.app.vault.getAbstractFileByPath(this.getTagInfoFilename());
+		if (file instanceof TFile) {
+			return file;
+		}
+		return null;
+	}
+	applyTagInfo() {
+		if (this.tagInfo == null) return;
+		if (!this.settings.useTagInfo) return;
+		tagInfo.set(this.tagInfo);
+		setTimeout(() => {
+			if (this.root) this.setRoot(this.root);
+		}, 10);
+	}
+	async loadTagInfo() {
+		if (!this.settings.useTagInfo) return;
+		if (this.tagInfo == null) this.tagInfo = {};
+		const file = this.getTagInfoFile();
+		if (file == null) return;
+		const data = await this.app.vault.read(file);
+		try {
+			const bodyStartIndex = data.indexOf("\n---");
+			if (!data.startsWith("---") || bodyStartIndex === -1) {
+				return;
+			}
+			const yaml = data.substring(3, bodyStartIndex);
+			const yamlData = parseYaml(yaml) as TagInfoDict;
+
+			const keys = Object.keys(yamlData);
+			const body = data.substring(bodyStartIndex + 5);
+			this.tagInfoBody = body;
+			this.tagInfoFrontMatterBuffrer = yamlData;
+
+			const newTagInfo = {} as TagInfoDict;
+			for (const key of keys) {
+				const w = yamlData[key];
+				if (!w) continue;
+				if (typeof (w) != "object") continue;
+				if (!("key" in w)) continue;
+				// snip unexpected entries.
+				const eachTag: TagInfo = {
+					key: w.key,
+					mark: w.mark ?? undefined,
+				}
+				newTagInfo[key] = eachTag;
+			}
+			this.tagInfo = newTagInfo;
+			this.applyTagInfo();
+		} catch (ex) {
+			console.log(ex);
+			// NO OP.
+		}
+
+	}
+	async saveTagInfo() {
+		if (!this.settings.useTagInfo) return;
+		if (this.tagInfo == null) return;
+		const file = this.getTagInfoFile();
+		const yaml = stringifyYaml({ ...this.tagInfoFrontMatterBuffrer, ...this.tagInfo });
+		const w = `---
+${yaml}---
+${this.tagInfoBody}`;
+
+		this.skipOnce = true;
+		if (file == null) {
+			this.app.vault.create(this.getTagInfoFilename(), w);
+		} else {
+			this.app.vault.modify(file, w);
+		}
+	}
 	async loadSettings() {
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
 			await this.loadData()
 		);
+		await this.loadTagInfo();
 		this.compareItems = getCompareMethodItems(this.settings);
 		this.compareTags = getCompareMethodTags(this.settings);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		await this.saveTagInfo();
 		this.compareItems = getCompareMethodItems(this.settings);
 		this.compareTags = getCompareMethodTags(this.settings);
 	}
@@ -1142,7 +1305,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Use title")
 			.setDesc(
-				"Use the title in the frontmatter or first level one heading for `NAME`."
+				"Use value in the frontmatter or first level one heading for `NAME`."
 			)
 			.addToggle((toggle) => {
 				toggle
@@ -1152,6 +1315,46 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
+		new Setting(containerEl)
+			.setName("Frontmatter path")
+			.addText((text) => {
+				text
+					.setValue(this.plugin.settings.frontmatterKey)
+					.onChange(async (value) => {
+						this.plugin.settings.frontmatterKey = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Use pinning")
+			.setDesc(
+				"When this feature is enabled, the pin information is saved in the file set in the next configuration."
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.useTagInfo)
+					.onChange(async (value) => {
+						this.plugin.settings.useTagInfo = value;
+						if (this.plugin.settings.useTagInfo) {
+							await this.plugin.loadTagInfo();
+						}
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Pin information file")
+			.addText((text) => {
+				text
+					.setValue(this.plugin.settings.tagInfo)
+					.onChange(async (value) => {
+						this.plugin.settings.tagInfo = value;
+						if (this.plugin.settings.useTagInfo) {
+							await this.plugin.loadTagInfo();
+						}
+						await this.plugin.saveSettings();
+					});
+			});
+
 		const setOrderMethod = async (key: string, order: string) => {
 			const oldSetting = this.plugin.settings.sortType.split("_");
 			if (!key) key = oldSetting[0];

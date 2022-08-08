@@ -66,7 +66,18 @@ You can configure how the entry shows.
 
 #### Use title
 
-When you enable this option, the title in the frontmatter or first level one heading will be shown instead of `NAME`.
+When you enable this option, the value in the frontmatter or first level one heading will be shown instead of `NAME`.
+
+#### Frontmatter path
+Dotted path to retrive title from frontmatter.
+
+#### Use pinning
+We can pin the tag if we enable this option.  
+When this feature is enabled, the pin information is saved in the file set in the next configuration.  
+Pinned tags are sorted according to `key` in the frontmatter of `taginfo.md`.
+
+### Pin information file.
+We can change the name of the file in which pin information is saved.
 
 #### Order method (Tags)
 

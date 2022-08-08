@@ -23,3 +23,11 @@ export type TagFolderItem = TreeItem | ViewItem;
 
 export const SUBTREE_MARK = "→ ";
 export const SUBTREE_MARK_REGEX = /\/→ /g;
+
+export interface TagInfoDict {
+	[key: string]: TagInfo;
+}
+export interface TagInfo {
+	key: string;
+	mark?: string;
+}
