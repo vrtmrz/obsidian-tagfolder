@@ -1,12 +1,13 @@
 <script lang="ts">
-	import { currentFile, maxDepth, tagInfo } from "store";
+	import { currentFile, maxDepth, tagInfo } from "./store";
 	import {
-		tagInfoDict,
 		TreeItem,
 		TagFolderItem,
 		SUBTREE_MARK_REGEX,
 		SUBTREE_MARK,
+		ViewItem,
 	} from "./types";
+	import type { TagInfoDict } from "./types";
 	export let entry: TagFolderItem;
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
 	export let openfile: (path: string) => void;
@@ -17,12 +18,15 @@
 		entry: TagFolderItem
 	) => void;
 	export let path: string;
+	export let skippedTag: string;
+
 	let collapsed = true;
 	let isSelected = false;
+
 	function getItemPath(item: TagFolderItem, basepath?: string) {
-		if ("tag" in item) {
+		if (item && "tag" in item) {
 			return basepath + item.tag + "/";
-	}
+		}
 		return basepath;
 	}
 	$: currentPath = getItemPath(entry, path);
@@ -65,7 +69,7 @@
 	}
 
 	function handleMouseover(e: MouseEvent, entry: TagFolderItem) {
-		if ("path" in entry) hoverPreview(e, entry.path);
+		if (entry && "path" in entry) hoverPreview(e, entry.path);
 	}
 
 	currentFile.subscribe((path: string) => {
@@ -73,36 +77,100 @@
 		if ("tags" in entry && entry.path == path) {
 			isSelected = true;
 		}
-		if ("tag" in entry && getFilenames(entry).contains(path)) {
+		if ("tag" in entry && getFilenames(entry).indexOf(path) !== -1) {
 			isSelected = true;
 		}
 	});
-	let _tagInfo :tagInfoDict = {};
+	let _tagInfo: TagInfoDict = {};
 	maxDepth.subscribe((depth: number) => {
 		_maxDepth = depth;
 		if (depth == 0) {
 			_maxDepth = currentDepth + 1;
 		}
 	});
-	tagInfo.subscribe((info:tagInfoDict)=>{
+	tagInfo.subscribe((info: TagInfoDict) => {
 		_tagInfo = info;
-	})
-	$: curTaginfo = "tag" in entry && (entry.tag in  _tagInfo) ? _tagInfo[entry.tag] : null;
-	$: tagMark = (!curTaginfo) ? "" : (
-			("mark" in curTaginfo&&curTaginfo.mark) ? curTaginfo.mark : "📌"
-		);
+	});
+	$: curTaginfo =
+		"tag" in entry && entry.tag in _tagInfo ? _tagInfo[entry.tag] : null;
+	$: tagMark = !curTaginfo
+		? ""
+		: "mark" in curTaginfo && curTaginfo.mark
+		? curTaginfo.mark
+		: "📌";
+
+	let tagTitle = "";
+
+	let showOnlyChildren = false;
+	$: {
+		showOnlyChildren = false;
+		const getChildren = (entry: TreeItem): string[] =>
+			entry.children
+				.map((e) => ("tag" in e ? getChildren(e) : e.tags))
+				.flat();
+
+		if ("tag" in entry) {
+			const childrenTags = entry.children.filter(
+				(e) => "tag" in e
+			) as TreeItem[];
+			const childrenItems = entry.children.filter(
+				(e) => "tags" in e
+			) as ViewItem[];
+			if (childrenTags.length == 1 && childrenItems.length == 0) {
+				// Only one tag and no children
+				showOnlyChildren = true;
+			}
+			if (entry.itemsCount == 1) {
+				if (childrenTags.length == 1) {
+					showOnlyChildren = true;
+					// memo
+					// const k = cx.ancestors.reduce(
+					// 	(p, i) =>
+					// 		!i.startsWith(SUBTREE_MARK)
+					// 			? [...p, i]
+					// 			: [
+					// 					...p,
+					// 					p.pop() +
+					// 						"/" +
+					// 						i.substring(SUBTREE_MARK.length),
+					// 			  ],
+					// 	[]
+					// );
+				}
+			}
+		}
+	}
+	$: tagTitle =
+		"tag" in entry
+			? `${
+					skippedTag
+						? `${skippedTag}${
+								entry.tag.startsWith(SUBTREE_MARK) ? " " : "/"
+						  }`
+						: ""
+			  }${tagMark}${entry.tag}`
+			: "";
 	let children: TagFolderItem[] = [];
 	$: {
-		let cx :TagFolderItem[] =[];
+		let cx: TagFolderItem[] = [];
 		if ("tag" in entry) {
-			if (entry.children && !collapsed) {
-				cx = [...cx,...entry.children.filter((e) => "tag" in e)];
-			}
-			if(_maxDepth != 1 && currentDepth > _maxDepth && (entry.allDescendants && !collapsed)){
-				cx = [...cx,...entry.allDescendants];
-			}
-			if(entry.descendants && !collapsed){
-				cx = [...cx,...entry.descendants];
+			if (showOnlyChildren) {
+				cx = [...cx, ...entry.children.filter((e) => "tag" in e)];
+			} else {
+				if (entry.children && !collapsed) {
+					cx = [...cx, ...entry.children.filter((e) => "tag" in e)];
+				}
+				if (
+					_maxDepth != 1 &&
+					currentDepth > _maxDepth &&
+					entry.allDescendants &&
+					!collapsed
+				) {
+					cx = [...cx, ...entry.allDescendants];
+				}
+				if (entry.descendants && !collapsed) {
+					cx = [...cx, ...entry.descendants];
+				}
 			}
 			children = cx;
 		}
@@ -110,7 +178,21 @@
 </script>
 
 <slot>
-	{#if "tag" in entry && (currentDepth <= _maxDepth || entry.tag.startsWith(SUBTREE_MARK)) && entry.itemsCount>0}
+	{#if showOnlyChildren}
+		{#if children.length > 0}
+			{#each children as item}
+				<svelte:self
+					entry={item}
+					{openfile}
+					{hoverPreview}
+					{expandFolder}
+					{showMenu}
+					skippedTag={tagTitle}
+					path={currentPath}
+				/>
+			{/each}
+		{/if}
+	{:else if "tag" in entry && (currentDepth <= _maxDepth || entry.tag.startsWith(SUBTREE_MARK))}
 		<div class="nav-folder" class:is-collapsed={collapsed}>
 			<div
 				class="nav-folder-title"
@@ -133,12 +215,12 @@
 				</div>
 				<div class="nav-folder-title-content lsl-f">
 					<div class="tagfolder-titletagname">
-						{tagMark}{entry.tag}
+						{tagTitle}
 					</div>
 					<div class="tagfolder-quantity">{entry.itemsCount}</div>
 				</div>
 			</div>
-			{#if children.length>0}
+			{#if children.length > 0}
 				<div class="nav-folder-children">
 					{#each children as item}
 						<svelte:self

@@ -133,6 +133,7 @@
 					{openfile}
 					{expandFolder}
 					{showMenu}
+					skippedTag={""}
 					path="/"
 				/>
 			{/each}

@@ -71,6 +71,7 @@ interface TagFolderSettings {
 	frontmatterKey: string;
 	useTagInfo: boolean;
 	tagInfo: string;
+	mergeRedundantCombination: boolean;
 }
 
 const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -90,7 +91,8 @@ const DEFAULT_SETTINGS: TagFolderSettings = {
 	reduceNestedParent: true,
 	frontmatterKey: "title",
 	useTagInfo: false,
-	tagInfo: "pininfo.md"
+	tagInfo: "pininfo.md",
+	mergeRedundantCombination: false,
 };
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
@@ -459,7 +461,8 @@ const expandDecendants = (
 	entry.itemsCount = new Set([...ret, ...leafs]).size;
 	return ret;
 };
-const expandTree = async (node: TreeItem, reduceNestedParent: boolean) => {
+const expandTree = async (node: TreeItem, reduceNestedParent: boolean): Promise<boolean> => {
+	let modified = false;
 	const tree = node.children;
 	const ancestor = [...node.ancestors, node.tag];
 	const tags = Array.from(
@@ -479,8 +482,6 @@ const expandTree = async (node: TreeItem, reduceNestedParent: boolean) => {
 				.contains(tag.toLocaleLowerCase())
 		)
 			continue;
-		const isSatisfied = ancestor.length == [...new Set([...ancestor, ...tags])].length;
-		if (isSatisfied) continue;
 		const newChildren = node.children.filter(
 			(e) =>
 				"tags" in e &&
@@ -488,6 +489,7 @@ const expandTree = async (node: TreeItem, reduceNestedParent: boolean) => {
 					.map((e) => e.toLocaleLowerCase())
 					.contains(tag.toLocaleLowerCase())
 		);
+		// If already exists in children, skip.
 		if (
 			tree.find(
 				(e) =>
@@ -507,9 +509,13 @@ const expandTree = async (node: TreeItem, reduceNestedParent: boolean) => {
 			allDescendants: null,
 		};
 		tree.push(newLeaf);
-		await splitTag(newLeaf, reduceNestedParent);
+		modified = await splitTag(newLeaf, reduceNestedParent);
 	}
-	await splitTag(node, reduceNestedParent)
+	modified = await splitTag(node, reduceNestedParent) || modified;
+	if (modified) {
+		await expandTree(node, reduceNestedParent);
+	}
+	return modified;
 };
 
 const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: TreeItem): Promise<boolean> => {
@@ -540,6 +546,7 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 
 					if (idxCar < idxCdr) {
 						// Same condition found.
+						// In this case, entry.children can be empty. in that case, we have to snip this entry.
 						modified = true;
 						continue;
 					} else {
@@ -631,8 +638,11 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 							itemsCount: 0,
 						};
 						parent.children.push(x);
-						if (!parent.isDedicatedTree)
+						if (!parent.isDedicatedTree && !(parent.children.some(e => "tags" in e))) {
 							parent.isDedicatedTree = true;
+						} else {
+							parent.isDedicatedTree = false;
+						}
 						await splitTag(parent, reduceNestedParent, xRoot);
 					}
 					modified = true;
@@ -640,8 +650,15 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 			}
 		}
 	}
+
 	if (modified) {
-		await splitTag(entry, reduceNestedParent, xRoot);
+		modified = await splitTag(entry, reduceNestedParent, xRoot);
+	}
+	if (modified) {
+		// If entry became back as not dedicaded tree, disable it.
+		if (entry.isDedicatedTree && entry.children.some(e => "tags" in e)) {
+			entry.isDedicatedTree = false;
+		}
 	}
 	return modified;
 };
@@ -759,20 +776,30 @@ export default class TagFolderPlugin extends Plugin {
 		this.searchString = search;
 		this.refreshAllTree(null);
 	}
-
-	async expandLastExpandedFolders(entry: TagFolderItem) {
+	async expandLastExpandedFolders(entry: TagFolderItem, force?: boolean, path: TreeItem[] = []) {
 		if ("tag" in entry) {
-			const key = [...entry.ancestors, entry.tag].join("/");
-			if (this.expandedFolders.contains(key)) {
-				await expandTree(entry, this.settings.reduceNestedParent);
-				await splitTag(entry, this.settings.reduceNestedParent);
-				for (const child of entry.children) {
-					await this.expandLastExpandedFolders(child);
+			if (path.indexOf(entry) !== -1) return;
+			const key = ([...entry.ancestors]).map(e => e.startsWith(SUBTREE_MARK) ? e.substring(SUBTREE_MARK.length) : e).join("/");
+			// console.log(key + "-" + path.map(e => e.tag).join("->"))
+
+			for (const tags of this.expandedFolders) {
+				const xtag = [];
+				const tagA = tags.split("/");
+				for (const f of tagA) {
+					xtag.push(f);
+					// if (xtag.length == 1) continue;
+					const px = xtag.join("/");
+					if (key.startsWith(px) || force) {
+						await expandTree(entry, this.settings.reduceNestedParent);
+						await splitTag(entry, this.settings.reduceNestedParent);
+						for (const child of entry.children) {
+							if ("tag" in child && path.indexOf(child) == -1) await this.expandLastExpandedFolders(child, false, [...path, entry]);
+						}
+					}
 				}
 			}
 		}
 	}
-
 	// Expand the folder (called from Tag pane.)
 	readonly expandFolder = async (entry: TagFolderItem, expanded: boolean) => {
 		if ("tag" in entry) {
@@ -794,7 +821,7 @@ export default class TagFolderPlugin extends Plugin {
 			// apply to pane.
 			this.setRoot(this.root);
 		}
-	};
+	}
 
 	getFileTitle(file: TFile): string {
 		if (!this.settings.useTitle) return file.basename;
@@ -930,11 +957,41 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		entry.descendants = entry.descendants.sort(this.sortChildren);
 	}
-
+	snipEmpty(root: TreeItem) {
+		for (const v of root.children) {
+			if ("tag" in v) this.snipEmpty(v);
+		}
+		root.children = root.children.filter(e => !("tag" in e && e.children.length == 0));
+	}
+	mergeRedundantCombination(root: TreeItem) {
+		const existenChild = {} as { [key: string]: TreeItem };
+		const removeChildren = [] as TreeItem[];
+		for (const entry of root.children) {
+			if (!("tag" in entry)) continue;
+			// snip children's tree first.
+			if ("tag" in entry) this.mergeRedundantCombination(entry);
+		}
+		for (const entry of root.children) {
+			// apply only TreeItem
+			if (!("tag" in entry)) continue;
+			const tags = [...new Set(retriveAllDecendants(entry))].map(e => e.path).sort().join("-");
+			if (tags in existenChild) {
+				removeChildren.push(entry);
+			} else {
+				existenChild[tags] = entry;
+			}
+		}
+		for (const v of removeChildren) {
+			root.children.remove(v);
+		}
+		root.children = [...root.children];
+	}
 	setRoot(root: TreeItem) {
 		rippleDirty(root);
 		expandDecendants(root, this.settings.hideItems);
+		this.snipEmpty(root);
 		this.sortTree(root);
+		if (this.settings.mergeRedundantCombination) this.mergeRedundantCombination(root);
 		this.root = root;
 		this.getView()?.setTreeRoot(root);
 	}
@@ -1094,7 +1151,7 @@ export default class TagFolderPlugin extends Plugin {
 		// Split tag that having slashes.
 		await splitTag(root, this.settings.reduceNestedParent);
 		// restore opened folder
-		await this.expandLastExpandedFolders(root);
+		await this.expandLastExpandedFolders(root, true);
 		return root;
 	}
 
@@ -1131,6 +1188,7 @@ export default class TagFolderPlugin extends Plugin {
 		const items = await this.getItemsList();
 		const root = await this.buildUpTree(items);
 		this.setRoot(root);
+
 	}
 
 	onunload() {
@@ -1357,7 +1415,19 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-
+		new Setting(containerEl)
+			.setName("Merge redundant combinations")
+			.setDesc(
+				"When this feature is enabled, a/b and b/a are merged into a/b if there is no intermediates."
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.mergeRedundantCombination)
+					.onChange(async (value) => {
+						this.plugin.settings.mergeRedundantCombination = value;
+						await this.plugin.saveSettings();
+					});
+			});
 		const setOrderMethod = async (key: string, order: string) => {
 			const oldSetting = this.plugin.settings.sortType.split("_");
 			if (!key) key = oldSetting[0];
