@@ -776,9 +776,9 @@ export default class TagFolderPlugin extends Plugin {
 		this.searchString = search;
 		this.refreshAllTree(null);
 	}
-	async expandLastExpandedFolders(entry: TagFolderItem, force?: boolean, path: TreeItem[] = []) {
+	async expandLastExpandedFolders(entry: TagFolderItem, force?: boolean, path: string[] = []) {
 		if ("tag" in entry) {
-			if (path.indexOf(entry) !== -1) return;
+			if (path.indexOf(entry.tag) !== -1) return;
 			const key = ([...entry.ancestors]).map(e => e.startsWith(SUBTREE_MARK) ? e.substring(SUBTREE_MARK.length) : e).join("/");
 			// console.log(key + "-" + path.map(e => e.tag).join("->"))
 
@@ -793,7 +793,7 @@ export default class TagFolderPlugin extends Plugin {
 						await expandTree(entry, this.settings.reduceNestedParent);
 						await splitTag(entry, this.settings.reduceNestedParent);
 						for (const child of entry.children) {
-							if ("tag" in child && path.indexOf(child) == -1) await this.expandLastExpandedFolders(child, false, [...path, entry]);
+							if ("tag" in child && path.indexOf(child.tag) == -1) await this.expandLastExpandedFolders(child, false, [...path, entry.tag]);
 						}
 					}
 				}
