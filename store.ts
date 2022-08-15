@@ -8,3 +8,4 @@ export const maxDepth = writable<number>(0);
 
 export const filterString = writable<string>("");
 export const tagInfo = writable<TagInfoDict>({});
+

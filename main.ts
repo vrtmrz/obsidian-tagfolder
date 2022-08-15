@@ -31,9 +31,12 @@ import {
 	TagInfo,
 } from "types";
 import { treeRoot, currentFile, maxDepth, tagInfo } from "store";
+import { ancestorToTags, isAutoExpandTree, omittedTags } from "./util";
 
 type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
 
+// The `Intermidiate` is spelled incorrectly, but it is already used as key of the configuration.
+// Leave it to the future.
 type HIDE_ITEMS_TYPE = "NONE" | "DEDICATED_INTERMIDIATES" | "ALL_EXCEPT_BOTTOM";
 
 const HideItemsType: Record<string, string> = {
@@ -114,7 +117,7 @@ const OrderKeyItem: Record<string, string> = {
 };
 
 let lastSkipped = 0;
-// The messagepump having ancient name.
+// The message pump having ancient name.
 const doevents = () => {
 	const n = performance.now();
 	// keep intact the microtask while 20ms
@@ -400,20 +403,32 @@ const rippleDirty = (entry: TreeItem): boolean => {
 	}
 	if (entry.descendants == null) return true;
 };
-const retriveAllDecendants = (entry: TagFolderItem): ViewItem[] => {
+const retrieveAllDescendants = (entry: TagFolderItem): ViewItem[] => {
 	return (
 		"tag" in entry
 			? entry.children.map(
 				(e) =>
 					"tag" in e
-						? [...e.descendants, ...retriveAllDecendants(e)]
+						? [...e.descendants, ...retrieveAllDescendants(e)]
 						: [e]
 				// eslint-disable-next-line no-mixed-spaces-and-tabs
 			)
 			: [entry]
 	).flat() as ViewItem[];
 };
-const expandDecendants = (
+const retrieveChildren = (entry: TagFolderItem): ViewItem[] => {
+	return (
+		"tag" in entry
+			? entry.children.map(
+				(e) =>
+					"tag" in e
+						? [...retrieveChildren(e)]
+						: [e]
+			)
+			: [entry]
+	).flat() as ViewItem[];
+};
+const expandDescendants = (
 	entry: TreeItem,
 	hideItems: HIDE_ITEMS_TYPE
 ): ViewItem[] => {
@@ -421,7 +436,7 @@ const expandDecendants = (
 	for (const v of entry.children) {
 		if ("tag" in v) {
 			if (v.descendants == null) {
-				const w = expandDecendants(v, hideItems).filter(
+				const w = expandDescendants(v, hideItems).filter(
 					(e) => !ret.contains(e)
 				);
 				ret.push(...w);
@@ -438,12 +453,12 @@ const expandDecendants = (
 	const leafs =
 		entry.descendantsMemo != null
 			? entry.descendantsMemo // if memo is exists, use it.
-			: (entry.descendantsMemo = entry.children // or retrive all and memorize
+			: (entry.descendantsMemo = entry.children // or retrieve all and memorize
 				.map((e) =>
 					"tag" in e
 						? e.children
 							.map((ee) =>
-								retriveAllDecendants(ee).flat()
+								retrieveAllDescendants(ee).flat()
 							)
 							.flat()
 						: []
@@ -464,20 +479,20 @@ const expandDecendants = (
 const expandTree = async (node: TreeItem, reduceNestedParent: boolean): Promise<boolean> => {
 	let modified = false;
 	const tree = node.children;
-	const ancestor = [...node.ancestors, node.tag];
+	const ancestor = [...node.ancestors];
+
 	const tags = Array.from(
 		new Set(
 			node.children
 				.filter((e) => "tags" in e)
 				.map((e) => (e as ViewItem).tags)
-				.map((e) => e.map((ee) => ee.toLocaleLowerCase()))
 				.flat()
 		)
 	);
-
+	const ancestorAsTags = ancestorToTags(ancestor);
 	for (const tag of tags) {
 		if (
-			ancestor
+			ancestorAsTags
 				.map((e) => e.toLocaleLowerCase())
 				.contains(tag.toLocaleLowerCase())
 		)
@@ -499,6 +514,7 @@ const expandTree = async (node: TreeItem, reduceNestedParent: boolean): Promise<
 		) {
 			continue;
 		}
+
 		const newLeaf: TreeItem = {
 			tag: tag,
 			children: newChildren,
@@ -509,7 +525,7 @@ const expandTree = async (node: TreeItem, reduceNestedParent: boolean): Promise<
 			allDescendants: null,
 		};
 		tree.push(newLeaf);
-		modified = await splitTag(newLeaf, reduceNestedParent);
+		// modified = await splitTag(newLeaf, reduceNestedParent);
 	}
 	modified = await splitTag(node, reduceNestedParent) || modified;
 	if (modified) {
@@ -564,7 +580,7 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 								itemsCount: 0,
 								descendants: null,
 								allDescendants: null,
-								isDedicatedTree: false,
+								isDedicatedTree: tempEntry.isDedicatedTree,
 							}
 							const old = entry.children.find(e => "tag" in e && e.tag == tagCdr);
 							if (old) {
@@ -582,7 +598,7 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 				) as TreeItem;
 				const tempChildren = tempEntry.children;
 				if (!parent) {
-					const xchild: TreeItem = {
+					const newGrandchild: TreeItem = {
 						tag: tagCdr,
 						children: [...tempChildren],
 						ancestors: [
@@ -595,17 +611,17 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 						allDescendants: null,
 						isDedicatedTree: false,
 					};
-					const x: TreeItem = {
+					const newChild: TreeItem = {
 						tag: tagCar,
-						children: [xchild],
+						children: [newGrandchild],
 						ancestors: [...new Set([...newAncestorsBase, tagCar])],
 						descendants: null,
 						allDescendants: null,
 						isDedicatedTree: true,
 						itemsCount: 0,
 					};
-					x.children = [xchild];
-					entry.children.push(x);
+					newChild.children = [newGrandchild];
+					entry.children.push(newChild);
 					await splitTag(entry, reduceNestedParent, xRoot);
 					modified = true;
 				} else {
@@ -638,10 +654,25 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 							itemsCount: 0,
 						};
 						parent.children.push(x);
-						if (!parent.isDedicatedTree && !(parent.children.some(e => "tags" in e))) {
-							parent.isDedicatedTree = true;
-						} else {
-							parent.isDedicatedTree = false;
+						// If it was dedicated tree, check all children are still inside.
+						// For cases as below:
+						// (Before) 
+						//  A
+						//  +-> B
+						//      + DOC 1
+						// (After)
+						//   A
+						//   +-B        <-- This level should be back to normal tree.
+						//   | +DOC 1
+						//   +-DOC 2
+						if (!parent.isDedicatedTree) {
+							const p = retrieveChildren(parent).map(e => e.path)
+							const c = retrieveChildren(tempEntry).map(e => e.path);
+							if (c.some(entry => !p.contains(entry))) {
+								parent.isDedicatedTree = false;
+							} else {
+								parent.isDedicatedTree = true;
+							}
 						}
 						await splitTag(parent, reduceNestedParent, xRoot);
 					}
@@ -655,7 +686,7 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 		modified = await splitTag(entry, reduceNestedParent, xRoot);
 	}
 	if (modified) {
-		// If entry became back as not dedicaded tree, disable it.
+		// If entry became back as not dedicated tree, disable it.
 		if (entry.isDedicatedTree && entry.children.some(e => "tags" in e)) {
 			entry.isDedicatedTree = false;
 		}
@@ -776,24 +807,42 @@ export default class TagFolderPlugin extends Plugin {
 		this.searchString = search;
 		this.refreshAllTree(null);
 	}
-	async expandLastExpandedFolders(entry: TagFolderItem, force?: boolean, path: string[] = []) {
+	expandingProcs = 0;
+	async expandLastExpandedFolders(entry: TagFolderItem, force?: boolean, path: string[] = [], openedTags: { [key: string]: Set<string> } = {}, maxDepth = 1) {
+		if (maxDepth < 0) {
+			return;
+		}
 		if ("tag" in entry) {
 			if (path.indexOf(entry.tag) !== -1) return;
+			if (omittedTags(entry)) return;
 			const key = ([...entry.ancestors]).map(e => e.startsWith(SUBTREE_MARK) ? e.substring(SUBTREE_MARK.length) : e).join("/");
-			// console.log(key + "-" + path.map(e => e.tag).join("->"))
 
 			for (const tags of this.expandedFolders) {
-				const xtag = [];
-				const tagA = tags.split("/");
-				for (const f of tagA) {
-					xtag.push(f);
-					// if (xtag.length == 1) continue;
-					const px = xtag.join("/");
-					if (key.startsWith(px) || force) {
+				const tagPrefixToOpen = [];
+				const tagArray = tags.split("/");
+
+				for (const f of tagArray) {
+					tagPrefixToOpen.push(f);
+					const tagPrefix: string = tagPrefixToOpen.join("/");
+					if (!(tagPrefix in openedTags)) {
+						openedTags[tagPrefix] = new Set();
+					}
+					if (openedTags[tagPrefix].has(key)) {
+						continue;
+					}
+					if (key.startsWith(tagPrefix) || force) {
+						openedTags[tagPrefix].add(key);
 						await expandTree(entry, this.settings.reduceNestedParent);
 						await splitTag(entry, this.settings.reduceNestedParent);
+
 						for (const child of entry.children) {
-							if ("tag" in child && path.indexOf(child.tag) == -1) await this.expandLastExpandedFolders(child, false, [...path, entry.tag]);
+							if ("tag" in child) {
+								const autoExp = isAutoExpandTree(child);
+								const nextDepth = autoExp ? maxDepth : maxDepth - 1;
+								if (path.indexOf(child.tag) == -1) {
+									await this.expandLastExpandedFolders(child, false, [...path, entry.tag], openedTags, nextDepth);
+								}
+							}
 						}
 					}
 				}
@@ -846,13 +895,13 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		const path = file.path.split("/");
 		path.pop();
-		const dpath = path.join("/");
+		const displayPath = path.join("/");
 
 		if (this.settings.displayMethod == "NAME : PATH") {
-			return `${filename} : ${dpath}`;
+			return `${filename} : ${displayPath}`;
 		}
 		if (this.settings.displayMethod == "PATH/NAME") {
-			return `${dpath}/${filename}`;
+			return `${displayPath}/${filename}`;
 		}
 		return filename;
 	}
@@ -863,7 +912,7 @@ export default class TagFolderPlugin extends Plugin {
 		this.sortChildren = this.sortChildren.bind(this);
 		this.modifyFile = this.modifyFile.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
-		// Make loadFileInfo debonced .
+		// Make loadFileInfo debounced .
 		this.loadFileInfo = debounce(
 			this.loadFileInfo.bind(this),
 			this.settings.scanDelay,
@@ -964,7 +1013,7 @@ export default class TagFolderPlugin extends Plugin {
 		root.children = root.children.filter(e => !("tag" in e && e.children.length == 0));
 	}
 	mergeRedundantCombination(root: TreeItem) {
-		const existenChild = {} as { [key: string]: TreeItem };
+		const existentChild = {} as { [key: string]: TreeItem };
 		const removeChildren = [] as TreeItem[];
 		for (const entry of root.children) {
 			if (!("tag" in entry)) continue;
@@ -974,11 +1023,11 @@ export default class TagFolderPlugin extends Plugin {
 		for (const entry of root.children) {
 			// apply only TreeItem
 			if (!("tag" in entry)) continue;
-			const tags = [...new Set(retriveAllDecendants(entry))].map(e => e.path).sort().join("-");
-			if (tags in existenChild) {
+			const tags = [...new Set(retrieveAllDescendants(entry))].map(e => e.path).sort().join("-");
+			if (tags in existentChild) {
 				removeChildren.push(entry);
 			} else {
-				existenChild[tags] = entry;
+				existentChild[tags] = entry;
 			}
 		}
 		for (const v of removeChildren) {
@@ -988,7 +1037,7 @@ export default class TagFolderPlugin extends Plugin {
 	}
 	setRoot(root: TreeItem) {
 		rippleDirty(root);
-		expandDecendants(root, this.settings.hideItems);
+		expandDescendants(root, this.settings.hideItems);
 		this.snipEmpty(root);
 		this.sortTree(root);
 		if (this.settings.mergeRedundantCombination) this.mergeRedundantCombination(root);
@@ -1065,7 +1114,7 @@ export default class TagFolderPlugin extends Plugin {
 				continue;
 			}
 			await doevents();
-			const allTagsDocs = getAllTags(fileCache.metadata) ?? [];
+			const allTagsDocs = [...new Set(getAllTags(fileCache.metadata) ?? [])];
 			let allTags = allTagsDocs.map((e) => e.substring(1));
 			if (this.settings.disableNestedTags) {
 				allTags = allTags.map((e) => e.split("/")).flat();
@@ -1118,7 +1167,6 @@ export default class TagFolderPlugin extends Plugin {
 			allTags = allTags.filter(
 				(tag) => !ignoreTags.contains(tag.toLocaleLowerCase())
 			);
-
 			items.push({
 				tags: allTags,
 				path: fileCache.file.path,
@@ -1136,7 +1184,7 @@ export default class TagFolderPlugin extends Plugin {
 		const root: TreeItem = {
 			tag: "root",
 			children: [...items],
-			ancestors: [],
+			ancestors: ["root"],
 			descendants: null,
 			allDescendants: null,
 			itemsCount: 0,
@@ -1163,7 +1211,7 @@ export default class TagFolderPlugin extends Plugin {
 		this.loadFileInfoAsync(diff);
 	}
 
-	// Sweep updated file or all files to retrive tags.
+	// Sweep updated file or all files to retrieve tags.
 	async loadFileInfoAsync(diff?: TFile) {
 		if (this.getView() == null) return;
 		const strSetting = JSON.stringify(this.settings);
@@ -1209,7 +1257,7 @@ export default class TagFolderPlugin extends Plugin {
 		);
 	}
 	tagInfo: TagInfoDict = null;
-	tagInfoFrontMatterBuffrer: any = {};
+	tagInfoFrontMatterBuffer: any = {};
 	skipOnce: boolean;
 	tagInfoBody = "";
 	async modifyFile(file: TFile | TFolder) {
@@ -1258,7 +1306,7 @@ export default class TagFolderPlugin extends Plugin {
 			const keys = Object.keys(yamlData);
 			const body = data.substring(bodyStartIndex + 5);
 			this.tagInfoBody = body;
-			this.tagInfoFrontMatterBuffrer = yamlData;
+			this.tagInfoFrontMatterBuffer = yamlData;
 
 			const newTagInfo = {} as TagInfoDict;
 			for (const key of keys) {
@@ -1285,7 +1333,7 @@ export default class TagFolderPlugin extends Plugin {
 		if (!this.settings.useTagInfo) return;
 		if (this.tagInfo == null) return;
 		const file = this.getTagInfoFile();
-		const yaml = stringifyYaml({ ...this.tagInfoFrontMatterBuffrer, ...this.tagInfo });
+		const yaml = stringifyYaml({ ...this.tagInfoFrontMatterBuffer, ...this.tagInfo });
 		const w = `---
 ${yaml}---
 ${this.tagInfoBody}`;

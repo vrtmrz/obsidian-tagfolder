@@ -5,8 +5,8 @@
 		TagFolderItem,
 		SUBTREE_MARK_REGEX,
 		SUBTREE_MARK,
-		ViewItem,
 	} from "./types";
+	import { isAutoExpandTree, omittedTags } from "./util";
 	import type { TagInfoDict } from "./types";
 	export let entry: TagFolderItem;
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
@@ -29,7 +29,9 @@
 		}
 		return basepath;
 	}
-	$: currentPath = getItemPath(entry, path);
+	$: currentPath =
+		getItemPath(entry, path) + omitTags.map((e) => "/" + e).join("");
+
 	const currentDepth = path
 		.replace(SUBTREE_MARK_REGEX, "###")
 		.split("/").length;
@@ -102,41 +104,18 @@
 	let tagTitle = "";
 
 	let showOnlyChildren = false;
+	let ellipsisMark = "";
+	let omitTags = [] as string[];
 	$: {
 		showOnlyChildren = false;
-		const getChildren = (entry: TreeItem): string[] =>
-			entry.children
-				.map((e) => ("tag" in e ? getChildren(e) : e.tags))
-				.flat();
-
+		ellipsisMark = "";
+		omitTags = [];
 		if ("tag" in entry) {
-			const childrenTags = entry.children.filter(
-				(e) => "tag" in e
-			) as TreeItem[];
-			const childrenItems = entry.children.filter(
-				(e) => "tags" in e
-			) as ViewItem[];
-			if (childrenTags.length == 1 && childrenItems.length == 0) {
-				// Only one tag and no children
-				showOnlyChildren = true;
-			}
-			if (entry.itemsCount == 1) {
-				if (childrenTags.length == 1) {
-					showOnlyChildren = true;
-					// memo
-					// const k = cx.ancestors.reduce(
-					// 	(p, i) =>
-					// 		!i.startsWith(SUBTREE_MARK)
-					// 			? [...p, i]
-					// 			: [
-					// 					...p,
-					// 					p.pop() +
-					// 						"/" +
-					// 						i.substring(SUBTREE_MARK.length),
-					// 			  ],
-					// 	[]
-					// );
-				}
+			showOnlyChildren = isAutoExpandTree(entry);
+			const omitTag = omittedTags(entry);
+			if (omitTag !== false) {
+				omitTags = [...omitTag];
+				ellipsisMark = "/" + omitTags.join("/");
 			}
 		}
 	}
@@ -195,7 +174,7 @@
 	{:else if "tag" in entry && (currentDepth <= _maxDepth || entry.tag.startsWith(SUBTREE_MARK))}
 		<div class="nav-folder" class:is-collapsed={collapsed}>
 			<div
-				class="nav-folder-title"
+				class="nav-folder-title tag-folder-title"
 				class:is-active={entry.children && collapsed && isSelected}
 				on:click={() => toggleFolder(entry)}
 				on:contextmenu={contextMenuFunc(entry)}
@@ -215,7 +194,7 @@
 				</div>
 				<div class="nav-folder-title-content lsl-f">
 					<div class="tagfolder-titletagname">
-						{tagTitle}
+						{tagTitle}{ellipsisMark}
 					</div>
 					<div class="tagfolder-quantity">{entry.itemsCount}</div>
 				</div>
@@ -260,12 +239,23 @@
 		flex-direction: row;
 		display: flex;
 		flex-grow: 1;
+		max-width: 100%;
 	}
 	.tagfolder-titletagname {
 		flex-grow: 1;
+		max-width: calc(100% - 2em);
+		width: calc(100% - 2em);
+		text-overflow: ellipsis;
+		overflow: hidden;
+		white-space: nowrap;
+		overflow: hidden;
 	}
 	.tagfolder-quantity {
 		width: 3em;
 		text-align: right;
+	}
+
+	.tag-folder-title {
+		max-width: 100%;
 	}
 </style>
