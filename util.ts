@@ -13,23 +13,45 @@ export function isAutoExpandTree(entry: TreeItem) {
         const childrenTags = entry.children.filter(
             (e) => "tag" in e
         ) as TreeItem[];
-        const childrenItems = entry.children.filter(
+        const childrenItems = (entry.allDescendants ?? entry.children).filter(
             (e) => "tags" in e
         ) as ViewItem[];
+        if (childrenTags.length == 0) return false;
         if (childrenTags.length == 1 && childrenItems.length == 0) {
             // Only one tag and no children
             return true;
         }
-        // if (childrenItems.length > 0) {
-        //     const tx = childrenItems.map((e) => [...e.tags].sort().join("-"));
-        //     const ancestorTags = ancestorToTags(entry.ancestors);
-        //     if (tx.length == 1) {
-        //         // The children has unique tags.
-        //         const tags = childrenItems[0].tags;
-        //         const lastT = tags.filter((e) => !ancestorTags.contains(e));
-        //         if (lastT.length == 0) return true;
-        //     }
-        // }
+
+        const entryAllTags = ancestorToTags(entry.ancestors.slice(1));
+
+        const entryTags = ancestorToLongestTag(
+            entryAllTags
+        );
+
+        //TODO: Too unintuitive.
+        // just truncating tags till current position.
+        // ex.) In `food`:
+        // root/food/sweet/red -> sweet/red
+        const childrenItemsTag = childrenItems.map(
+            e => (
+                {
+                    ...e,
+                    tags: e.tags.map(
+                        oldTag => entryTags.reduce(
+                            (trimTag, tagToTrim) => (
+                                trimTag.startsWith(tagToTrim + "/") ?
+                                    trimTag.substring(tagToTrim.length + 1)
+                                    : trimTag)
+                            , oldTag)).filter(e => e)
+                }));
+        const firstLevelChildren = unique(
+            [...childrenItemsTag.flatMap(e => e.tags.map(ee => ee.substring(0, (ee + "/").indexOf("/")))),
+            ...childrenTags.map(e => e.tag.startsWith(SUBTREE_MARK) ? e.tag.substring(SUBTREE_MARK.length) : e.tag)]).filter(e => !entryAllTags.contains(e));
+
+        if (firstLevelChildren.length == 1) {
+            return true;
+        }
+
         if (childrenTags.length == 1 && childrenItems.length > 1) {
             // Check all children can be unified
             const sTags = allTags(entry).join("-").toLocaleLowerCase();
@@ -49,7 +71,7 @@ export function omittedTags(entry: TreeItem): false | string[] {
     const childrenTags = entry.children.filter(
         (e) => "tag" in e
     ) as TreeItem[];
-    const childrenItems = entry.children.filter(
+    const childrenItems = (entry.allDescendants ?? entry.children).filter(
         (e) => "tags" in e
     ) as ViewItem[];
 
@@ -69,7 +91,7 @@ export function omittedTags(entry: TreeItem): false | string[] {
     return false;
 }
 
-export function ancestorToTags(ancestors: string[]) {
+export function ancestorToTags(ancestors: string[]): string[] {
     const SUBTREE_MARK_LENGTH = SUBTREE_MARK.length;
     return ancestors.reduce(
         (p, i) =>
@@ -83,4 +105,7 @@ export function ancestorToTags(ancestors: string[]) {
                 ],
         []
     )
+}
+export function ancestorToLongestTag(ancestors: string[]): string[] {
+    return ancestors.reduceRight((a: string[], e) => !a ? [e] : (a[0].startsWith(e) ? a : [e, ...a]), null)
 }

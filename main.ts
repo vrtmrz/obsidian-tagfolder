@@ -815,8 +815,7 @@ export default class TagFolderPlugin extends Plugin {
 		if ("tag" in entry) {
 			if (path.indexOf(entry.tag) !== -1) return;
 			if (omittedTags(entry)) return;
-			const key = ([...entry.ancestors]).map(e => e.startsWith(SUBTREE_MARK) ? e.substring(SUBTREE_MARK.length) : e).join("/");
-
+			const key = entry.ancestors.join("/");
 			for (const tags of this.expandedFolders) {
 				const tagPrefixToOpen = [];
 				const tagArray = tags.split("/");
@@ -852,7 +851,7 @@ export default class TagFolderPlugin extends Plugin {
 	// Expand the folder (called from Tag pane.)
 	readonly expandFolder = async (entry: TagFolderItem, expanded: boolean) => {
 		if ("tag" in entry) {
-			const key = [...entry.ancestors, entry.tag].join("/");
+			const key = [...entry.ancestors].join("/");
 			if (expanded) {
 				this.expandedFolders = Array.from(
 					new Set([...this.expandedFolders, key])

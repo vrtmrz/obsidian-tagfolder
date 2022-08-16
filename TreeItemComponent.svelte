@@ -35,7 +35,7 @@
 	const currentDepth = path
 		.replace(SUBTREE_MARK_REGEX, "###")
 		.split("/").length;
-	let _maxDepth = 0;
+	let _maxDepth = currentDepth + 1;
 
 	function toggleFolder(entry: TagFolderItem) {
 		if ("tag" in entry) {
