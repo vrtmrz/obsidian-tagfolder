@@ -559,7 +559,6 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 				const idxCar = ancestors.indexOf(tagCar.toLocaleLowerCase());
 				const idxCdr = ancestors.indexOf(tagCdr.toLocaleLowerCase());
 				if (idxCar != -1) {
-
 					if (idxCar < idxCdr) {
 						// Same condition found.
 						// In this case, entry.children can be empty. in that case, we have to snip this entry.
@@ -569,7 +568,7 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 						if (reduceNestedParent) {
 							// Skip to make parent and expand this immediately.
 							modified = true;
-							const w: TreeItem = {
+							const replacer: TreeItem = {
 								...tempEntry,
 								tag: tagCdr,
 								ancestors: [
@@ -582,11 +581,14 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 								allDescendants: null,
 								isDedicatedTree: tempEntry.isDedicatedTree,
 							}
-							const old = entry.children.find(e => "tag" in e && e.tag == tagCdr);
+							// Look up for the entry which to be removed.
+							const old = entry.children.find(e => "tag" in e && e.tag == tagCdr) as null | TreeItem;
 							if (old) {
 								entry.children.remove(old);
+								// Merge children into new entry.
+								replacer.children = [...replacer.children, ...old.children]
 							}
-							entry.children.push(w);
+							entry.children.push(replacer);
 							continue;
 						}
 					}
@@ -819,7 +821,6 @@ export default class TagFolderPlugin extends Plugin {
 			for (const tags of this.expandedFolders) {
 				const tagPrefixToOpen = [];
 				const tagArray = tags.split("/");
-
 				for (const f of tagArray) {
 					tagPrefixToOpen.push(f);
 					const tagPrefix: string = tagPrefixToOpen.join("/");
@@ -1117,12 +1118,6 @@ export default class TagFolderPlugin extends Plugin {
 			let allTags = allTagsDocs.map((e) => e.substring(1));
 			if (this.settings.disableNestedTags) {
 				allTags = allTags.map((e) => e.split("/")).flat();
-			} else {
-				// If the circumstance like below:
-				// #test
-				// #test/child
-				// This may make complicated situation. so we have to skip this.
-				allTags = allTags.filter(e => !allTags.some(ae => ae.startsWith(e + "/")));
 			}
 			if (allTags.length == 0) {
 				allTags = ["_untagged"];
