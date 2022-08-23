@@ -29,15 +29,21 @@ import {
 	ViewItem,
 	TagInfoDict,
 	TagInfo,
+	ScrollViewState,
+	ScrollViewFile,
+	TagFolderSettings,
+	DEFAULT_SETTINGS,
+	VIEW_TYPE_SCROLL
 } from "types";
 import { treeRoot, currentFile, maxDepth, tagInfo } from "store";
-import { ancestorToTags, isAutoExpandTree, omittedTags } from "./util";
+import { ancestorToTags, isAutoExpandTree, isSpecialTag, omittedTags, renderSpecialTag, secondsToFreshness } from "./util";
+import { ScrollView } from "./ScrollView";
 
-type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
+export type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
 
 // The `Intermidiate` is spelled incorrectly, but it is already used as key of the configuration.
 // Leave it to the future.
-type HIDE_ITEMS_TYPE = "NONE" | "DEDICATED_INTERMIDIATES" | "ALL_EXCEPT_BOTTOM";
+export type HIDE_ITEMS_TYPE = "NONE" | "DEDICATED_INTERMIDIATES" | "ALL_EXCEPT_BOTTOM";
 
 const HideItemsType: Record<string, string> = {
 	NONE: "Hide nothing",
@@ -45,58 +51,7 @@ const HideItemsType: Record<string, string> = {
 	ALL_EXCEPT_BOTTOM: "All intermediates",
 };
 
-interface TagFolderSettings {
-	displayMethod: DISPLAY_METHOD;
-	alwaysOpen: boolean;
-	ignoreDocTags: string;
-	ignoreTags: string;
-	ignoreFolders: string;
-	hideOnRootTags: string;
-	sortType:
-	| "DISPNAME_ASC"
-	| "DISPNAME_DESC"
-	| "NAME_ASC"
-	| "NAME_DESC"
-	| "MTIME_ASC"
-	| "MTIME_DESC"
-	| "CTIME_ASC"
-	| "CTIME_DESC"
-	| "FULLPATH_ASC"
-	| "FULLPATH_DESC";
-	sortTypeTag: "NAME_ASC" | "NAME_DESC" | "ITEMS_ASC" | "ITEMS_DESC";
-	expandLimit: number;
-	disableNestedTags: boolean;
 
-	hideItems: HIDE_ITEMS_TYPE;
-	scanDelay: number;
-	useTitle: boolean;
-	reduceNestedParent: boolean;
-	frontmatterKey: string;
-	useTagInfo: boolean;
-	tagInfo: string;
-	mergeRedundantCombination: boolean;
-}
-
-const DEFAULT_SETTINGS: TagFolderSettings = {
-	displayMethod: "NAME",
-	alwaysOpen: false,
-	ignoreDocTags: "",
-	ignoreTags: "",
-	hideOnRootTags: "",
-	sortType: "DISPNAME_ASC",
-	sortTypeTag: "NAME_ASC",
-	expandLimit: 0,
-	disableNestedTags: false,
-	hideItems: "NONE",
-	ignoreFolders: "",
-	scanDelay: 250,
-	useTitle: true,
-	reduceNestedParent: true,
-	frontmatterKey: "title",
-	useTagInfo: false,
-	tagInfo: "pininfo.md",
-	mergeRedundantCombination: false,
-};
 
 const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
 
@@ -139,6 +94,7 @@ const dotted = (object: any, notation: string) => {
 
 const compare = (Intl && Intl.Collator) ? (new Intl.Collator().compare) :
 	(x: string, y: string) => (`${x ?? ""}`).localeCompare(`${y ?? ""}`);
+
 
 class TagFolderView extends ItemView {
 	component: TagFolderViewComponent;
@@ -292,6 +248,7 @@ class TagFolderView extends ItemView {
 				showOrder: this.showOrder,
 				newNote: this.newNote,
 				setSearchString: this.plugin.setSearchString,
+				openScrollView: this.plugin.openScrollView
 			},
 		});
 	}
@@ -309,7 +266,9 @@ class TagFolderView extends ItemView {
 		const expandedTags = x
 			.split("/")
 			.filter((e) => e.trim() != "")
+			.filter(e => !isSpecialTag(e))
 			.map((e) => e.replace(/###/g, "/"))
+			.map(e => e.split("/").map(ee => renderSpecialTag(ee)).join("/"))
 			.map((e) => "#" + e)
 			.join(" ")
 			.trim();
@@ -360,8 +319,15 @@ class TagFolderView extends ItemView {
 							})
 					})
 				}
-				// menu.addItem((item) =>
-				// 	item.setTitle(`Pin`))
+				menu.addItem(item => {
+					item.setTitle(`Open scroll view`)
+						.setIcon("sheets-in-box")
+						.onClick(async () => {
+							const files = entry.allDescendants.map(e => e.path);
+							const tagPath = entry.ancestors.join("/");
+							await this.plugin.openScrollView(null, expandedTags, tagPath, files);
+						})
+				})
 			}
 		}
 		if ("path" in entry) {
@@ -754,6 +720,7 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 	}
 }
 
+
 export default class TagFolderPlugin extends Plugin {
 	settings: TagFolderSettings;
 
@@ -912,6 +879,7 @@ export default class TagFolderPlugin extends Plugin {
 		this.sortChildren = this.sortChildren.bind(this);
 		this.modifyFile = this.modifyFile.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
+		this.openScrollView = this.openScrollView.bind(this);
 		// Make loadFileInfo debounced .
 		this.loadFileInfo = debounce(
 			this.loadFileInfo.bind(this),
@@ -922,6 +890,10 @@ export default class TagFolderPlugin extends Plugin {
 		this.registerView(
 			VIEW_TYPE_TAGFOLDER,
 			(leaf) => new TagFolderView(leaf, this)
+		);
+		this.registerView(
+			VIEW_TYPE_SCROLL,
+			(leaf) => new ScrollView(leaf, this)
 		);
 		this.app.workspace.onLayoutReady(async () => {
 			if (this.settings.alwaysOpen) {
@@ -1103,6 +1075,9 @@ export default class TagFolderPlugin extends Plugin {
 			.toLocaleLowerCase()
 			.split("|")
 			.map((ee) => ee.split(" ").map((e) => e.trim()));
+
+
+		const today = Date.now();
 		for (const fileCache of this.fileCaches) {
 			if (
 				ignoreFolders.find(
@@ -1121,6 +1096,12 @@ export default class TagFolderPlugin extends Plugin {
 			}
 			if (allTags.length == 0) {
 				allTags = ["_untagged"];
+			}
+			if (this.settings.useVirtualTag) {
+				const mtime = fileCache.file.stat.mtime;
+				const diff = today - mtime
+				const disp = secondsToFreshness(diff);
+				allTags.push(`_VIRTUAL_TAG_FRESHNESS/${disp}`);
 			}
 			if (
 				allTags.some((tag) =>
@@ -1224,18 +1205,111 @@ export default class TagFolderPlugin extends Plugin {
 			!isSettingChanged
 		) {
 			// If any conditions are not changed, skip processing.
+			await this.applyUpdateIntoScroll(diff);
 			return;
 		}
 
 		const items = await this.getItemsList();
 		const root = await this.buildUpTree(items);
 		this.setRoot(root);
+		await this.applyUpdateIntoScroll(diff);
 
 	}
 
 	onunload() {
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_TAGFOLDER);
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_SCROLL);
 	}
+
+	async openScrollView(leaf: WorkspaceLeaf, title: string, tagPath: string, files: string[]) {
+		if (!leaf) {
+			// const recent = this.app.workspace.getMostRecentLeaf();
+			leaf = this.app.workspace.createLeafInParent(this.app.workspace.rootSplit, 1);
+		}
+		await leaf.setViewState({
+			type: VIEW_TYPE_SCROLL,
+			active: true,
+			state: { files: files.map(e => ({ path: e })), title: title, tagPath: tagPath } as ScrollViewState
+		});
+
+		this.app.workspace.revealLeaf(
+			leaf
+		);
+	}
+	findTreeItemFromPath(tagPath: string, root?: TreeItem): TreeItem | null {
+		// debugger;
+		if (!root) {
+			root = this.root;
+		}
+
+		//If this is the bottom, return.
+		if (root.children.some(e => !("tag" in e))) {
+			return root;
+		}
+		const paths = tagPath.split("/");
+		paths.shift();
+		const path = [] as string[];
+
+		while (paths.length > 0) {
+			path.push(paths.shift());
+			const child = root.children.find(e => "tag" in e && e.tag == path.join("/")) as TreeItem;
+			if (child) {
+				return this.findTreeItemFromPath(paths.join("/"), child);
+			}
+		}
+		return null;
+	}
+
+
+	async applyUpdateIntoScroll(file?: TFile) {
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_SCROLL);
+		for (const leaf of leaves) {
+			const view = leaf.view as ScrollView;
+			const viewStat = { ...leaf.getViewState(), state: { ...view.getScrollViewState() } }
+			if (file && view.isFileOpened(file.path)) {
+
+				const newStat = {
+					...viewStat,
+					state: {
+						...viewStat.state,
+						files: viewStat.state.files.map(e => e.path == file.path ? ({
+							path: file.path
+						} as ScrollViewFile) : e)
+
+					}
+				}
+				leaf.setViewState(newStat);
+			}
+			// Check files that included in the Scroll view.
+			const openedNode = this.findTreeItemFromPath(viewStat.state.tagPath);
+			if (openedNode) {
+				const newFilesArray = openedNode.allDescendants.map(e => e.path);
+				const newFiles = newFilesArray.sort().join("-");
+				const oldFiles = viewStat.state.files.map(e => e.path).sort().join("-");
+				if (newFiles != oldFiles) {
+					// List has changed
+					const newStat = {
+						...viewStat,
+						state: {
+							...viewStat.state,
+							files: newFilesArray.map(path => {
+								const old = viewStat.state.files.find(e => e.path == path);
+								if (old) return old;
+								return {
+									path: path
+								} as ScrollViewFile;
+
+
+							}) as ScrollViewFile[]
+						}
+					}
+					leaf.setViewState(newStat);
+				}
+			}
+		}
+
+	}
+
 
 	async activateView() {
 		this.loadFileInfo();
@@ -1532,6 +1606,16 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.reduceNestedParent)
 					.onChange(async (value) => {
 						this.plugin.settings.reduceNestedParent = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Use virtual tags")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.useVirtualTag)
+					.onChange(async (value) => {
+						this.plugin.settings.useVirtualTag = value;
 						await this.plugin.saveSettings();
 					});
 			});

@@ -5,8 +5,9 @@
 		TagFolderItem,
 		SUBTREE_MARK_REGEX,
 		SUBTREE_MARK,
+		tagDispDict,
 	} from "./types";
-	import { isAutoExpandTree, omittedTags } from "./util";
+	import { isAutoExpandTree, omittedTags, renderSpecialTag } from "./util";
 	import type { TagInfoDict } from "./types";
 	export let entry: TagFolderItem;
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
@@ -19,6 +20,12 @@
 	) => void;
 	export let path: string;
 	export let skippedTag: string;
+	export let openScrollView: (
+		leaf: null,
+		title: string,
+		tagPath: string,
+		files: string[]
+	) => Promise<void>;
 
 	let collapsed = true;
 	let isSelected = false;
@@ -37,7 +44,12 @@
 		.split("/").length;
 	let _maxDepth = currentDepth + 1;
 
-	function toggleFolder(entry: TagFolderItem) {
+	function toggleFolder(evt: MouseEvent, entry: TagFolderItem) {
+		if (
+			evt.target instanceof HTMLElement &&
+			evt.target.hasClass("tagfolder-quantity")
+		)
+			return;
 		if ("tag" in entry) {
 			expandFolder(entry, collapsed);
 			collapsed = !collapsed;
@@ -73,6 +85,17 @@
 	function handleMouseover(e: MouseEvent, entry: TagFolderItem) {
 		if (entry && "path" in entry) hoverPreview(e, entry.path);
 	}
+	function handleOpenScroll(e: MouseEvent, entry: TagFolderItem) {
+		if ("tag" in entry) {
+			openScrollView(
+				null,
+				"",
+				entry.ancestors.join("/"),
+				entry.allDescendants.map((e) => e.path)
+			);
+			e.preventDefault();
+		}
+	}
 
 	currentFile.subscribe((path: string) => {
 		isSelected = false;
@@ -106,6 +129,7 @@
 	let showOnlyChildren = false;
 	let ellipsisMark = "";
 	let omitTags = [] as string[];
+
 	$: {
 		showOnlyChildren = false;
 		ellipsisMark = "";
@@ -114,11 +138,20 @@
 			showOnlyChildren = isAutoExpandTree(entry);
 			const omitTag = omittedTags(entry);
 			if (omitTag !== false) {
-				omitTags = [...omitTag];
+				omitTags = [
+					...omitTag.map((e) =>
+						e
+							.split("/")
+							.map((ee) => renderSpecialTag(ee))
+							.join("/")
+					),
+				];
 				ellipsisMark = "/" + omitTags.join("/");
 			}
 		}
 	}
+
+	$: convertedTag = "tag" in entry ? renderSpecialTag(entry.tag) : "";
 	$: tagTitle =
 		"tag" in entry
 			? `${
@@ -127,7 +160,7 @@
 								entry.tag.startsWith(SUBTREE_MARK) ? " " : "/"
 						  }`
 						: ""
-			  }${tagMark}${entry.tag}`
+			  }${tagMark}${convertedTag}`
 			: "";
 	let children: TagFolderItem[] = [];
 	$: {
@@ -166,6 +199,7 @@
 					{hoverPreview}
 					{expandFolder}
 					{showMenu}
+					{openScrollView}
 					skippedTag={tagTitle}
 					path={currentPath}
 				/>
@@ -176,7 +210,7 @@
 			<div
 				class="nav-folder-title tag-folder-title"
 				class:is-active={entry.children && collapsed && isSelected}
-				on:click={() => toggleFolder(entry)}
+				on:click={(evt) => toggleFolder(evt, entry)}
 				on:contextmenu={contextMenuFunc(entry)}
 			>
 				<div class="nav-folder-collapse-indicator collapse-icon">
@@ -196,7 +230,12 @@
 					<div class="tagfolder-titletagname">
 						{tagTitle}{ellipsisMark}
 					</div>
-					<div class="tagfolder-quantity">{entry.itemsCount}</div>
+					<div
+						class="tagfolder-quantity"
+						on:click={(e) => handleOpenScroll(e, entry)}
+					>
+						<span>{entry.itemsCount}</span>
+					</div>
 				</div>
 			</div>
 			{#if children.length > 0}
@@ -208,6 +247,7 @@
 							{hoverPreview}
 							{expandFolder}
 							{showMenu}
+							{openScrollView}
 							path={currentPath}
 						/>
 					{/each}
@@ -250,9 +290,19 @@
 		white-space: nowrap;
 		overflow: hidden;
 	}
+	.nav-folder-title-content:hover .tagfolder-quantity span {
+		background-color: var(--interactive-accent-hover);
+		color: var(--text-on-accent);
+	}
+	.tagfolder-quantity span {
+		background-color: var(--background-secondary-alt);
+		border-radius: 4px;
+		padding: 2px 4px;
+	}
 	.tagfolder-quantity {
 		width: 3em;
 		text-align: right;
+		cursor: pointer;
 	}
 
 	.tag-folder-title {

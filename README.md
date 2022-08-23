@@ -33,7 +33,7 @@ Tag Folder respects nested tags and makes the dedicated hierarchy. The nested ch
 
 ```
 TagFolder Readme: #dev #readme #2021/12/10 #status/draft
-Technical informations: #dev #note #2021/12/09 #status/draft
+Technical information: #dev #note #2021/12/09 #status/draft
 SelfHosted LiveSync Readme : #dev #readme #2021/12/06 #status/proofread
 Old Note: #dev #readme #2021/12/10 #status/abandoned
 ```
@@ -69,7 +69,7 @@ You can configure how the entry shows.
 When you enable this option, the value in the frontmatter or first level one heading will be shown instead of `NAME`.
 
 #### Frontmatter path
-Dotted path to retrive title from frontmatter.
+Dotted path to retrieve title from frontmatter.
 
 #### Use pinning
 We can pin the tag if we enable this option.  
@@ -120,6 +120,19 @@ topic
               example note
          example note 
 ```
+
+#### Use virtual tags
+
+When we enable this feature, our notes will be tagged as their freshness automatically.
+| Icon | Edited ...            |
+| ---- | --------------------- |
+| 🕐    | Within an hour        |
+| 📖    | Within 6 hours        |
+| 📗    | Within 3 days         |
+| 📚    | Within 7 days         |
+| 🗄    | Older than 7 days ago |
+
+
 
 #### Hide Items
 

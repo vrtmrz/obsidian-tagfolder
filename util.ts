@@ -1,4 +1,4 @@
-import { SUBTREE_MARK, TreeItem, ViewItem, TagFolderItem } from "types";
+import { SUBTREE_MARK, TreeItem, ViewItem, TagFolderItem, EPOCH_DAY, EPOCH_HOUR, FRESHNESS_1, FRESHNESS_2, FRESHNESS_3, FRESHNESS_4, FRESHNESS_5, tagDispDict } from "types";
 
 export function unique<T>(items: T[]) {
 	return [...new Set<T>([...items])];
@@ -110,4 +110,31 @@ export function ancestorToTags(ancestors: string[]): string[] {
 }
 export function ancestorToLongestTag(ancestors: string[]): string[] {
 	return ancestors.reduceRight((a: string[], e) => !a ? [e] : (a[0].startsWith(e) ? a : [e, ...a]), null)
+}
+
+
+export function isSpecialTag(tagSrc: string) {
+	const tag = tagSrc.startsWith(SUBTREE_MARK)
+		? tagSrc.substring(SUBTREE_MARK.length)
+		: tagSrc;
+	return tag == "_untagged" || tag in tagDispDict;
+}
+
+export function renderSpecialTag(tagSrc: string) {
+	const tag = tagSrc.startsWith(SUBTREE_MARK)
+		? tagSrc.substring(SUBTREE_MARK.length)
+		: tagSrc;
+	return tag in tagDispDict ? tagDispDict[tag] : tag;
+
+}
+
+export function secondsToFreshness(totalAsMSec: number) {
+	const totalAsSec = ~~(totalAsMSec / 1000);
+	const sign = totalAsSec / Math.abs(totalAsSec);
+	const totalSec = ~~(totalAsSec * sign);
+	if (totalSec < EPOCH_HOUR) return FRESHNESS_1
+	if (totalSec < EPOCH_HOUR * 6) return FRESHNESS_2
+	if (totalSec < EPOCH_DAY * 3) return FRESHNESS_3
+	if (totalSec < EPOCH_DAY * 7) return FRESHNESS_4
+	return FRESHNESS_5
 }

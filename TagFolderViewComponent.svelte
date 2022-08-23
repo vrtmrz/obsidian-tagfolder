@@ -22,6 +22,13 @@
 
 	export let setSearchString: (search: string) => void;
 
+	export let openScrollView: (
+		leaf: null,
+		title: string,
+		tagPath: string,
+		files: string[]
+	) => Promise<void>;
+
 	treeRoot.subscribe((root: TreeItem) => {
 		items = root?.children ?? [];
 	});
@@ -135,6 +142,7 @@
 					{showMenu}
 					skippedTag={""}
 					path="/"
+					{openScrollView}
 				/>
 			{/each}
 		</div>
