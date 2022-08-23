@@ -47,7 +47,7 @@
 	function toggleFolder(evt: MouseEvent, entry: TagFolderItem) {
 		if (
 			evt.target instanceof HTMLElement &&
-			evt.target.hasClass("tagfolder-quantity")
+			evt.target.hasClass("itemscount")
 		)
 			return;
 		if ("tag" in entry) {
@@ -231,10 +231,10 @@
 						{tagTitle}{ellipsisMark}
 					</div>
 					<div
-						class="tagfolder-quantity"
+						class="tagfolder-quantity itemscount"
 						on:click={(e) => handleOpenScroll(e, entry)}
 					>
-						<span>{entry.itemsCount}</span>
+						<span class="itemscount">{entry.itemsCount}</span>
 					</div>
 				</div>
 			</div>
