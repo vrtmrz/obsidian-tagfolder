@@ -23,7 +23,6 @@ import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 
 import {
 	SUBTREE_MARK,
-	SUBTREE_MARK_REGEX,
 	TagFolderItem,
 	TreeItem,
 	ViewItem,
@@ -36,7 +35,7 @@ import {
 	VIEW_TYPE_SCROLL
 } from "types";
 import { treeRoot, currentFile, maxDepth, tagInfo } from "store";
-import { ancestorToTags, isAutoExpandTree, isSpecialTag, omittedTags, renderSpecialTag, secondsToFreshness } from "./util";
+import { ancestorToLongestTag, ancestorToTags, isAutoExpandTree, isSpecialTag, omittedTags, renderSpecialTag, secondsToFreshness } from "./util";
 import { ScrollView } from "./ScrollView";
 
 export type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
@@ -262,13 +261,28 @@ class TagFolderView extends ItemView {
 	}
 
 	showMenu(evt: MouseEvent, path: string, entry: TagFolderItem) {
-		const x = path.replace(SUBTREE_MARK_REGEX, "###");
-		const expandedTags = x
-			.split("/")
-			.filter((e) => e.trim() != "")
-			.filter(e => !isSpecialTag(e))
-			.map((e) => e.replace(/###/g, "/"))
-			.map(e => e.split("/").map(ee => renderSpecialTag(ee)).join("/"))
+
+		const entryPath = "tag" in entry ? [...ancestorToTags(entry.ancestors)] : ['root', ...entry.tags];
+
+		if ("tag" in entry) {
+			const oTags = omittedTags(entry);
+			if (oTags != false) {
+				entryPath.push(...oTags);
+			}
+		}
+		entryPath.shift()
+		const expandedTagsAll = ancestorToLongestTag(ancestorToTags(entryPath));
+		const expandedTags = expandedTagsAll
+			.map(e => e.split("/")
+				.filter(ee => !isSpecialTag(ee))
+				.join("/")).filter(e => e != "")
+			.map((e) => "#" + e)
+			.join(" ")
+			.trim();
+		const displayExpandedTags = expandedTagsAll
+			.map(e => e.split("/")
+				.filter(ee => renderSpecialTag(ee))
+				.join("/")).filter(e => e != "")
 			.map((e) => "#" + e)
 			.join(" ")
 			.trim();
@@ -285,6 +299,16 @@ class TagFolderView extends ItemView {
 					})
 			);
 		}
+		menu.addItem((item) =>
+			item
+				.setTitle(`New note ${"tag" in entry ? "in here" : "as like this"}`)
+				.setIcon("create-new")
+				.onClick(async () => {
+					//@ts-ignore
+					const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
+					await this.app.vault.append(ww, expandedTags);
+				})
+		);
 		if ("tag" in entry) {
 			if (this.plugin.settings.useTagInfo && this.plugin.tagInfo != null) {
 				const tag = entry.ancestors[entry.ancestors.length - 1];
@@ -325,7 +349,7 @@ class TagFolderView extends ItemView {
 						.onClick(async () => {
 							const files = entry.allDescendants.map(e => e.path);
 							const tagPath = entry.ancestors.join("/");
-							await this.plugin.openScrollView(null, expandedTags, tagPath, files);
+							await this.plugin.openScrollView(null, displayExpandedTags, tagPath, files);
 						})
 				})
 			}
@@ -419,7 +443,7 @@ const expandDescendants = (
 	const leafs =
 		entry.descendantsMemo != null
 			? entry.descendantsMemo // if memo is exists, use it.
-			: (entry.descendantsMemo = entry.children // or retrieve all and memorize
+			: (entry.descendantsMemo = [...new Set(entry.children // or retrieve all and memorize
 				.map((e) =>
 					"tag" in e
 						? e.children
@@ -429,7 +453,7 @@ const expandDescendants = (
 							.flat()
 						: []
 				)
-				.flat());
+				.flat())]);
 	if (
 		(hideItems == "DEDICATED_INTERMIDIATES" && entry.isDedicatedTree) ||
 		hideItems == "ALL_EXCEPT_BOTTOM"
@@ -1070,6 +1094,13 @@ export default class TagFolderPlugin extends Plugin {
 			.split(",")
 			.map((e) => e.trim())
 			.filter((e) => !!e);
+		const targetFolders = this.settings.targetFolders
+			.toLocaleLowerCase()
+			.replace(/\n/g, "")
+			.split(",")
+			.map((e) => e.trim())
+			.filter((e) => !!e);
+
 
 		const searchItems = this.searchString
 			.toLocaleLowerCase()
@@ -1078,9 +1109,22 @@ export default class TagFolderPlugin extends Plugin {
 
 
 		const today = Date.now();
+
 		for (const fileCache of this.fileCaches) {
 			if (
-				ignoreFolders.find(
+				targetFolders.length > 0 &&
+				!targetFolders.some(
+					(e) => {
+						console.log(fileCache.file.path)
+						return e != "" &&
+							fileCache.file.path.toLocaleLowerCase().startsWith(e)
+					}
+				)
+			) {
+				continue;
+			}
+			if (
+				ignoreFolders.some(
 					(e) =>
 						e != "" &&
 						fileCache.file.path.toLocaleLowerCase().startsWith(e)
@@ -1662,7 +1706,18 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
-
+		new Setting(containerEl)
+			.setName("Target Folders")
+			.setDesc("The plugin will only target files in it.")
+			.addTextArea((text) =>
+				text
+					.setValue(this.plugin.settings.targetFolders)
+					.setPlaceholder("study,documents/summary")
+					.onChange(async (value) => {
+						this.plugin.settings.targetFolders = value;
+						await this.plugin.saveSettings();
+					})
+			);
 		new Setting(containerEl)
 			.setName("Ignore Folders")
 			.setDesc("Ignore documents in specific folders.")

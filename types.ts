@@ -40,6 +40,7 @@ export interface TagFolderSettings {
 	ignoreDocTags: string;
 	ignoreTags: string;
 	ignoreFolders: string;
+	targetFolders: string;
 	hideOnRootTags: string;
 	sortType: "DISPNAME_ASC" |
 	"DISPNAME_DESC" |
@@ -78,6 +79,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	disableNestedTags: false,
 	hideItems: "NONE",
 	ignoreFolders: "",
+	targetFolders: "",
 	scanDelay: 250,
 	useTitle: true,
 	reduceNestedParent: true,
