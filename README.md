@@ -221,6 +221,9 @@ If the note has the tag that is set in here, the note would be treated as there 
 
 Tags that were set here would be treated as there were not.
 
+#### Target Folders
+If we set this, the plugin will only target files in it.
+
 #### Ignore Folders
 
 Ignore documents in specific folders.
