@@ -5,7 +5,6 @@
 		TagFolderItem,
 		SUBTREE_MARK_REGEX,
 		SUBTREE_MARK,
-		tagDispDict,
 	} from "./types";
 	import { isAutoExpandTree, omittedTags, renderSpecialTag } from "./util";
 	import type { TagInfoDict } from "./types";

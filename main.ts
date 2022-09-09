@@ -1115,7 +1115,6 @@ export default class TagFolderPlugin extends Plugin {
 				targetFolders.length > 0 &&
 				!targetFolders.some(
 					(e) => {
-						console.log(fileCache.file.path)
 						return e != "" &&
 							fileCache.file.path.toLocaleLowerCase().startsWith(e)
 					}
