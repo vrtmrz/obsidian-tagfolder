@@ -22,7 +22,7 @@ esbuild
 		external: ["obsidian", "electron", ...builtins],
 		format: "cjs",
 		watch: !prod,
-		target: "es2016",
+		target: "es2018",
 		logLevel: "info",
 		sourcemap: prod ? false : "inline",
 		// sourcemap: false,
