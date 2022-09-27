@@ -24,36 +24,6 @@ export function isAutoExpandTree(entry: TreeItem) {
 			return true;
 		}
 
-		const entryAllTags = ancestorToTags(entry.ancestors.slice(1));
-
-		const entryTags = ancestorToLongestTag(
-			entryAllTags
-		);
-
-		//TODO: Too unintuitive.
-		// just truncating tags till current position.
-		// ex.) In `food`:
-		// root/food/sweet/red -> sweet/red
-		const childrenItemsTag = childrenItems.map(
-			e => (
-				{
-					...e,
-					tags: e.tags.map(
-						oldTag => entryTags.reduce(
-							(trimTag, tagToTrim) => (
-								trimTag.startsWith(tagToTrim + "/") ?
-									trimTag.substring(tagToTrim.length + 1)
-									: trimTag)
-							, oldTag)).filter(e => e)
-				}));
-		const firstLevelChildren = unique(
-			[...childrenItemsTag.flatMap(e => e.tags.map(ee => ee.substring(0, (ee + "/").indexOf("/")))),
-			...childrenTags.map(e => e.tag.startsWith(SUBTREE_MARK) ? e.tag.substring(SUBTREE_MARK.length) : e.tag)]).filter(e => !entryAllTags.contains(e));
-
-		if (firstLevelChildren.length == 1) {
-			return true;
-		}
-
 		if (childrenTags.length == 1 && childrenItems.length > 1) {
 			// Check all children can be unified
 			const sTags = allTags(entry).join("-").toLocaleLowerCase();
