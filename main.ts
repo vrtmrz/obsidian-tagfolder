@@ -1749,5 +1749,34 @@ class TagFolderSettingTab extends PluginSettingTab {
 				text.inputEl.setAttribute("min", "250");
 				return text;
 			});
+
+		containerEl.createEl("h3", { text: "Utilities" });
+
+		new Setting(containerEl)
+			.setName("Dumping tags for reporting bugs")
+			.setDesc(
+				"If you want to open an issue to the GitHub, this information can be useful. and, also if you want to keep secret about name of tags, you can use `disguised`."
+			)
+			.addButton((button) =>
+				button
+					.setButtonText("Copy tags")
+					.setDisabled(false)
+					.onClick(async () => {
+						const items = this.plugin.root.allDescendants.map(e => e.tags.filter(e => e != "_untagged")).filter(e => e.length);
+						await navigator.clipboard.writeText(items.map(e => e.map(e => `#${e}`).join(", ")).join("\n"));
+						new Notice("Copied to clipboard");
+					})
+			).addButton((button) =>
+				button
+					.setButtonText("Copy disguised tags")
+					.setDisabled(false)
+					.onClick(async () => {
+						const x = new Map<string, number>();
+						let i = 0;
+						const items = this.plugin.root.allDescendants.map(e => e.tags.filter(e => e != "_untagged").map(e => x.has(e) ? x.get(e) : (x.set(e, i++), i))).filter(e => e.length);
+						await navigator.clipboard.writeText(items.map(e => e.map(e => `#tag${e}`).join(", ")).join("\n"));
+						new Notice("Copied to clipboard");
+					})
+			);
 	}
 }
