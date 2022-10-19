@@ -108,3 +108,22 @@ export function secondsToFreshness(totalAsMSec: number) {
 	if (totalSec < EPOCH_DAY * 7) return FRESHNESS_4
 	return FRESHNESS_5
 }
+
+
+let lastSkipped = 0;
+
+// The message pump having ancient name.
+export const doEvents = () => {
+	const n = performance.now();
+	// keep intact the microtask while 20ms
+	if (n - lastSkipped < 20) {
+		return Promise.resolve();
+	}
+	// otherwise, run next process after some microtask.
+	return new Promise<void>((res) => {
+		window.requestAnimationFrame(() => {
+			lastSkipped = performance.now();
+			res();
+		});
+	});
+};

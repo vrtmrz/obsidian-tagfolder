@@ -35,7 +35,7 @@ import {
 	VIEW_TYPE_SCROLL
 } from "types";
 import { treeRoot, currentFile, maxDepth, tagInfo } from "store";
-import { ancestorToLongestTag, ancestorToTags, isAutoExpandTree, isSpecialTag, omittedTags, renderSpecialTag, secondsToFreshness } from "./util";
+import { ancestorToLongestTag, ancestorToTags, doEvents, isAutoExpandTree, isSpecialTag, omittedTags, renderSpecialTag, secondsToFreshness } from "./util";
 import { ScrollView } from "./ScrollView";
 
 export type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
@@ -70,22 +70,6 @@ const OrderKeyItem: Record<string, string> = {
 	FULLPATH: "Fullpath of the file",
 };
 
-let lastSkipped = 0;
-// The message pump having ancient name.
-const doevents = () => {
-	const n = performance.now();
-	// keep intact the microtask while 20ms
-	if (n - lastSkipped < 20) {
-		return Promise.resolve();
-	}
-	// otherwise, run next process after some microtask.
-	return new Promise<void>((res) => {
-		window.requestAnimationFrame(() => {
-			lastSkipped = performance.now();
-			res();
-		});
-	});
-};
 
 const dotted = (object: any, notation: string) => {
 	return notation.split('.').reduce((a, b) => (a && (b in a)) ? a[b] : null, object);
@@ -120,13 +104,13 @@ class TagFolderView extends ItemView {
 	}
 
 	showOrder(evt: MouseEvent) {
-		const menu = new Menu(this.app);
+		const menu = new Menu();
 
 		menu.addItem((item) => {
 			item.setTitle("Tags")
 				.setIcon("hashtag")
 				.onClick(async (evt2) => {
-					const menu2 = new Menu(this.app);
+					const menu2 = new Menu();
 					for (const key in OrderKeyTag) {
 						for (const direction in OrderDirection) {
 							menu2.addItem((item) => {
@@ -161,7 +145,7 @@ class TagFolderView extends ItemView {
 			item.setTitle("Items")
 				.setIcon("document")
 				.onClick(async (evt2) => {
-					const menu2 = new Menu(this.app);
+					const menu2 = new Menu();
 					for (const key in OrderKeyItem) {
 						for (const direction in OrderDirection) {
 							menu2.addItem((item) => {
@@ -194,7 +178,7 @@ class TagFolderView extends ItemView {
 	}
 
 	showLevelSelect(evt: MouseEvent) {
-		const menu = new Menu(this.app);
+		const menu = new Menu();
 		const setLevel = async (level: number) => {
 			this.plugin.settings.expandLimit = level;
 			await this.plugin.saveSettings();
@@ -286,7 +270,7 @@ class TagFolderView extends ItemView {
 			.map((e) => "#" + e)
 			.join(" ")
 			.trim();
-		const menu = new Menu(this.app);
+		const menu = new Menu();
 
 		if (navigator && navigator.clipboard) {
 			menu.addItem((item) =>
@@ -527,7 +511,7 @@ const expandTree = async (node: TreeItem, reduceNestedParent: boolean): Promise<
 const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: TreeItem): Promise<boolean> => {
 	let modified = false;
 	const xRoot = root || entry;
-	await doevents();
+	await doEvents();
 	entry.children = entry.children.sort((a, b) => {
 		if ("tag" in a && "tag" in b) {
 			return a.tag.split("/").length - b.tag.split("/").length;
@@ -1131,7 +1115,7 @@ export default class TagFolderPlugin extends Plugin {
 			) {
 				continue;
 			}
-			await doevents();
+			await doEvents();
 			const allTagsDocs = [...new Set(getAllTags(fileCache.metadata) ?? [])];
 			let allTags = allTagsDocs.map((e) => e.substring(1));
 			if (this.settings.disableNestedTags) {
@@ -1267,8 +1251,10 @@ export default class TagFolderPlugin extends Plugin {
 	async openScrollView(leaf: WorkspaceLeaf, title: string, tagPath: string, files: string[]) {
 		if (!leaf) {
 			// const recent = this.app.workspace.getMostRecentLeaf();
-			leaf = this.app.workspace.createLeafInParent(this.app.workspace.rootSplit, 1);
+			// leaf = this.app.workspace.createLeafInParent(this.app.workspace.getLeaf("split"), 1);
+			leaf = this.app.workspace.getLeaf("split");
 		}
+		// this.app.workspace.create
 		await leaf.setViewState({
 			type: VIEW_TYPE_SCROLL,
 			active: true,

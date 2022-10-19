@@ -5,6 +5,7 @@
 	import { renderSpecialTag } from "./util";
 
 	import ScrollViewMarkdown from "ScrollViewMarkdownComponent.svelte";
+	import { onDestroy, onMount } from "svelte";
 
 	export let store: Writable<ScrollViewState> = writable<ScrollViewState>({
 		files: [],
@@ -29,6 +30,32 @@
 		openfile(file.path);
 		e.preventDefault();
 	}
+	// Observe appearing and notify the component that you should render the content.
+	let scrollEl: HTMLElement;
+	let observer: IntersectionObserver;
+	const onAppearing = new CustomEvent("appearing", {
+		detail: {},
+	});
+	onMount(() => {
+		const options = {
+			root: scrollEl,
+			rootMargin: "10px",
+			threshold: 0,
+		};
+		observer = new IntersectionObserver(
+			(entries: IntersectionObserverEntry[]) => {
+				for (const entry of entries) {
+					if (entry.isIntersecting) {
+						entry.target.dispatchEvent(onAppearing);
+					}
+				}
+			},
+			options
+		);
+	});
+	onDestroy(() => {
+		observer.disconnect();
+	});
 </script>
 
 <div class="x">
@@ -37,12 +64,16 @@
 	</div>
 	<hr />
 	{#each files as file}
-		<div class="file" on:click={(evt) => handleOpenFile(evt, file)}>
+		<div
+			class="file"
+			on:click={(evt) => handleOpenFile(evt, file)}
+			bind:this={scrollEl}
+		>
 			<div class="header">
 				<span>{file.title}</span>
 				<span class="path">({file.path})</span>
 			</div>
-			<ScrollViewMarkdown {file} />
+			<ScrollViewMarkdown {file} {observer} />
 			<hr />
 		</div>
 	{/each}

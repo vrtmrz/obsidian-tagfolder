@@ -1,16 +1,27 @@
 <script lang="ts">
 	import { MarkdownRenderer } from "obsidian";
 
-	import { onMount } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import { ScrollViewFile } from "types";
 
 	export let file: ScrollViewFile = { path: "" };
-	let el: HTMLDivElement;
+	export let observer: IntersectionObserver;
 
-	onMount(() => {
+	let el: HTMLElement;
+
+	function onAppearing(this: HTMLElement, ev: Event) {
 		if (file.content && el) {
 			MarkdownRenderer.renderMarkdown(file.content, el, file.path, null);
 		}
+	}
+
+	onMount(() => {
+		observer.observe(el);
+		el.addEventListener("appearing", onAppearing);
+	});
+	onDestroy(() => {
+		observer.unobserve(el);
+		el.removeEventListener("appearing", onAppearing);
 	});
 
 	$: {
@@ -21,8 +32,7 @@
 	}
 </script>
 
-<div class="markdownBody" bind:this={el}>
-</div>
+<div class="markdownBody" bind:this={el} />
 
 <style>
 	.markdownBody {

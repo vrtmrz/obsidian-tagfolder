@@ -11,6 +11,7 @@ import {
 } from "types";
 import { writable, Writable } from "svelte/store";
 import TagFolderPlugin from "./main";
+import { doEvents } from "./util";
 
 // Show notes as like scroll.
 export class ScrollView extends ItemView {
@@ -79,6 +80,7 @@ export class ScrollView extends ItemView {
 				}
 				const title = this.plugin.getFileTitle(f);
 				const w = await this.app.vault.read(f);
+				await doEvents();
 				item.content = w;
 				item.title = title;
 				items.push(item);
