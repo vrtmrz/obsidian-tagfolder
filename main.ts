@@ -350,6 +350,33 @@ class TagFolderView extends ItemView {
 			);
 		}
 
+		if ("tags" in entry) {
+			menu.addSeparator();
+			menu.addItem((item) =>
+				item
+					.setTitle(`Open in new tab`)
+					.setIcon("lucide-file-plus")
+					.onClick(async () => {
+						app.workspace.openLinkText(entry.path, entry.path, "tab");
+					})
+			);
+			menu.addItem((item) =>
+				item
+					.setTitle(`Open to the right`)
+					.setIcon("lucide-separator-vertical")
+					.onClick(async () => {
+						app.workspace.openLinkText(entry.path, entry.path, "split");
+					})
+			);
+			// menu.addItem((item) =>
+			// 	item
+			// 		.setTitle(`Open in new window`)
+			// 		.setIcon("lucide-maximize")
+			// 		.onClick(async () => {
+			// 			app.workspace.openLinkText(entry.path, entry.path, "window");
+			// 		})
+			// );
+		}
 		if ("screenX" in evt) {
 			menu.showAtPosition({ x: evt.pageX, y: evt.pageY });
 		} else {
@@ -759,14 +786,19 @@ export default class TagFolderPlugin extends Plugin {
 	}
 
 	// Called when item clicked in the tag folder pane.
-	readonly focusFile = (path: string): void => {
+	readonly focusFile = (path: string, specialKey: boolean): void => {
 		const targetFile = this.app.vault
 			.getFiles()
 			.find((f) => f.path === path);
 
 		if (targetFile) {
-			const leaf = this.app.workspace.getLeaf(false);
-			leaf.openFile(targetFile);
+			if (specialKey) {
+				app.workspace.openLinkText(targetFile.path, targetFile.path, "split");
+			} else {
+				// const leaf = this.app.workspace.getLeaf(false);
+				// leaf.openFile(targetFile);
+				app.workspace.openLinkText(targetFile.path, targetFile.path);
+			}
 		}
 	};
 

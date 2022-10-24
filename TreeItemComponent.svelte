@@ -10,7 +10,7 @@
 	import type { TagInfoDict } from "./types";
 	export let entry: TagFolderItem;
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
-	export let openfile: (path: string) => void;
+	export let openfile: (path: string, specialKey: boolean) => void;
 	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
 	export let showMenu: (
 		evt: MouseEvent,
@@ -65,8 +65,8 @@
 		}
 	}
 
-	function openfileLocal(entry: TagFolderItem) {
-		if ("path" in entry) openfile(entry.path);
+	function openfileLocal(entry: TagFolderItem, evt: MouseEvent) {
+		if ("path" in entry) openfile(entry.path, evt.metaKey || evt.ctrlKey);
 	}
 	function handleContextMenu(
 		e: MouseEvent,
@@ -252,7 +252,7 @@
 			<div
 				class="nav-file-title"
 				class:is-active={isSelected}
-				on:click={() => openfileLocal(entry)}
+				on:click={(evt) => openfileLocal(entry, evt)}
 				on:mouseover={(e) => handleMouseover(e, entry)}
 				on:focus={() => {
 					/* ignore aria complaint */

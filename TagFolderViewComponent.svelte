@@ -7,7 +7,7 @@
 
 	export let items: Array<TagFolderItem> = [];
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
-	export let openfile: (path: string) => void;
+	export let openfile: (path: string, specialKey: boolean) => void;
 	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
 	export let vaultname: string = "";
 	export let showMenu: (
@@ -74,7 +74,11 @@
 <div hidden bind:this={iconDivEl} />
 <div class="nav-header">
 	<div class="nav-buttons-container tagfolder-buttons-container">
-		<div class="clickable-icon nav-action-button" aria-label="New note" on:click={newNote}>
+		<div
+			class="clickable-icon nav-action-button"
+			aria-label="New note"
+			on:click={newNote}
+		>
 			{@html documentIcon}
 		</div>
 		<div
