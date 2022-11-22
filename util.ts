@@ -1,4 +1,4 @@
-import { SUBTREE_MARK, TreeItem, ViewItem, TagFolderItem, EPOCH_DAY, EPOCH_HOUR, FRESHNESS_1, FRESHNESS_2, FRESHNESS_3, FRESHNESS_4, FRESHNESS_5, tagDispDict } from "types";
+import { SUBTREE_MARK, TreeItem, ViewItem, TagFolderItem, EPOCH_DAY, EPOCH_HOUR, FRESHNESS_1, FRESHNESS_2, FRESHNESS_3, FRESHNESS_4, FRESHNESS_5, tagDispDict, TagFolderSettings } from "types";
 
 export function unique<T>(items: T[]) {
 	return [...new Set<T>([...items])];
@@ -8,7 +8,8 @@ export function allTags(entry: TagFolderItem): string[] {
 	return unique([...(entry?.descendants ?? []).flatMap(e => e.tags), ...entry.children.flatMap(e => "tag" in e ? allTags(e) : e.tags).filter(e => e)]);
 }
 
-export function isAutoExpandTree(entry: TreeItem) {
+export function isAutoExpandTree(entry: TreeItem, setting: TagFolderSettings) {
+	if (setting.doNotSimplifyTags) return false;
 	if ("tag" in entry) {
 
 		const childrenTags = entry.children.filter(
@@ -39,7 +40,8 @@ export function isAutoExpandTree(entry: TreeItem) {
 	return false;
 }
 
-export function omittedTags(entry: TreeItem): false | string[] {
+export function omittedTags(entry: TreeItem, setting: TagFolderSettings): false | string[] {
+	if (setting.doNotSimplifyTags) return false;
 	const childrenTags = entry.children.filter(
 		(e) => "tag" in e
 	) as TreeItem[];
@@ -94,7 +96,7 @@ export function renderSpecialTag(tagSrc: string) {
 	const tag = tagSrc.startsWith(SUBTREE_MARK)
 		? tagSrc.substring(SUBTREE_MARK.length)
 		: tagSrc;
-	return tag in tagDispDict ? tagDispDict[tag] : tag;
+	return tag in tagDispDict ? tagDispDict[tag] : tagSrc;
 
 }
 

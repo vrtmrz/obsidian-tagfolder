@@ -34,7 +34,7 @@ import {
 	DEFAULT_SETTINGS,
 	VIEW_TYPE_SCROLL
 } from "types";
-import { treeRoot, currentFile, maxDepth, tagInfo } from "store";
+import { treeRoot, currentFile, maxDepth, tagInfo, tagFolderSetting } from "store";
 import { ancestorToLongestTag, ancestorToTags, doEvents, isAutoExpandTree, isSpecialTag, omittedTags, renderSpecialTag, secondsToFreshness } from "./util";
 import { ScrollView } from "./ScrollView";
 
@@ -249,7 +249,7 @@ class TagFolderView extends ItemView {
 		const entryPath = "tag" in entry ? [...ancestorToTags(entry.ancestors)] : ['root', ...entry.tags];
 
 		if ("tag" in entry) {
-			const oTags = omittedTags(entry);
+			const oTags = omittedTags(entry, this.plugin.settings);
 			if (oTags != false) {
 				entryPath.push(...oTags);
 			}
@@ -823,7 +823,7 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		if ("tag" in entry) {
 			if (path.indexOf(entry.tag) !== -1) return;
-			if (omittedTags(entry)) return;
+			if (omittedTags(entry, this.settings)) return;
 			const key = entry.ancestors.join("/");
 			for (const tags of this.expandedFolders) {
 				const tagPrefixToOpen = [];
@@ -844,7 +844,7 @@ export default class TagFolderPlugin extends Plugin {
 
 						for (const child of entry.children) {
 							if ("tag" in child) {
-								const autoExp = isAutoExpandTree(child);
+								const autoExp = isAutoExpandTree(child, this.settings);
 								const nextDepth = autoExp ? maxDepth : maxDepth - 1;
 								if (path.indexOf(child.tag) == -1) {
 									await this.expandLastExpandedFolders(child, false, [...path, entry.tag], openedTags, nextDepth);
@@ -1481,6 +1481,7 @@ ${this.tagInfoBody}`;
 			await this.loadData()
 		);
 		await this.loadTagInfo();
+		tagFolderSetting.set(this.settings);
 		this.compareItems = getCompareMethodItems(this.settings);
 		this.compareTags = getCompareMethodTags(this.settings);
 	}
@@ -1488,6 +1489,7 @@ ${this.tagInfoBody}`;
 	async saveSettings() {
 		await this.saveData(this.settings);
 		await this.saveTagInfo();
+		tagFolderSetting.set(this.settings);
 		this.compareItems = getCompareMethodItems(this.settings);
 		this.compareTags = getCompareMethodTags(this.settings);
 	}
@@ -1602,6 +1604,19 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.mergeRedundantCombination)
 					.onChange(async (value) => {
 						this.plugin.settings.mergeRedundantCombination = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Do not simplify empty folders")
+			.setDesc(
+				"Keep empty folders, even if they can be simplified."
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.doNotSimplifyTags)
+					.onChange(async (value) => {
+						this.plugin.settings.doNotSimplifyTags = value;
 						await this.plugin.saveSettings();
 					});
 			});

@@ -65,6 +65,7 @@ export interface TagFolderSettings {
 	tagInfo: string;
 	mergeRedundantCombination: boolean;
 	useVirtualTag: boolean;
+	doNotSimplifyTags: boolean;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -88,6 +89,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	tagInfo: "pininfo.md",
 	mergeRedundantCombination: false,
 	useVirtualTag: false,
+	doNotSimplifyTags: false,
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";

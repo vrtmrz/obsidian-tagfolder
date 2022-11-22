@@ -1,10 +1,12 @@
 <script lang="ts">
-	import { currentFile, maxDepth, tagInfo } from "./store";
+	import { currentFile, maxDepth, tagInfo, tagFolderSetting } from "./store";
 	import {
 		TreeItem,
 		TagFolderItem,
 		SUBTREE_MARK_REGEX,
 		SUBTREE_MARK,
+		TagFolderSettings,
+		DEFAULT_SETTINGS,
 	} from "./types";
 	import { isAutoExpandTree, omittedTags, renderSpecialTag } from "./util";
 	import type { TagInfoDict } from "./types";
@@ -45,6 +47,12 @@
 		.split("/").length;
 	let _maxDepth = currentDepth + 1;
 
+	let setting: TagFolderSettings = JSON.parse(
+		JSON.stringify(DEFAULT_SETTINGS)
+	);
+	tagFolderSetting.subscribe((newSetting) => {
+		setting = newSetting;
+	});
 	function toggleFolder(evt: MouseEvent, entry: TagFolderItem) {
 		if (
 			evt.target instanceof HTMLElement &&
@@ -136,8 +144,8 @@
 		ellipsisMark = "";
 		omitTags = [];
 		if ("tag" in entry) {
-			showOnlyChildren = isAutoExpandTree(entry);
-			const omitTag = omittedTags(entry);
+			showOnlyChildren = isAutoExpandTree(entry, setting);
+			const omitTag = omittedTags(entry, setting);
 			if (omitTag !== false) {
 				omitTags = [
 					...omitTag.map((e) =>
@@ -147,7 +155,8 @@
 							.join("/")
 					),
 				];
-				ellipsisMark = "/" + omitTags.join("/");
+				ellipsisMark =
+					" " + omitTags.join(" ").replace(/\//g, SUBTREE_MARK);
 			}
 		}
 	}
@@ -158,7 +167,7 @@
 			? `${
 					skippedTag
 						? `${skippedTag}${
-								entry.tag.startsWith(SUBTREE_MARK) ? " " : "/"
+								entry.tag.startsWith(SUBTREE_MARK) ? " " : " "
 						  }`
 						: ""
 			  }${tagMark}${convertedTag}`
