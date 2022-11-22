@@ -76,8 +76,15 @@ We can pin the tag if we enable this option.
 When this feature is enabled, the pin information is saved in the file set in the next configuration.  
 Pinned tags are sorted according to `key` in the frontmatter of `taginfo.md`.
 
-### Pin information file.
+#### Pin information file.
 We can change the name of the file in which pin information is saved.
+
+
+#### Merge redundant combinations
+When this feature is enabled, a/b and b/a are merged into a/b if there is no intermediates.
+
+#### Do not simplify empty folders
+Keep empty folders, even if they can be simplified.
 
 #### Order method (Tags)
 
