@@ -139,7 +139,9 @@ When we enable this feature, our notes will be tagged as their freshness automat
 | 📚    | Within 7 days         |
 | 🗄    | Older than 7 days ago |
 
-
+#### Search tags inside TagFolder when clicking tags
+We can search tags inside TagFolder when clicking tags instead of opening the default search pane.
+With control keys, we can remove the tag from the search condition or add an exclusion of it to that.
 
 #### Hide Items
 
