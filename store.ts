@@ -6,7 +6,7 @@ export const currentFile = writable<string>("");
 
 export const maxDepth = writable<number>(0);
 
-export const filterString = writable<string>("");
+export const searchString = writable<string>("");
 export const tagInfo = writable<TagInfoDict>({});
 
 export const tagFolderSetting = writable<TagFolderSettings>(DEFAULT_SETTINGS);

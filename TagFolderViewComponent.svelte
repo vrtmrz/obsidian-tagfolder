@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { treeRoot } from "./store";
+	import { searchString, treeRoot } from "./store";
 	import { TreeItem, TagFolderItem } from "./types";
 	import TreeItemComponent from "./TreeItemComponent.svelte";
 	import { onMount } from "svelte";
@@ -22,8 +22,6 @@
 
 	export let newNote: (evt: MouseEvent) => void;
 
-	export let setSearchString: (search: string) => void;
-
 	export let openScrollView: (
 		leaf: null,
 		title: string,
@@ -38,11 +36,16 @@
 	let search = "";
 
 	$: {
-		// filterString.set(search);
-		if (setSearchString != null) {
-			setSearchString(search);
-		}
+		searchString.set(search);
 	}
+	searchString.subscribe((newSearch: string) => {
+		if (search != newSearch) {
+			if (newSearch != "") {
+				showSearch = true;
+			}
+			search = newSearch;
+		}
+	});
 	let showSearch = false;
 	function toggleSearch() {
 		showSearch = !showSearch;

@@ -34,7 +34,7 @@ import {
 	DEFAULT_SETTINGS,
 	VIEW_TYPE_SCROLL
 } from "types";
-import { treeRoot, currentFile, maxDepth, tagInfo, tagFolderSetting } from "store";
+import { treeRoot, currentFile, maxDepth, tagInfo, tagFolderSetting, searchString } from "store";
 import { ancestorToLongestTag, ancestorToTags, doEvents, isAutoExpandTree, isSpecialTag, omittedTags, renderSpecialTag, secondsToFreshness } from "./util";
 import { ScrollView } from "./ScrollView";
 
@@ -230,7 +230,6 @@ class TagFolderView extends ItemView {
 				showLevelSelect: this.showLevelSelect,
 				showOrder: this.showOrder,
 				newNote: this.newNote,
-				setSearchString: this.plugin.setSearchString,
 				openScrollView: this.plugin.openScrollView
 			},
 		});
@@ -755,6 +754,13 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 	}
 }
 
+// Thank you @pjeby!
+function onElement<T extends HTMLElement | Document>(el: T, event: string, selector: string, callback: any, options: EventListenerOptions) {
+	//@ts-ignore
+	el.on(event, selector, callback, options)
+	//@ts-ignore
+	return () => el.off(event, selector, callback, options);
+}
 
 export default class TagFolderPlugin extends Plugin {
 	settings: TagFolderSettings;
@@ -813,8 +819,7 @@ export default class TagFolderPlugin extends Plugin {
 	}
 
 	setSearchString(search: string) {
-		this.searchString = search;
-		this.refreshAllTree(null);
+		searchString.set(search);
 	}
 	expandingProcs = 0;
 	async expandLastExpandedFolders(entry: TagFolderItem, force?: boolean, path: string[] = [], openedTags: { [key: string]: Set<string> } = {}, maxDepth = 1) {
@@ -969,6 +974,78 @@ export default class TagFolderPlugin extends Plugin {
 				await this.loadTagInfo();
 			});
 		}
+		searchString.subscribe((search => {
+			this.searchString = search;
+			this.refreshAllTree(null);
+		}))
+
+
+		const setTagSearchString = (event: MouseEvent, tagString: string) => {
+			if (tagString) {
+				const regExpTagStr = new RegExp(`(^|\\s)${tagString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`, "u");
+				const regExpTagStrInv = new RegExp(`(^|\\s)-${tagString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`, "u");
+				if (event.ctrlKey) {
+					if (this.searchString.match(regExpTagStr)) {
+						this.setSearchString(this.searchString.replace(regExpTagStr, ""));
+					} else if (!this.searchString.match(regExpTagStrInv)) {
+						this.setSearchString(this.searchString + (this.searchString.length == 0 ? "" : " ") + `-${tagString}`);
+					}
+				} else {
+					if (this.searchString.match(regExpTagStrInv)) {
+						this.setSearchString(this.searchString.replace(regExpTagStrInv, ""));
+					} else if (!this.searchString.match(regExpTagStr)) {
+						this.setSearchString(this.searchString + (this.searchString.length == 0 ? "" : " ") + `${tagString}`);
+					}
+				}
+				event.preventDefault();
+				event.stopPropagation();
+
+			}
+		}
+
+		const selectorHashTagLink = 'a.tag[href^="#"]';
+		const selectorHashTagSpan = "span.cm-hashtag.cm-meta";
+		this.register(
+			onElement(document, "click", selectorHashTagLink, (event: MouseEvent, targetEl: HTMLElement) => {
+				if (!this.settings.overrideTagClicking) return;
+				const tagString = targetEl.innerText.substring(1);
+				if (tagString) {
+					setTagSearchString(event, tagString);
+				}
+			}, { capture: true })
+		);
+		this.register(
+			onElement(document, "click", selectorHashTagSpan, (event: MouseEvent, targetEl: HTMLElement) => {
+				if (!this.settings.overrideTagClicking) return;
+				let enumTags: Element = targetEl;
+				let tagString = "";
+				// A tag is consisted of possibly several spans having each class.
+				// Usually, they have been merged into two spans. but can be more.
+				// In any event, the first item has `cm-hashtag-begin`, and the last
+				// item has `cm-hashtag-end` but both (or all) spans possibly raises events.
+				// So we have to find the head and trace them to the tail.
+				while (!enumTags.classList.contains("cm-hashtag-begin")) {
+					enumTags = enumTags.previousElementSibling;
+					if (!enumTags) {
+						console.log("Error! start tag not found.");
+						return;
+					}
+				}
+
+				do {
+					if (enumTags instanceof HTMLElement) {
+						tagString += enumTags.innerText;
+						if (enumTags.classList.contains("cm-hashtag-end")) {
+							break;
+						}
+					}
+					enumTags = enumTags.nextElementSibling;
+
+				} while (enumTags);
+				tagString = tagString.substring(1) //Snip hash.
+				setTagSearchString(event, tagString);
+			}, { capture: true })
+		);
 	}
 
 	watchWorkspaceOpen(file: TFile) {
@@ -1692,6 +1769,16 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.useVirtualTag)
 					.onChange(async (value) => {
 						this.plugin.settings.useVirtualTag = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Search tags inside TagFolder when clicking tags.")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.overrideTagClicking)
+					.onChange(async (value) => {
+						this.plugin.settings.overrideTagClicking = value;
 						await this.plugin.saveSettings();
 					});
 			});

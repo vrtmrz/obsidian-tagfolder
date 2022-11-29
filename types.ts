@@ -66,6 +66,7 @@ export interface TagFolderSettings {
 	mergeRedundantCombination: boolean;
 	useVirtualTag: boolean;
 	doNotSimplifyTags: boolean;
+	overrideTagClicking: boolean;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -90,6 +91,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	mergeRedundantCombination: false,
 	useVirtualTag: false,
 	doNotSimplifyTags: false,
+	overrideTagClicking: false,
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";
