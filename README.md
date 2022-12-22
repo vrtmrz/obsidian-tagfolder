@@ -1,6 +1,6 @@
 ## TagFolder
 
-This is the plugin that shows your tags as like a folder.
+This is the plugin that shows your tags like folders.
 
 ![screenshot](images/screenshot.png)
 
@@ -8,7 +8,7 @@ This is the plugin that shows your tags as like a folder.
 
 Install this plugin, press `Ctrl+p`, and choose "Show Tag Folder".
 
-### Behavior
+### Behaviour
 
 This plugin creates a tree by tags permutation.
 
@@ -47,7 +47,7 @@ Old Note: #dev #readme #2021/12/10 #status/abandoned
 
 
 #### Search tags
-You can search tags. As like this:
+You can search tags. like this:
 
 ```
 sweet -red | food -sweet
@@ -81,7 +81,7 @@ We can change the name of the file in which pin information is saved.
 
 
 #### Merge redundant combinations
-When this feature is enabled, a/b and b/a are merged into a/b if there is no intermediates.
+When this feature is enabled, a/b and b/a are merged into a/b if there are no intermediates.
 
 #### Do not simplify empty folders
 Keep empty folders, even if they can be simplified.
@@ -104,11 +104,11 @@ You can order items by:
 
 If you enable this option, every nested tag is split into normal tags.
 
-`#dev/TagFolder` will be treated as like `#dev` and `#TagFolder`.
+`#dev/TagFolder` will be treated like `#dev` and `#TagFolder`.
 
 #### Reduce duplicated parents in nested tags
 
-If we have the doc (e.g., `example note`) with nested tags which have same parents, as like `#topic/calculus`, `#topic/electromagnetics`:
+If we have the doc (e.g., `example note`) with nested tags which have the same parents, like `#topic/calculus`, `#topic/electromagnetics`:
 
 - Disabled
 ```
@@ -141,7 +141,7 @@ When we enable this feature, our notes will be tagged as their freshness automat
 
 #### Search tags inside TagFolder when clicking tags
 We can search tags inside TagFolder when clicking tags instead of opening the default search pane.
-With control keys, we can remove the tag from the search condition or add an exclusion of it to that.
+With control and shift keys, we can remove the tag from the search condition or add an exclusion of it to that.
 
 #### Hide Items
 
