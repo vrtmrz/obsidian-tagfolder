@@ -53,6 +53,9 @@
 			search = "";
 		}
 	}
+	function clearSearch() {
+		search = "";
+	}
 	let iconDivEl: HTMLDivElement;
 	let documentIcon = "";
 	let folderIcon = "";
@@ -119,7 +122,8 @@
 			<div
 				class="search-input-clear-button"
 				aria-label="Clear search"
-				style="display: none;"
+				style="display:{search.trim() == '' ? 'none' : ''};"
+				on:click={clearSearch}
 			/>
 		</div>
 	{/if}

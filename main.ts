@@ -984,18 +984,21 @@ export default class TagFolderPlugin extends Plugin {
 			if (tagString) {
 				const regExpTagStr = new RegExp(`(^|\\s)${tagString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`, "u");
 				const regExpTagStrInv = new RegExp(`(^|\\s)-${tagString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`, "u");
-				if (event.ctrlKey) {
+				if (event.ctrlKey && event.shiftKey) {
 					if (this.searchString.match(regExpTagStr)) {
 						this.setSearchString(this.searchString.replace(regExpTagStr, ""));
 					} else if (!this.searchString.match(regExpTagStrInv)) {
 						this.setSearchString(this.searchString + (this.searchString.length == 0 ? "" : " ") + `-${tagString}`);
 					}
-				} else {
+				} else if (event.ctrlKey) {
 					if (this.searchString.match(regExpTagStrInv)) {
 						this.setSearchString(this.searchString.replace(regExpTagStrInv, ""));
 					} else if (!this.searchString.match(regExpTagStr)) {
 						this.setSearchString(this.searchString + (this.searchString.length == 0 ? "" : " ") + `${tagString}`);
 					}
+				} else {
+					this.setSearchString(tagString);
+
 				}
 				event.preventDefault();
 				event.stopPropagation();
