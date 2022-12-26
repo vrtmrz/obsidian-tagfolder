@@ -125,5 +125,6 @@ export const tagDispDict: { [key: string]: string } = {
 	FRESHNESS_03: "📗",
 	FRESHNESS_04: "📚",
 	FRESHNESS_05: "🗄",
-	_VIRTUAL_TAG_FRESHNESS: "⌛"
+	_VIRTUAL_TAG_FRESHNESS: "⌛",
+	_VIRTUAL_TAG_CANVAS: "📋 Canvas"
 };

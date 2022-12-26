@@ -1141,7 +1141,7 @@ export default class TagFolderPlugin extends Plugin {
 
 	updateFileCaches(diff?: TFile) {
 		if (this.fileCaches.length == 0 || !diff) {
-			const files = this.app.vault.getMarkdownFiles();
+			const files = [...this.app.vault.getMarkdownFiles(), ...this.app.vault.getAllLoadedFiles().filter(e => "extension" in e && e.extension == "canvas") as TFile[]];
 			this.fileCaches = files.map((fileEntry) => {
 				return {
 					file: fileEntry,
@@ -1235,6 +1235,9 @@ export default class TagFolderPlugin extends Plugin {
 			}
 			if (allTags.length == 0) {
 				allTags = ["_untagged"];
+			}
+			if (fileCache.file.extension == "canvas") {
+				allTags.push("_VIRTUAL_TAG_CANVAS")
 			}
 			if (this.settings.useVirtualTag) {
 				const mtime = fileCache.file.stat.mtime;
