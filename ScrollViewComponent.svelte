@@ -12,7 +12,7 @@
 		title: "",
 		tagPath: "",
 	});
-	export let openfile: (path: string) => void;
+	export let openfile: (path: string, specialKey: boolean) => void;
 	let state: ScrollViewState = { files: [], title: "", tagPath: "" };
 
 	$: {
@@ -27,7 +27,7 @@
 		.map((e) => renderSpecialTag(e))
 		.join("/");
 	function handleOpenFile(e: MouseEvent, file: ScrollViewFile) {
-		openfile(file.path);
+		openfile(file.path, false);
 		e.preventDefault();
 	}
 	// Observe appearing and notify the component that you should render the content.

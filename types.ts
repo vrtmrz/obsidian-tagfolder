@@ -67,6 +67,7 @@ export interface TagFolderSettings {
 	useVirtualTag: boolean;
 	doNotSimplifyTags: boolean;
 	overrideTagClicking: boolean;
+	useMultiPaneList: boolean;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -92,6 +93,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	useVirtualTag: false,
 	doNotSimplifyTags: false,
 	overrideTagClicking: false,
+	useMultiPaneList: false,
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";
@@ -128,3 +130,8 @@ export const tagDispDict: { [key: string]: string } = {
 	_VIRTUAL_TAG_FRESHNESS: "⌛",
 	_VIRTUAL_TAG_CANVAS: "📋 Canvas"
 };
+
+export const CONTEXT_KEY = Symbol();
+export type TagFolderViewContext = {
+	isMainTree: boolean;
+}

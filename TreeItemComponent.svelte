@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { currentFile, maxDepth, tagInfo, tagFolderSetting } from "./store";
+	import {
+		currentFile,
+		maxDepth,
+		tagInfo,
+		tagFolderSetting,
+		selectedTags,
+	} from "./store";
 	import {
 		TreeItem,
 		TagFolderItem,
@@ -8,7 +14,13 @@
 		TagFolderSettings,
 		DEFAULT_SETTINGS,
 	} from "./types";
-	import { isAutoExpandTree, omittedTags, renderSpecialTag } from "./util";
+	import {
+		ancestorToLongestTag,
+		ancestorToTags,
+		isAutoExpandTree,
+		omittedTags,
+		renderSpecialTag,
+	} from "./util";
 	import type { TagInfoDict } from "./types";
 	export let entry: TagFolderItem;
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
@@ -29,6 +41,8 @@
 	) => Promise<void>;
 
 	export let folderIcon: string;
+	export let isMainTree: Boolean;
+	export let parentTags: string[];
 
 	let collapsed = true;
 	let isSelected = false;
@@ -62,8 +76,16 @@
 		if ("tag" in entry) {
 			expandFolder(entry, collapsed);
 			collapsed = !collapsed;
+			if (setting.useMultiPaneList) {
+				selectedTags.set(entry.ancestors);
+			}
 		}
 	}
+	function toggleFolderTitle(evt: MouseEvent, entry: TagFolderItem) {
+		toggleFolder(evt, entry);
+		return;
+	}
+
 	function getFilenames(entry: TreeItem) {
 		if (entry.allDescendants == null) {
 			return [];
@@ -138,15 +160,17 @@
 	let showOnlyChildren = false;
 	let ellipsisMark = "";
 	let omitTags = [] as string[];
-
+	let omitTagSrc = [] as string[];
 	$: {
 		showOnlyChildren = false;
 		ellipsisMark = "";
 		omitTags = [];
+		omitTagSrc = [];
 		if ("tag" in entry) {
 			showOnlyChildren = isAutoExpandTree(entry, setting);
 			const omitTag = omittedTags(entry, setting);
 			if (omitTag !== false) {
+				omitTagSrc = omitTag;
 				omitTags = [
 					...omitTag.map((e) =>
 						e
@@ -197,6 +221,35 @@
 			children = cx;
 		}
 	}
+	let entryLeftTags = [] as string[];
+	$: {
+		entryLeftTags = [];
+		if ("tags" in entry) {
+			const tempTags = [
+				...("tags" in entry ? entry.tags : ([] as string[])),
+			];
+			const removeTags = [
+				...ancestorToLongestTag(
+					ancestorToTags(parentTags.filter((e) => e) ?? [])
+				),
+			];
+			let filteredTags = [...tempTags];
+			for (const removeTag of removeTags) {
+				const part = removeTag.split("/");
+				for (const piece of part)
+					filteredTags = filteredTags.map((e) =>
+						e == piece
+							? ""
+							: e.startsWith(piece + "/")
+							? e.substring(piece.length + 1)
+							: e
+					);
+			}
+			entryLeftTags = filteredTags
+				.filter((e) => e.trim() != "")
+				.map((e) => renderSpecialTag(e));
+		}
+	}
 </script>
 
 <slot>
@@ -213,6 +266,12 @@
 					skippedTag={tagTitle}
 					path={currentPath}
 					{folderIcon}
+					{isMainTree}
+					parentTags={[
+						...parentTags,
+						...omitTagSrc,
+						"tag" in item ? item.tag : undefined,
+					]}
 				/>
 			{/each}
 		{/if}
@@ -251,12 +310,18 @@
 							{openScrollView}
 							path={currentPath}
 							{folderIcon}
+							{isMainTree}
+							parentTags={[
+								...parentTags,
+								...omitTagSrc,
+								"tag" in item ? item.tag : undefined,
+							]}
 						/>
 					{/each}
 				</div>
 			{/if}
 		</div>
-	{:else if "path" in entry}
+	{:else if "path" in entry && ((setting.useMultiPaneList && !isMainTree) || !setting.useMultiPaneList)}
 		<div class="nav-file">
 			<div
 				class="nav-file-title"
@@ -268,8 +333,13 @@
 				}}
 				on:contextmenu={contextMenuFunc(entry)}
 			>
-				<div class="nav-file-title-content">
+				<div class="nav-file-title-content lsl-f">
 					{entry.displayName}
+				</div>
+				<div class="taglist">
+					{#each entryLeftTags as leftTag}
+						<span class="tags">{leftTag}</span>
+					{/each}
 				</div>
 			</div>
 		</div>
@@ -281,7 +351,20 @@
 		flex-direction: row;
 		display: flex;
 		flex-grow: 1;
-		max-width: 100%;
+		overflow: visible;
+		max-width: calc(100% - var(--nav-item-parent-padding));
+	}
+	.tags {
+		background-color: var(--background-secondary-alt);
+		border-radius: 4px;
+		padding: 2px 4px;
+		margin-left: 4px;
+	}
+	.taglist {
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		padding-left: 1em;
+		overflow: hidden;
 	}
 	.tagfolder-titletagname {
 		flex-grow: 1;

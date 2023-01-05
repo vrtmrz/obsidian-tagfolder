@@ -10,3 +10,5 @@ export const searchString = writable<string>("");
 export const tagInfo = writable<TagInfoDict>({});
 
 export const tagFolderSetting = writable<TagFolderSettings>(DEFAULT_SETTINGS);
+
+export const selectedTags = writable<string[]>();

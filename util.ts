@@ -112,20 +112,57 @@ export function secondsToFreshness(totalAsMSec: number) {
 }
 
 
-let lastSkipped = 0;
-
+const queues = [] as (() => void)[];
+function pump() {
+	requestAnimationFrame(() => {
+		const proc = queues.shift();
+		if (proc) {
+			proc();
+			pump();
+		}
+	});
+}
 // The message pump having ancient name.
 export const doEvents = () => {
-	const n = performance.now();
-	// keep intact the microtask while 20ms
-	if (n - lastSkipped < 20) {
-		return Promise.resolve();
-	}
-	// otherwise, run next process after some microtask.
-	return new Promise<void>((res) => {
-		window.requestAnimationFrame(() => {
-			lastSkipped = performance.now();
+
+	return new Promise<void>(res => {
+		const proc = () => {
 			res();
-		});
-	});
-};
+		};
+		queues.push(proc);
+		pump();
+	})
+}
+
+
+export const compare = (Intl && Intl.Collator) ? (new Intl.Collator().compare) :
+	(x: string, y: string) => (`${x ?? ""}`).localeCompare(`${y ?? ""}`);
+
+
+//TODO:TIDY
+export function pickEntry(entry: TagFolderItem, path: string | string[], past: string[] = []): TagFolderItem | null {
+	const paths = typeof path == "string" ? path.split("/").slice(1) : path;
+	const [head, ...tail] = paths;
+
+	if (!entry) return null;
+	if (!head) return entry;
+
+	if (!("children" in entry)) {
+		if (past.contains(head)) {
+			return pickEntry(entry, tail, [...past, head.toLocaleLowerCase()]);
+		} else {
+			console.log("Picked leaf is not leaf")
+			return null;
+		}
+	}
+	const next = entry.children.find(e => "tag" in e && compare(e.tag, head) == 0);
+	if (!next) {
+		if (past.contains(head)) {
+			return pickEntry(entry, tail, [...past, head.toLocaleLowerCase()]);
+		} else {
+			console.log("Picking leaf looks something wrong")
+			return null;
+		}
+	}
+	return pickEntry(next, tail, [...past, head.toLocaleLowerCase()]);
+}
