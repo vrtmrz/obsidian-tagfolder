@@ -64,6 +64,7 @@
 	</div>
 	<hr />
 	{#each files as file}
+		<!-- svelte-ignore a11y-click-events-have-key-events -->
 		<div
 			class="file"
 			on:click={(evt) => handleOpenFile(evt, file)}

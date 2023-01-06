@@ -42,10 +42,12 @@ export class ScrollView extends ItemView {
 	getDisplayText() {
 		return this.state.tagPath || "Tags scroll";
 	}
+
 	async setFile(filenames: ScrollViewFile[]) {
 		this.state = { ...this.state, files: filenames };
 		await this.updateView();
 	}
+
 	async setState(state: ScrollViewState, result: ViewStateResult): Promise<void> {
 		this.state = { ...state };
 		this.title = state.title;
@@ -61,6 +63,7 @@ export class ScrollView extends ItemView {
 	isFileOpened(path: string) {
 		return this.state.files.some(e => e.path == path);
 	}
+
 	getScrollViewState(): ScrollViewState {
 		return this.state;
 	}

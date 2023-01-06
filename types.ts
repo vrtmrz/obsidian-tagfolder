@@ -131,7 +131,27 @@ export const tagDispDict: { [key: string]: string } = {
 	_VIRTUAL_TAG_CANVAS: "📋 Canvas"
 };
 
-export const CONTEXT_KEY = Symbol();
-export type TagFolderViewContext = {
-	isMainTree: boolean;
+export const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
+export const VIEW_TYPE_TAGFOLDER_LIST = "tagfolder-view-list";
+
+export const OrderKeyTag: Record<string, string> = {
+	NAME: "File name",
+	ITEMS: "Count of items",
+};
+export const OrderDirection: Record<string, string> = {
+	ASC: "Ascending",
+	DESC: "Descending",
+};
+export const OrderKeyItem: Record<string, string> = {
+	DISPNAME: "Displaying name",
+	NAME: "File name",
+	MTIME: "Modified time",
+	CTIME: "Created time",
+	FULLPATH: "Fullpath of the file",
+};
+
+
+export type TagFolderListState = {
+	tags: string[];
+	title: string;
 }

@@ -1,8 +1,23 @@
-import { SUBTREE_MARK, TreeItem, ViewItem, TagFolderItem, EPOCH_DAY, EPOCH_HOUR, FRESHNESS_1, FRESHNESS_2, FRESHNESS_3, FRESHNESS_4, FRESHNESS_5, tagDispDict, TagFolderSettings } from "types";
+import {
+	EPOCH_DAY,
+	EPOCH_HOUR,
+	FRESHNESS_1,
+	FRESHNESS_2,
+	FRESHNESS_3,
+	FRESHNESS_4,
+	FRESHNESS_5,
+	SUBTREE_MARK,
+	tagDispDict,
+	TagFolderItem,
+	TagFolderSettings,
+	TreeItem,
+	ViewItem
+} from "types";
 
 export function unique<T>(items: T[]) {
 	return [...new Set<T>([...items])];
 }
+
 export function allTags(entry: TagFolderItem): string[] {
 	if ("tags" in entry) return entry.tags;
 	return unique([...(entry?.descendants ?? []).flatMap(e => e.tags), ...entry.children.flatMap(e => "tag" in e ? allTags(e) : e.tags).filter(e => e)]);
@@ -80,6 +95,7 @@ export function ancestorToTags(ancestors: string[]): string[] {
 		[]
 	)
 }
+
 export function ancestorToLongestTag(ancestors: string[]): string[] {
 	return ancestors.reduceRight((a: string[], e) => !a ? [e] : (a[0].startsWith(e) ? a : [e, ...a]), null)
 }
@@ -113,6 +129,7 @@ export function secondsToFreshness(totalAsMSec: number) {
 
 
 const queues = [] as (() => void)[];
+
 function pump() {
 	requestAnimationFrame(() => {
 		const proc = queues.shift();
@@ -122,6 +139,7 @@ function pump() {
 		}
 	});
 }
+
 // The message pump having ancient name.
 export const doEvents = () => {
 

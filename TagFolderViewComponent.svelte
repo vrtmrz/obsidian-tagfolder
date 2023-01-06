@@ -4,7 +4,7 @@
 	import TreeItemComponent from "./TreeItemComponent.svelte";
 	import { onMount } from "svelte";
 	import { setIcon } from "obsidian";
-	import { ancestorToLongestTag, ancestorToTags, pickEntry } from "./util";
+	import { pickEntry } from "./util";
 
 	export let items: Array<TagFolderItem> = [];
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
@@ -31,6 +31,9 @@
 		tagPath: string,
 		files: string[]
 	) => Promise<void>;
+
+	export let isViewSwitchable: boolean;
+	export let switchView: () => void;
 
 	treeRoot.subscribe((root: TreeItem) => {
 		if (tags.length == 0) {
@@ -71,12 +74,19 @@
 	function clearSearch() {
 		search = "";
 	}
+
+	function doSwitch() {
+		if (switchView) {
+			switchView();
+		}
+	}
 	let iconDivEl: HTMLDivElement;
 	let documentIcon = "";
 	let folderIcon = "";
 	let upAndDownArrowsIcon = "";
 	let stackedLevels = "";
 	let searchIcon = "";
+	let switchIcon = "";
 
 	onMount(async () => {
 		setIcon(iconDivEl, "right-triangle", 24);
@@ -91,6 +101,8 @@
 			setIcon(iconDivEl, "search", 20);
 			searchIcon = iconDivEl.innerHTML;
 		}
+		setIcon(iconDivEl, "lucide-arrow-left-right", 20);
+		switchIcon = iconDivEl.innerHTML;
 	});
 	$: headerTitle = title == "" ? `Tags: ${vaultname}` : `Items: ${title}`;
 	$: isMainTree = tags.length == 0;
@@ -99,6 +111,7 @@
 <div hidden bind:this={iconDivEl} />
 <div class="nav-header">
 	<div class="nav-buttons-container tagfolder-buttons-container">
+		<!-- svelte-ignore a11y-click-events-have-key-events -->
 		<div
 			class="clickable-icon nav-action-button"
 			aria-label="New note"
@@ -107,6 +120,7 @@
 			{@html documentIcon}
 		</div>
 		{#if isMainTree}
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<div
 				class="clickable-icon nav-action-button"
 				aria-label="Change sort order"
@@ -114,6 +128,7 @@
 			>
 				{@html upAndDownArrowsIcon}
 			</div>
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<div
 				class="clickable-icon nav-action-button"
 				aria-label="Expand limit"
@@ -121,12 +136,23 @@
 			>
 				{@html stackedLevels}
 			</div>
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<div
 				class="clickable-icon nav-action-button"
 				aria-label="Search"
 				on:click={toggleSearch}
 			>
 				{@html searchIcon}
+			</div>
+		{/if}
+		{#if isViewSwitchable}
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<div
+				class="clickable-icon nav-action-button"
+				aria-label="Switch List/Tree"
+				on:click={doSwitch}
+			>
+				{@html switchIcon}
 			</div>
 		{/if}
 	</div>
@@ -140,6 +166,7 @@
 				placeholder="Type to start search..."
 				bind:value={search}
 			/>
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<div
 				class="search-input-clear-button"
 				aria-label="Clear search"

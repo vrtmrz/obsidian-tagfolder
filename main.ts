@@ -5,39 +5,50 @@ import {
 	CachedMetadata,
 	debounce,
 	getAllTags,
+	normalizePath,
+	Notice,
+	parseYaml,
+	Platform,
 	Plugin,
 	PluginSettingTab,
 	Setting,
-	TFile,
-	ItemView,
-	WorkspaceLeaf,
-	TFolder,
-	Menu,
-	Notice,
-	normalizePath,
-	parseYaml,
 	stringifyYaml,
-	ViewStateResult,
+	TFile,
+	TFolder,
+	WorkspaceLeaf,
 } from "obsidian";
 
-import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
-
 import {
+	DEFAULT_SETTINGS,
+	OrderDirection,
+	OrderKeyItem,
+	OrderKeyTag,
+	ScrollViewFile,
+	ScrollViewState,
 	SUBTREE_MARK,
 	TagFolderItem,
-	TreeItem,
-	ViewItem,
-	TagInfoDict,
-	TagInfo,
-	ScrollViewState,
-	ScrollViewFile,
+	TagFolderListState,
 	TagFolderSettings,
-	DEFAULT_SETTINGS,
-	VIEW_TYPE_SCROLL
+	TagInfoDict,
+	TreeItem,
+	VIEW_TYPE_SCROLL,
+	VIEW_TYPE_TAGFOLDER,
+	VIEW_TYPE_TAGFOLDER_LIST,
+	ViewItem
 } from "types";
-import { treeRoot, currentFile, maxDepth, tagInfo, tagFolderSetting, searchString, selectedTags } from "store";
-import { ancestorToLongestTag, ancestorToTags, doEvents, isAutoExpandTree, isSpecialTag, omittedTags, renderSpecialTag, secondsToFreshness, compare } from "./util";
+import { currentFile, maxDepth, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
+import {
+	ancestorToTags,
+	compare,
+	doEvents,
+	isAutoExpandTree,
+	omittedTags,
+	renderSpecialTag,
+	secondsToFreshness,
+} from "./util";
 import { ScrollView } from "./ScrollView";
+import { TagFolderView } from "./TagFolderView";
+import { TagFolderList } from "./TagFolderList";
 
 export type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
 
@@ -52,689 +63,8 @@ const HideItemsType: Record<string, string> = {
 };
 
 
-
-const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
-const VIEW_TYPE_TAGFOLDER_LIST = "tagfolder-view-list";
-
-const OrderKeyTag: Record<string, string> = {
-	NAME: "File name",
-	ITEMS: "Count of items",
-};
-const OrderDirection: Record<string, string> = {
-	ASC: "Ascending",
-	DESC: "Descending",
-};
-const OrderKeyItem: Record<string, string> = {
-	DISPNAME: "Displaying name",
-	NAME: "File name",
-	MTIME: "Modified time",
-	CTIME: "Created time",
-	FULLPATH: "Fullpath of the file",
-};
-
-
 const dotted = (object: any, notation: string) => {
 	return notation.split('.').reduce((a, b) => (a && (b in a)) ? a[b] : null, object);
-}
-
-class TagFolderView extends ItemView {
-	component: TagFolderViewComponent;
-	plugin: TagFolderPlugin;
-	icon: "stacked-levels";
-
-	getIcon(): string {
-		return "stacked-levels";
-	}
-
-	constructor(leaf: WorkspaceLeaf, plugin: TagFolderPlugin) {
-		super(leaf);
-		this.plugin = plugin;
-
-		this.showMenu = this.showMenu.bind(this);
-		this.showOrder = this.showOrder.bind(this);
-		this.newNote = this.newNote.bind(this);
-		this.showLevelSelect = this.showLevelSelect.bind(this);
-	}
-
-	newNote(evt: MouseEvent) {
-		//@ts-ignore
-		this.app.commands.executeCommandById("file-explorer:new-file");
-	}
-
-	showOrder(evt: MouseEvent) {
-		const menu = new Menu();
-
-		menu.addItem((item) => {
-			item.setTitle("Tags")
-				.setIcon("hashtag")
-				.onClick(async (evt2) => {
-					const menu2 = new Menu();
-					for (const key in OrderKeyTag) {
-						for (const direction in OrderDirection) {
-							menu2.addItem((item) => {
-								const newSetting = `${key}_${direction}`;
-								item.setTitle(
-									OrderKeyTag[key] +
-									" " +
-									OrderDirection[direction]
-								).onClick(async () => {
-									//@ts-ignore
-									this.plugin.settings.sortTypeTag =
-										newSetting;
-									await this.plugin.saveSettings();
-									this.plugin.setRoot(this.plugin.root);
-								});
-								if (
-									newSetting ==
-									this.plugin.settings.sortTypeTag
-								) {
-									item.setIcon("checkmark");
-								}
-
-								menu2.showAtMouseEvent(evt);
-								return item;
-							});
-						}
-					}
-				});
-			return item;
-		});
-		menu.addItem((item) => {
-			item.setTitle("Items")
-				.setIcon("document")
-				.onClick(async (evt2) => {
-					const menu2 = new Menu();
-					for (const key in OrderKeyItem) {
-						for (const direction in OrderDirection) {
-							menu2.addItem((item) => {
-								const newSetting = `${key}_${direction}`;
-								item.setTitle(
-									OrderKeyItem[key] +
-									" " +
-									OrderDirection[direction]
-								).onClick(async () => {
-									//@ts-ignore
-									this.plugin.settings.sortType = newSetting;
-									await this.plugin.saveSettings();
-									this.plugin.setRoot(this.plugin.root);
-								});
-								if (
-									newSetting == this.plugin.settings.sortType
-								) {
-									item.setIcon("checkmark");
-								}
-
-								menu2.showAtMouseEvent(evt);
-								return item;
-							});
-						}
-					}
-				});
-			return item;
-		});
-		menu.showAtMouseEvent(evt);
-	}
-
-	showLevelSelect(evt: MouseEvent) {
-		const menu = new Menu();
-		const setLevel = async (level: number) => {
-			this.plugin.settings.expandLimit = level;
-			await this.plugin.saveSettings();
-			maxDepth.set(level);
-			this.plugin.setRoot(this.plugin.root);
-		};
-		for (const level of [2, 3, 4, 5]) {
-			menu.addItem((item) => {
-				item.setTitle(`Level ${level - 1}`).onClick(() => {
-					setLevel(level);
-				});
-				if (this.plugin.settings.expandLimit == level)
-					item.setIcon("checkmark");
-				return item;
-			});
-		}
-
-		menu.addItem((item) => {
-			item.setTitle("No limit")
-				// .setIcon("hashtag")
-				.onClick(() => {
-					setLevel(0);
-				});
-			if (this.plugin.settings.expandLimit == 0)
-				item.setIcon("checkmark");
-
-			return item;
-		});
-		menu.showAtMouseEvent(evt);
-	}
-
-	getViewType() {
-		return VIEW_TYPE_TAGFOLDER;
-	}
-
-	getDisplayText() {
-		return "Tag Folder";
-	}
-
-	async onOpen() {
-		this.component = new TagFolderViewComponent({
-			target: this.contentEl,
-			props: {
-				openfile: this.plugin.focusFile,
-				hoverPreview: this.plugin.hoverPreview,
-				expandFolder: this.plugin.expandFolder,
-				vaultname: this.app.vault.getName(),
-				showMenu: this.showMenu,
-				showLevelSelect: this.showLevelSelect,
-				showOrder: this.showOrder,
-				newNote: this.newNote,
-				openScrollView: this.plugin.openScrollView
-			},
-		});
-	}
-
-	async onClose() {
-		this.component.$destroy();
-	}
-
-	setTreeRoot(root: TreeItem) {
-		treeRoot.set(root);
-	}
-
-	showMenu(evt: MouseEvent, path: string, entry: TagFolderItem) {
-
-		const entryPath = "tag" in entry ? [...ancestorToTags(entry.ancestors)] : ['root', ...entry.tags];
-
-		if ("tag" in entry) {
-			const oTags = omittedTags(entry, this.plugin.settings);
-			if (oTags != false) {
-				entryPath.push(...oTags);
-			}
-		}
-		entryPath.shift()
-		const expandedTagsAll = ancestorToLongestTag(ancestorToTags(entryPath));
-		const expandedTags = expandedTagsAll
-			.map(e => e.split("/")
-				.filter(ee => !isSpecialTag(ee))
-				.join("/")).filter(e => e != "")
-			.map((e) => "#" + e)
-			.join(" ")
-			.trim();
-		const displayExpandedTags = expandedTagsAll
-			.map(e => e.split("/")
-				.filter(ee => renderSpecialTag(ee))
-				.join("/")).filter(e => e != "")
-			.map((e) => "#" + e)
-			.join(" ")
-			.trim();
-		const menu = new Menu();
-
-		if (navigator && navigator.clipboard) {
-			menu.addItem((item) =>
-				item
-					.setTitle(`Copy tags:${expandedTags}`)
-					.setIcon("hashtag")
-					.onClick(async () => {
-						await navigator.clipboard.writeText(expandedTags);
-						new Notice("Copied");
-					})
-			);
-		}
-		menu.addItem((item) =>
-			item
-				.setTitle(`New note ${"tag" in entry ? "in here" : "as like this"}`)
-				.setIcon("create-new")
-				.onClick(async () => {
-					//@ts-ignore
-					const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
-					await this.app.vault.append(ww, expandedTags);
-				})
-		);
-		if ("tag" in entry) {
-			if (this.plugin.settings.useTagInfo && this.plugin.tagInfo != null) {
-				const tag = entry.ancestors[entry.ancestors.length - 1];
-
-				if (tag in this.plugin.tagInfo && this.plugin.tagInfo[tag]) {
-					menu.addItem((item) =>
-						item.setTitle(`Unpin`)
-							.setIcon("pin")
-							.onClick(async () => {
-								this.plugin.tagInfo =
-								{
-									...this.plugin.tagInfo,
-									[tag]: undefined
-								};
-								this.plugin.applyTagInfo();
-								await this.plugin.saveTagInfo();
-							})
-					)
-
-				} else {
-					menu.addItem((item) => {
-						item.setTitle(`Pin`)
-							.setIcon("pin")
-							.onClick(async () => {
-								this.plugin.tagInfo =
-								{
-									...this.plugin.tagInfo,
-									[tag]: { key: "" }
-								};
-								this.plugin.applyTagInfo();
-								await this.plugin.saveTagInfo();
-							})
-					})
-				}
-				menu.addItem(item => {
-					item.setTitle(`Open scroll view`)
-						.setIcon("sheets-in-box")
-						.onClick(async () => {
-							const files = entry.allDescendants.map(e => e.path);
-							const tagPath = entry.ancestors.join("/");
-							await this.plugin.openScrollView(null, displayExpandedTags, tagPath, files);
-						})
-				})
-				menu.addItem(item => {
-					item.setTitle(`Open list`)
-						.setIcon("sheets-in-box")
-						.onClick(async () => {
-							selectedTags.set(
-								entry.ancestors
-							);
-						})
-				})
-			}
-		}
-		if ("path" in entry) {
-			const path = entry.path;
-			const file = this.app.vault.getAbstractFileByPath(path);
-			// Trigger
-			this.app.workspace.trigger(
-				"file-menu",
-				menu,
-				file,
-				"file-explorer"
-			);
-		}
-
-		if ("tags" in entry) {
-			menu.addSeparator();
-			menu.addItem((item) =>
-				item
-					.setTitle(`Open in new tab`)
-					.setIcon("lucide-file-plus")
-					.onClick(async () => {
-						app.workspace.openLinkText(entry.path, entry.path, "tab");
-					})
-			);
-			menu.addItem((item) =>
-				item
-					.setTitle(`Open to the right`)
-					.setIcon("lucide-separator-vertical")
-					.onClick(async () => {
-						app.workspace.openLinkText(entry.path, entry.path, "split");
-					})
-			);
-		}
-		if ("screenX" in evt) {
-			menu.showAtPosition({ x: evt.pageX, y: evt.pageY });
-		} else {
-			menu.showAtPosition({
-				// @ts-ignore
-				x: evt.nativeEvent.locationX,
-				// @ts-ignore
-				y: evt.nativeEvent.locationY,
-			});
-		}
-		// menu.showAtMouseEvent(evt);
-	}
-}
-type TagFolderListState = {
-	tags: string[];
-	title: string;
-}
-
-//TODO:USE COMMON BASE
-class TagFolderList extends ItemView {
-	component: TagFolderViewComponent;
-	plugin: TagFolderPlugin;
-	icon: "stacked-levels";
-	title: string;
-	onPaneMenu(menu: Menu, source: string): void {
-		super.onPaneMenu(menu, source);
-		menu.addItem(item => {
-			item.setIcon("pin")
-				.setTitle("Pin")
-				.onClick(() => {
-					this.leaf.togglePinned();
-				})
-		})
-	}
-	getIcon(): string {
-		return "stacked-levels";
-	}
-	state: TagFolderListState = { tags: [], title: "" };
-	async setState(state: TagFolderListState, result: ViewStateResult): Promise<void> {
-		this.state = { ...state };
-		this.title = state.tags.join(",");
-		this.component.$set({ tags: state.tags, title: state.title ?? "" })
-		result = {};
-		return;
-	}
-
-	getState() {
-		return this.state;
-	}
-	constructor(leaf: WorkspaceLeaf, plugin: TagFolderPlugin) {
-		super(leaf);
-		this.plugin = plugin;
-
-		this.showMenu = this.showMenu.bind(this);
-		this.showOrder = this.showOrder.bind(this);
-		this.newNote = this.newNote.bind(this);
-		this.showLevelSelect = this.showLevelSelect.bind(this);
-	}
-
-	async newNote(evt: MouseEvent) {
-
-		const expandedTags = this.state.tags
-			.map(e => e.split("/")
-				.filter(ee => !isSpecialTag(ee))
-				.join("/")).filter(e => e != "")
-			.map((e) => "#" + e)
-			.join(" ")
-			.trim();
-
-		//@ts-ignore
-		const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
-		await this.app.vault.append(ww, expandedTags);
-	}
-
-	showOrder(evt: MouseEvent) {
-		const menu = new Menu();
-
-		menu.addItem((item) => {
-			item.setTitle("Tags")
-				.setIcon("hashtag")
-				.onClick(async (evt2) => {
-					const menu2 = new Menu();
-					for (const key in OrderKeyTag) {
-						for (const direction in OrderDirection) {
-							menu2.addItem((item) => {
-								const newSetting = `${key}_${direction}`;
-								item.setTitle(
-									OrderKeyTag[key] +
-									" " +
-									OrderDirection[direction]
-								).onClick(async () => {
-									//@ts-ignore
-									this.plugin.settings.sortTypeTag =
-										newSetting;
-									await this.plugin.saveSettings();
-									this.plugin.setRoot(this.plugin.root);
-								});
-								if (
-									newSetting ==
-									this.plugin.settings.sortTypeTag
-								) {
-									item.setIcon("checkmark");
-								}
-
-								menu2.showAtMouseEvent(evt);
-								return item;
-							});
-						}
-					}
-				});
-			return item;
-		});
-		menu.addItem((item) => {
-			item.setTitle("Items")
-				.setIcon("document")
-				.onClick(async (evt2) => {
-					const menu2 = new Menu();
-					for (const key in OrderKeyItem) {
-						for (const direction in OrderDirection) {
-							menu2.addItem((item) => {
-								const newSetting = `${key}_${direction}`;
-								item.setTitle(
-									OrderKeyItem[key] +
-									" " +
-									OrderDirection[direction]
-								).onClick(async () => {
-									//@ts-ignore
-									this.plugin.settings.sortType = newSetting;
-									await this.plugin.saveSettings();
-									this.plugin.setRoot(this.plugin.root);
-								});
-								if (
-									newSetting == this.plugin.settings.sortType
-								) {
-									item.setIcon("checkmark");
-								}
-
-								menu2.showAtMouseEvent(evt);
-								return item;
-							});
-						}
-					}
-				});
-			return item;
-		});
-		menu.showAtMouseEvent(evt);
-	}
-
-	showLevelSelect(evt: MouseEvent) {
-		const menu = new Menu();
-		const setLevel = async (level: number) => {
-			this.plugin.settings.expandLimit = level;
-			await this.plugin.saveSettings();
-			maxDepth.set(level);
-			this.plugin.setRoot(this.plugin.root);
-		};
-		for (const level of [2, 3, 4, 5]) {
-			menu.addItem((item) => {
-				item.setTitle(`Level ${level - 1}`).onClick(() => {
-					setLevel(level);
-				});
-				if (this.plugin.settings.expandLimit == level)
-					item.setIcon("checkmark");
-				return item;
-			});
-		}
-
-		menu.addItem((item) => {
-			item.setTitle("No limit")
-				// .setIcon("hashtag")
-				.onClick(() => {
-					setLevel(0);
-				});
-			if (this.plugin.settings.expandLimit == 0)
-				item.setIcon("checkmark");
-
-			return item;
-		});
-		menu.showAtMouseEvent(evt);
-	}
-
-	getViewType() {
-		return VIEW_TYPE_TAGFOLDER_LIST;
-	}
-
-	getDisplayText() {
-		return "List";
-	}
-
-	async onOpen() {
-		this.component = new TagFolderViewComponent({
-			target: this.contentEl,
-			props: {
-				openfile: this.plugin.focusFile,
-				hoverPreview: this.plugin.hoverPreview,
-				expandFolder: this.plugin.expandFolder,
-				title: "",
-				showMenu: this.showMenu,
-				showLevelSelect: this.showLevelSelect,
-				showOrder: this.showOrder,
-				newNote: this.newNote,
-				openScrollView: this.plugin.openScrollView,
-				items: [],
-			},
-		});
-	}
-
-	async onClose() {
-		this.component.$destroy();
-	}
-
-	setTreeRoot(root: TreeItem) {
-		treeRoot.set(root);
-	}
-
-	showMenu(evt: MouseEvent, path: string, entry: TagFolderItem) {
-
-		const entryPath = "tag" in entry ? [...ancestorToTags(entry.ancestors)] : ['root', ...entry.tags];
-
-		if ("tag" in entry) {
-			const oTags = omittedTags(entry, this.plugin.settings);
-			if (oTags != false) {
-				entryPath.push(...oTags);
-			}
-		}
-		entryPath.shift()
-		const expandedTagsAll = ancestorToLongestTag(ancestorToTags(entryPath));
-		const expandedTags = expandedTagsAll
-			.map(e => e.split("/")
-				.filter(ee => !isSpecialTag(ee))
-				.join("/")).filter(e => e != "")
-			.map((e) => "#" + e)
-			.join(" ")
-			.trim();
-		const displayExpandedTags = expandedTagsAll
-			.map(e => e.split("/")
-				.filter(ee => renderSpecialTag(ee))
-				.join("/")).filter(e => e != "")
-			.map((e) => "#" + e)
-			.join(" ")
-			.trim();
-		const menu = new Menu();
-
-		if (navigator && navigator.clipboard) {
-			menu.addItem((item) =>
-				item
-					.setTitle(`Copy tags:${expandedTags}`)
-					.setIcon("hashtag")
-					.onClick(async () => {
-						await navigator.clipboard.writeText(expandedTags);
-						new Notice("Copied");
-					})
-			);
-		}
-		menu.addItem((item) =>
-			item
-				.setTitle(`New note ${"tag" in entry ? "in here" : "as like this"}`)
-				.setIcon("create-new")
-				.onClick(async () => {
-					//@ts-ignore
-					const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
-					await this.app.vault.append(ww, expandedTags);
-				})
-		);
-		if ("tag" in entry) {
-			if (this.plugin.settings.useTagInfo && this.plugin.tagInfo != null) {
-				const tag = entry.ancestors[entry.ancestors.length - 1];
-
-				if (tag in this.plugin.tagInfo && this.plugin.tagInfo[tag]) {
-					menu.addItem((item) =>
-						item.setTitle(`Unpin`)
-							.setIcon("pin")
-							.onClick(async () => {
-								this.plugin.tagInfo =
-								{
-									...this.plugin.tagInfo,
-									[tag]: undefined
-								};
-								this.plugin.applyTagInfo();
-								await this.plugin.saveTagInfo();
-							})
-					)
-
-				} else {
-					menu.addItem((item) => {
-						item.setTitle(`Pin`)
-							.setIcon("pin")
-							.onClick(async () => {
-								this.plugin.tagInfo =
-								{
-									...this.plugin.tagInfo,
-									[tag]: { key: "" }
-								};
-								this.plugin.applyTagInfo();
-								await this.plugin.saveTagInfo();
-							})
-					})
-				}
-				menu.addItem(item => {
-					item.setTitle(`Open scroll view`)
-						.setIcon("sheets-in-box")
-						.onClick(async () => {
-							const files = entry.allDescendants.map(e => e.path);
-							const tagPath = entry.ancestors.join("/");
-							await this.plugin.openScrollView(null, displayExpandedTags, tagPath, files);
-						})
-				})
-			}
-		}
-		if ("path" in entry) {
-			const path = entry.path;
-			const file = this.app.vault.getAbstractFileByPath(path);
-			// Trigger
-			this.app.workspace.trigger(
-				"file-menu",
-				menu,
-				file,
-				"file-explorer"
-			);
-		}
-
-		if ("tags" in entry) {
-			menu.addSeparator();
-			menu.addItem((item) =>
-				item
-					.setTitle(`Open in new tab`)
-					.setIcon("lucide-file-plus")
-					.onClick(async () => {
-						app.workspace.openLinkText(entry.path, entry.path, "tab");
-					})
-			);
-			menu.addItem((item) =>
-				item
-					.setTitle(`Open to the right`)
-					.setIcon("lucide-separator-vertical")
-					.onClick(async () => {
-						app.workspace.openLinkText(entry.path, entry.path, "split");
-					})
-			);
-			// menu.addItem((item) =>
-			// 	item
-			// 		.setTitle(`Open in new window`)
-			// 		.setIcon("lucide-maximize")
-			// 		.onClick(async () => {
-			// 			app.workspace.openLinkText(entry.path, entry.path, "window");
-			// 		})
-			// );
-		}
-		if ("screenX" in evt) {
-			menu.showAtPosition({ x: evt.pageX, y: evt.pageY });
-		} else {
-			menu.showAtPosition({
-				// @ts-ignore
-				x: evt.nativeEvent.locationX,
-				// @ts-ignore
-				y: evt.nativeEvent.locationY,
-			});
-		}
-		// menu.showAtMouseEvent(evt);
-	}
 }
 
 const rippleDirty = (entry: TreeItem): boolean => {
@@ -1042,6 +372,7 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 	}
 	return modified;
 };
+
 function getTagName(tagName: string, tagInfo: TagInfoDict, invert: number) {
 	if (tagInfo == null) return tagName;
 	const prefix = invert == -1 ? `\uffff` : `\u0001`;
@@ -1049,12 +380,12 @@ function getTagName(tagName: string, tagInfo: TagInfoDict, invert: number) {
 
 	if (tagName in tagInfo && tagInfo[tagName]) {
 		if ("key" in tagInfo[tagName]) {
-			const k = `${prefix}_-${tagInfo[tagName].key}__${tagName}`;
-			return k;
+			return `${prefix}_-${tagInfo[tagName].key}__${tagName}`;
 		}
 	}
 	return `${prefix}_${unpinned}_${tagName}`
 }
+
 function getCompareMethodTags(settings: TagFolderSettings) {
 	const invert = settings.sortTypeTag.contains("_DESC") ? -1 : 1;
 	switch (settings.sortTypeTag) {
@@ -1168,7 +499,7 @@ export default class TagFolderPlugin extends Plugin {
 	setSearchString(search: string) {
 		searchString.set(search);
 	}
-	expandingProcs = 0;
+
 	async expandLastExpandedFolders(entry: TagFolderItem, force?: boolean, path: string[] = [], openedTags: { [key: string]: Set<string> } = {}, maxDepth = 1) {
 		if (maxDepth < 0) {
 			return;
@@ -1208,6 +539,7 @@ export default class TagFolderPlugin extends Plugin {
 			}
 		}
 	}
+
 	// Expand the folder (called from Tag pane.)
 	readonly expandFolder = async (entry: TagFolderItem, expanded: boolean) => {
 		if ("tag" in entry) {
@@ -1293,7 +625,7 @@ export default class TagFolderPlugin extends Plugin {
 		);
 		this.app.workspace.onLayoutReady(async () => {
 			if (this.settings.alwaysOpen) {
-				this.activateView();
+				await this.activateView();
 			}
 		});
 		this.addCommand({
@@ -1335,7 +667,9 @@ export default class TagFolderPlugin extends Plugin {
 			if (tagString) {
 				const regExpTagStr = new RegExp(`(^|\\s)${tagString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`, "u");
 				const regExpTagStrInv = new RegExp(`(^|\\s)-${tagString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`, "u");
-				if (event.ctrlKey && event.shiftKey) {
+				if (event.altKey) {
+					return;
+				} else if (event.ctrlKey && event.shiftKey) {
 					if (this.searchString.match(regExpTagStr)) {
 						this.setSearchString(this.searchString.replace(regExpTagStr, ""));
 					} else if (!this.searchString.match(regExpTagStrInv)) {
@@ -1452,12 +786,14 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		entry.descendants = entry.descendants.sort(this.sortChildren);
 	}
+
 	snipEmpty(root: TreeItem) {
 		for (const v of root.children) {
 			if ("tag" in v) this.snipEmpty(v);
 		}
 		root.children = root.children.filter(e => !("tag" in e && e.children.length == 0));
 	}
+
 	mergeRedundantCombination(root: TreeItem) {
 		const existentChild = {} as { [key: string]: TreeItem };
 		const removeChildren = [] as TreeItem[];
@@ -1481,6 +817,7 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		root.children = [...root.children];
 	}
+
 	setRoot(root: TreeItem) {
 		rippleDirty(root);
 		expandDescendants(root, this.settings.hideItems);
@@ -1525,17 +862,15 @@ export default class TagFolderPlugin extends Plugin {
 		}
 	}
 
-	lastTags = "";
-
 	async getItemsList(): Promise<ViewItem[]> {
 		const items: ViewItem[] = [];
 		const ignoreDocTags = this.settings.ignoreDocTags
 			.toLocaleLowerCase()
-			.replace(/\n| /g, "")
+			.replace(/[\n ]/g, "")
 			.split(",");
 		const ignoreTags = this.settings.ignoreTags
 			.toLocaleLowerCase()
-			.replace(/\n| /g, "")
+			.replace(/[\n ]/g, "")
 			.split(",");
 
 		const ignoreFolders = this.settings.ignoreFolders
@@ -1619,7 +954,7 @@ export default class TagFolderPlugin extends Plugin {
 									.toLocaleLowerCase()
 									.contains(search.substring(1))
 							);
-						if (bx) continue;
+						// if (bx) continue;
 					} else {
 						bx =
 							bx ||
@@ -1627,7 +962,7 @@ export default class TagFolderPlugin extends Plugin {
 								(tag) =>
 									!tag.toLocaleLowerCase().contains(search)
 							);
-						if (bx) continue;
+						// if (bx) continue;
 					}
 				}
 				return bx;
@@ -1679,7 +1014,9 @@ export default class TagFolderPlugin extends Plugin {
 	lastSearchString = "";
 
 	loadFileInfo(diff?: TFile) {
-		this.loadFileInfoAsync(diff);
+		this.loadFileInfoAsync(diff).then(e => {
+			/* NO op*/
+		});
 	}
 
 	// Sweep updated file or all files to retrieve tags.
@@ -1733,6 +1070,7 @@ export default class TagFolderPlugin extends Plugin {
 			leaf
 		);
 	}
+
 	findTreeItemFromPath(tagPath: string, root?: TreeItem): TreeItem | null {
 		// debugger;
 		if (!root) {
@@ -1775,7 +1113,7 @@ export default class TagFolderPlugin extends Plugin {
 
 					}
 				}
-				leaf.setViewState(newStat);
+				await leaf.setViewState(newStat);
 			}
 			// Check files that included in the Scroll view.
 			const openedNode = this.findTreeItemFromPath(viewStat.state.tagPath);
@@ -1800,7 +1138,7 @@ export default class TagFolderPlugin extends Plugin {
 							}) as ScrollViewFile[]
 						}
 					}
-					leaf.setViewState(newStat);
+					await leaf.setViewState(newStat);
 				}
 			}
 		}
@@ -1821,10 +1159,12 @@ export default class TagFolderPlugin extends Plugin {
 			this.app.workspace.getLeavesOfType(VIEW_TYPE_TAGFOLDER)[0]
 		);
 	}
+
 	tagInfo: TagInfoDict = null;
 	tagInfoFrontMatterBuffer: any = {};
 	skipOnce: boolean;
 	tagInfoBody = "";
+
 	async modifyFile(file: TFile | TFolder) {
 		if (!this.settings.useTagInfo) return;
 		if (this.skipOnce) {
@@ -1839,6 +1179,7 @@ export default class TagFolderPlugin extends Plugin {
 	getTagInfoFilename() {
 		return normalizePath(this.settings.tagInfo);
 	}
+
 	getTagInfoFile() {
 		const file = this.app.vault.getAbstractFileByPath(this.getTagInfoFilename());
 		if (file instanceof TFile) {
@@ -1846,6 +1187,7 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		return null;
 	}
+
 	applyTagInfo() {
 		if (this.tagInfo == null) return;
 		if (!this.settings.useTagInfo) return;
@@ -1854,6 +1196,7 @@ export default class TagFolderPlugin extends Plugin {
 			if (this.root) this.setRoot(this.root);
 		}, 10);
 	}
+
 	async loadTagInfo() {
 		if (!this.settings.useTagInfo) return;
 		if (this.tagInfo == null) this.tagInfo = {};
@@ -1869,8 +1212,7 @@ export default class TagFolderPlugin extends Plugin {
 			const yamlData = parseYaml(yaml) as TagInfoDict;
 
 			const keys = Object.keys(yamlData);
-			const body = data.substring(bodyStartIndex + 5);
-			this.tagInfoBody = body;
+			this.tagInfoBody = data.substring(bodyStartIndex + 5);
 			this.tagInfoFrontMatterBuffer = yamlData;
 
 			const newTagInfo = {} as TagInfoDict;
@@ -1880,11 +1222,10 @@ export default class TagFolderPlugin extends Plugin {
 				if (typeof (w) != "object") continue;
 				if (!("key" in w)) continue;
 				// snip unexpected entries.
-				const eachTag: TagInfo = {
+				newTagInfo[key] = {
 					key: w.key,
 					mark: w.mark ?? undefined,
-				}
-				newTagInfo[key] = eachTag;
+				};
 			}
 			this.tagInfo = newTagInfo;
 			this.applyTagInfo();
@@ -1894,6 +1235,7 @@ export default class TagFolderPlugin extends Plugin {
 		}
 
 	}
+
 	async saveTagInfo() {
 		if (!this.settings.useTagInfo) return;
 		if (this.tagInfo == null) return;
@@ -1905,11 +1247,12 @@ ${this.tagInfoBody}`;
 
 		this.skipOnce = true;
 		if (file == null) {
-			this.app.vault.create(this.getTagInfoFilename(), w);
+			await this.app.vault.create(this.getTagInfoFilename(), w);
 		} else {
-			this.app.vault.modify(file, w);
+			await this.app.vault.modify(file, w);
 		}
 	}
+
 	async loadSettings() {
 		this.settings = Object.assign(
 			{},
@@ -1956,7 +1299,12 @@ ${this.tagInfoBody}`;
 				// Cancel if the tagfolder has been disappeared.
 				return;
 			}
-			theLeaf = this.app.workspace.createLeafBySplit(parent, "horizontal", false);
+			if (!Platform.isMobile) {
+				theLeaf = this.app.workspace.createLeafBySplit(parent, "horizontal", false);
+			} else {
+				theLeaf = this.app.workspace.getLeftLeaf(false);
+				// theLeaf = this.app.workspace.getLeaf("split", "horizontal");
+			}
 		}
 		const title = tags.map((e) =>
 			e
@@ -2289,7 +1637,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Dumping tags for reporting bugs")
 			.setDesc(
-				"If you want to open an issue to the GitHub, this information can be useful. and, also if you want to keep secret about name of tags, you can use `disguised`."
+				"If you want to open an issue to the GitHub, this information can be useful. and, also if you want to keep secrets about names of tags, you can use `disguised`."
 			)
 			.addButton((button) =>
 				button

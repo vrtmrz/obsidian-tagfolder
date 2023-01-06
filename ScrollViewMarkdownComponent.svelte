@@ -9,7 +9,7 @@
 
 	let el: HTMLElement;
 
-	function onAppearing(this: HTMLElement, ev: Event) {
+	function onAppearing(this: HTMLElement, _: Event) {
 		if (file.content && el) {
 			MarkdownRenderer.renderMarkdown(file.content, el, file.path, null);
 		}

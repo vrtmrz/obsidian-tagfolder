@@ -81,8 +81,17 @@
 			}
 		}
 	}
-	function toggleFolderTitle(evt: MouseEvent, entry: TagFolderItem) {
-		toggleFolder(evt, entry);
+	function toggleFolderExpandOnly(evt: MouseEvent, entry: TagFolderItem) {
+		evt.stopImmediatePropagation();
+		if (
+			evt.target instanceof HTMLElement &&
+			evt.target.hasClass("itemscount")
+		)
+			return;
+		if ("tag" in entry) {
+			expandFolder(entry, collapsed);
+			collapsed = !collapsed;
+		}
 		return;
 	}
 
@@ -252,6 +261,7 @@
 	}
 </script>
 
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <slot>
 	{#if showOnlyChildren}
 		{#if children.length > 0}
@@ -283,7 +293,10 @@
 				on:click={(evt) => toggleFolder(evt, entry)}
 				on:contextmenu={contextMenuFunc(entry)}
 			>
-				<div class="nav-folder-collapse-indicator collapse-icon">
+				<div
+					class="nav-folder-collapse-indicator collapse-icon"
+					on:click={(evt) => toggleFolderExpandOnly(evt, entry)}
+				>
 					{@html folderIcon}
 				</div>
 				<div class="nav-folder-title-content lsl-f">
