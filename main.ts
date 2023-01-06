@@ -1303,7 +1303,6 @@ ${this.tagInfoBody}`;
 				theLeaf = this.app.workspace.createLeafBySplit(parent, "horizontal", false);
 			} else {
 				theLeaf = this.app.workspace.getLeftLeaf(false);
-				// theLeaf = this.app.workspace.getLeaf("split", "horizontal");
 			}
 		}
 		const title = tags.map((e) =>
@@ -1317,6 +1316,7 @@ ${this.tagInfoBody}`;
 			active: true,
 			state: { tags: tags, title: title } as TagFolderListState
 		});
+		(theLeaf.view as TagFolderList).setTreeRoot(this.root);
 
 		this.app.workspace.revealLeaf(
 			theLeaf
