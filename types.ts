@@ -68,6 +68,7 @@ export interface TagFolderSettings {
 	doNotSimplifyTags: boolean;
 	overrideTagClicking: boolean;
 	useMultiPaneList: boolean;
+	archiveTags: string;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -94,6 +95,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	doNotSimplifyTags: false,
 	overrideTagClicking: false,
 	useMultiPaneList: false,
+	archiveTags: "",
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";

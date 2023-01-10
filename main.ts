@@ -987,15 +987,38 @@ export default class TagFolderPlugin extends Plugin {
 	}
 
 	async buildUpTree(items: ViewItem[]): Promise<TreeItem> {
+
+		// Pick notes which tagged with archiveTags
+		const archiveTags = this.settings.archiveTags
+			.toLocaleLowerCase()
+			.replace(/[\n ]/g, "")
+			.split(",");
+
+		const archivedNotes = archiveTags.map(archiveTag => ([archiveTag, items.filter(item => item.tags.some(tag => tag.toLocaleLowerCase() == archiveTag))])) as [string, ViewItem[]][]
 		const root: TreeItem = {
 			tag: "root",
-			children: [...items],
+			children: [...items.filter(e => e.tags.every(tag => !archiveTags.contains(tag.toLocaleLowerCase())))],
 			ancestors: ["root"],
 			descendants: null,
 			allDescendants: null,
 			itemsCount: 0,
 			isDedicatedTree: false,
 		};
+		// Make branches of archived tags.
+
+		for (const [archiveTag, items] of archivedNotes) {
+			root.children.push(
+				{
+					tag: archiveTag,
+					children: items,
+					ancestors: ["root", archiveTag],
+					descendants: null,
+					allDescendants: null,
+					itemsCount: 0,
+					isDedicatedTree: false,
+				}
+			)
+		}
 
 		await expandTree(root, this.settings.reduceNestedParent);
 
@@ -1338,14 +1361,15 @@ class TagFolderSettingTab extends PluginSettingTab {
 
 	display(): void {
 		const { containerEl } = this;
-
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Settings for Tag Folder." });
+		containerEl.createEl("h2", { text: "Settings for TagFolder" });
 
+
+		containerEl.createEl("h3", { text: "Behavior" });
 		new Setting(containerEl)
 			.setName("Always Open")
-			.setDesc("Open Tag Folder when obsidian has been launched")
+			.setDesc("Open TagFolder automatically when obsidian has been launched")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.alwaysOpen)
@@ -1354,46 +1378,6 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
-		new Setting(containerEl)
-			.setName("Display method")
-			.setDesc("Filename display")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions({
-						"PATH/NAME": "PATH/NAME",
-						NAME: "NAME",
-						"NAME : PATH": "NAME : PATH",
-					})
-					.setValue(this.plugin.settings.displayMethod)
-					.onChange(async (value: DISPLAY_METHOD) => {
-						this.plugin.settings.displayMethod = value;
-						this.plugin.loadFileInfo(null);
-						await this.plugin.saveSettings();
-					})
-			);
-		new Setting(containerEl)
-			.setName("Use title")
-			.setDesc(
-				"Use value in the frontmatter or first level one heading for `NAME`."
-			)
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.useTitle)
-					.onChange(async (value) => {
-						this.plugin.settings.useTitle = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		new Setting(containerEl)
-			.setName("Frontmatter path")
-			.addText((text) => {
-				text
-					.setValue(this.plugin.settings.frontmatterKey)
-					.onChange(async (value) => {
-						this.plugin.settings.frontmatterKey = value;
-						await this.plugin.saveSettings();
-					});
-			});
 		new Setting(containerEl)
 			.setName("Use pinning")
 			.setDesc(
@@ -1408,10 +1392,12 @@ class TagFolderSettingTab extends PluginSettingTab {
 							await this.plugin.loadTagInfo();
 						}
 						await this.plugin.saveSettings();
+						pi.setDisabled(!value);
 					});
 			});
-		new Setting(containerEl)
+		const pi = new Setting(containerEl)
 			.setName("Pin information file")
+			.setDisabled(!this.plugin.settings.useTagInfo)
 			.addText((text) => {
 				text
 					.setValue(this.plugin.settings.tagInfo)
@@ -1419,6 +1405,149 @@ class TagFolderSettingTab extends PluginSettingTab {
 						this.plugin.settings.tagInfo = value;
 						if (this.plugin.settings.useTagInfo) {
 							await this.plugin.loadTagInfo();
+						}
+						await this.plugin.saveSettings();
+					});
+			});
+		containerEl.createEl("h3", { text: "Files" });
+		new Setting(containerEl)
+			.setName("Display method")
+			.setDesc("How to show a title of files")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions({
+						"PATH/NAME": "PATH/NAME",
+						NAME: "NAME",
+						"NAME : PATH": "NAME : PATH",
+					})
+					.setValue(this.plugin.settings.displayMethod)
+					.onChange(async (value: DISPLAY_METHOD) => {
+						this.plugin.settings.displayMethod = value;
+						this.plugin.loadFileInfo(null);
+						await this.plugin.saveSettings();
+					})
+			);
+		const setOrderMethod = async (key: string, order: string) => {
+			const oldSetting = this.plugin.settings.sortType.split("_");
+			if (!key) key = oldSetting[0];
+			if (!order) order = oldSetting[1];
+			//@ts-ignore
+			this.plugin.settings.sortType = `${key}_${order}`;
+			await this.plugin.saveSettings();
+			this.plugin.setRoot(this.plugin.root);
+		};
+		new Setting(containerEl)
+			.setName("Order method")
+			.setDesc("how to order items")
+			.addDropdown((dd) => {
+				dd.addOptions(OrderKeyItem)
+					.setValue(this.plugin.settings.sortType.split("_")[0])
+					.onChange((key) => setOrderMethod(key, null));
+			})
+			.addDropdown((dd) => {
+				dd.addOptions(OrderDirection)
+					.setValue(this.plugin.settings.sortType.split("_")[1])
+					.onChange((order) => setOrderMethod(null, order));
+			});
+		new Setting(containerEl)
+			.setName("Use title")
+			.setDesc(
+				"Use value in the frontmatter or first level one heading for `NAME`."
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.useTitle)
+					.onChange(async (value) => {
+						this.plugin.settings.useTitle = value;
+						fpath.setDisabled(!value);
+						await this.plugin.saveSettings();
+					});
+			});
+		const fpath = new Setting(containerEl)
+			.setName("Frontmatter path")
+			.setDisabled(!this.plugin.settings.useTitle)
+			.addText((text) => {
+				text
+					.setValue(this.plugin.settings.frontmatterKey)
+					.onChange(async (value) => {
+						this.plugin.settings.frontmatterKey = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		containerEl.createEl("h3", { text: "Tags" });
+
+		const setOrderMethodTag = async (key: string, order: string) => {
+			const oldSetting = this.plugin.settings.sortTypeTag.split("_");
+			if (!key) key = oldSetting[0];
+			if (!order) order = oldSetting[1];
+			//@ts-ignore
+			this.plugin.settings.sortTypeTag = `${key}_${order}`;
+			await this.plugin.saveSettings();
+			this.plugin.setRoot(this.plugin.root);
+		};
+		new Setting(containerEl)
+			.setName("Order method")
+			.setDesc("how to order tags")
+			.addDropdown((dd) => {
+				dd.addOptions(OrderKeyTag)
+					.setValue(this.plugin.settings.sortTypeTag.split("_")[0])
+					.onChange((key) => setOrderMethodTag(key, null));
+			})
+			.addDropdown((dd) => {
+				dd.addOptions(OrderDirection)
+					.setValue(this.plugin.settings.sortTypeTag.split("_")[1])
+					.onChange((order) => setOrderMethodTag(null, order));
+			});
+
+
+		new Setting(containerEl)
+			.setName("Use virtual tags")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.useVirtualTag)
+					.onChange(async (value) => {
+						this.plugin.settings.useVirtualTag = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		containerEl.createEl("h3", { text: "Actions" });
+		new Setting(containerEl)
+			.setName("Search tags inside TagFolder when clicking tags")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.overrideTagClicking)
+					.onChange(async (value) => {
+						this.plugin.settings.overrideTagClicking = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("List files in a separated pane")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.useMultiPaneList)
+					.onChange(async (value) => {
+						this.plugin.settings.useMultiPaneList = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		containerEl.createEl("h3", { text: "Arrangements" });
+
+		new Setting(containerEl)
+			.setName("Hide Items")
+			.setDesc("Hide items on the landing or nested tags")
+			.addDropdown((dd) => {
+				dd.addOptions(HideItemsType)
+					.setValue(this.plugin.settings.hideItems)
+					.onChange(async (key) => {
+						if (
+							key == "NONE" ||
+							key == "DEDICATED_INTERMIDIATES" ||
+							key == "ALL_EXCEPT_BOTTOM"
+						) {
+							this.plugin.settings.hideItems = key;
 						}
 						await this.plugin.saveSettings();
 					});
@@ -1449,50 +1578,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		const setOrderMethod = async (key: string, order: string) => {
-			const oldSetting = this.plugin.settings.sortType.split("_");
-			if (!key) key = oldSetting[0];
-			if (!order) order = oldSetting[1];
-			//@ts-ignore
-			this.plugin.settings.sortType = `${key}_${order}`;
-			await this.plugin.saveSettings();
-			this.plugin.setRoot(this.plugin.root);
-		};
-		const setOrderMethodTag = async (key: string, order: string) => {
-			const oldSetting = this.plugin.settings.sortTypeTag.split("_");
-			if (!key) key = oldSetting[0];
-			if (!order) order = oldSetting[1];
-			//@ts-ignore
-			this.plugin.settings.sortTypeTag = `${key}_${order}`;
-			await this.plugin.saveSettings();
-			this.plugin.setRoot(this.plugin.root);
-		};
-		new Setting(containerEl)
-			.setName("Order method (Tags)")
-			.setDesc("how to order tags")
-			.addDropdown((dd) => {
-				dd.addOptions(OrderKeyTag)
-					.setValue(this.plugin.settings.sortTypeTag.split("_")[0])
-					.onChange((key) => setOrderMethodTag(key, null));
-			})
-			.addDropdown((dd) => {
-				dd.addOptions(OrderDirection)
-					.setValue(this.plugin.settings.sortTypeTag.split("_")[1])
-					.onChange((order) => setOrderMethodTag(null, order));
-			});
-		new Setting(containerEl)
-			.setName("Order method (Items)")
-			.setDesc("how to order items")
-			.addDropdown((dd) => {
-				dd.addOptions(OrderKeyItem)
-					.setValue(this.plugin.settings.sortType.split("_")[0])
-					.onChange((key) => setOrderMethod(key, null));
-			})
-			.addDropdown((dd) => {
-				dd.addOptions(OrderDirection)
-					.setValue(this.plugin.settings.sortType.split("_")[1])
-					.onChange((order) => setOrderMethod(null, order));
-			});
+
 		new Setting(containerEl)
 			.setName("Do not treat nested tags as dedicated levels")
 			.setDesc("Treat nested tags as normal tags")
@@ -1506,6 +1592,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 			});
 		new Setting(containerEl)
 			.setName("Reduce duplicated parents in nested tags")
+			.setDesc("If enabled, #web/css, #web/javascript will merged into web -> css -> javascript")
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.reduceNestedParent)
@@ -1514,53 +1601,32 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
+
+		containerEl.createEl("h3", { text: "Filters" });
 		new Setting(containerEl)
-			.setName("Use virtual tags")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.useVirtualTag)
+			.setName("Target Folders")
+			.setDesc("If configured, the plugin will only target files in it.")
+			.addTextArea((text) =>
+				text
+					.setValue(this.plugin.settings.targetFolders)
+					.setPlaceholder("study,documents/summary")
 					.onChange(async (value) => {
-						this.plugin.settings.useVirtualTag = value;
+						this.plugin.settings.targetFolders = value;
 						await this.plugin.saveSettings();
-					});
-			});
+					})
+			);
 		new Setting(containerEl)
-			.setName("Search tags inside TagFolder when clicking tags")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.overrideTagClicking)
+			.setName("Ignore Folders")
+			.setDesc("Ignore documents in specific folders.")
+			.addTextArea((text) =>
+				text
+					.setValue(this.plugin.settings.ignoreFolders)
+					.setPlaceholder("template,list/standard_tags")
 					.onChange(async (value) => {
-						this.plugin.settings.overrideTagClicking = value;
+						this.plugin.settings.ignoreFolders = value;
 						await this.plugin.saveSettings();
-					});
-			});
-		new Setting(containerEl)
-			.setName("List files in a separated pane")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.useMultiPaneList)
-					.onChange(async (value) => {
-						this.plugin.settings.useMultiPaneList = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		new Setting(containerEl)
-			.setName("Hide Items")
-			.setDesc("Hide items on the landing or nested tags")
-			.addDropdown((dd) => {
-				dd.addOptions(HideItemsType)
-					.setValue(this.plugin.settings.hideItems)
-					.onChange(async (key) => {
-						if (
-							key == "NONE" ||
-							key == "DEDICATED_INTERMIDIATES" ||
-							key == "ALL_EXCEPT_BOTTOM"
-						) {
-							this.plugin.settings.hideItems = key;
-						}
-						await this.plugin.saveSettings();
-					});
-			});
+					})
+			);
 		new Setting(containerEl)
 			.setName("Ignore note Tag")
 			.setDesc(
@@ -1588,29 +1654,20 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Target Folders")
-			.setDesc("The plugin will only target files in it.")
+			.setName("Archive tags")
+			.setDesc("If configured, notes with these tags will be moved under the tag.")
 			.addTextArea((text) =>
 				text
-					.setValue(this.plugin.settings.targetFolders)
-					.setPlaceholder("study,documents/summary")
+					.setValue(this.plugin.settings.archiveTags)
+					.setPlaceholder("archived, discontinued")
 					.onChange(async (value) => {
-						this.plugin.settings.targetFolders = value;
+						this.plugin.settings.archiveTags = value;
 						await this.plugin.saveSettings();
 					})
 			);
-		new Setting(containerEl)
-			.setName("Ignore Folders")
-			.setDesc("Ignore documents in specific folders.")
-			.addTextArea((text) =>
-				text
-					.setValue(this.plugin.settings.ignoreFolders)
-					.setPlaceholder("template,list/standard_tags")
-					.onChange(async (value) => {
-						this.plugin.settings.ignoreFolders = value;
-						await this.plugin.saveSettings();
-					})
-			);
+
+		containerEl.createEl("h3", { text: "Misc" });
+
 		new Setting(containerEl)
 			.setName("Tag scanning delay")
 			.setDesc(
@@ -1647,8 +1704,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 						const items = this.plugin.root.allDescendants.map(e => e.tags.filter(e => e != "_untagged")).filter(e => e.length);
 						await navigator.clipboard.writeText(items.map(e => e.map(e => `#${e}`).join(", ")).join("\n"));
 						new Notice("Copied to clipboard");
-					})
-			).addButton((button) =>
+					}))
+			.addButton((button) =>
 				button
 					.setButtonText("Copy disguised tags")
 					.setDisabled(false)
