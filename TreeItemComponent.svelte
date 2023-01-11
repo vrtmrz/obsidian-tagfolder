@@ -20,6 +20,7 @@
 		isAutoExpandTree,
 		omittedTags,
 		renderSpecialTag,
+		unique,
 	} from "./util";
 	import type { TagInfoDict } from "./types";
 	export let entry: TagFolderItem;
@@ -227,7 +228,7 @@
 					cx = [...cx, ...entry.descendants];
 				}
 			}
-			children = cx;
+			children = unique(cx);
 		}
 	}
 	let entryLeftTags = [] as string[];
