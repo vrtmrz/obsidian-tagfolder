@@ -89,19 +89,19 @@
 	let switchIcon = "";
 
 	onMount(async () => {
-		setIcon(iconDivEl, "right-triangle", 24);
+		setIcon(iconDivEl, "right-triangle");
 		folderIcon = `${iconDivEl.innerHTML}`;
-		setIcon(iconDivEl, "document", 20);
+		setIcon(iconDivEl, "document");
 		documentIcon = `${iconDivEl.innerHTML}`;
 		if (isMainTree) {
-			setIcon(iconDivEl, "lucide-sort-asc", 20);
+			setIcon(iconDivEl, "lucide-sort-asc");
 			upAndDownArrowsIcon = iconDivEl.innerHTML;
-			setIcon(iconDivEl, "stacked-levels", 20);
+			setIcon(iconDivEl, "stacked-levels");
 			stackedLevels = iconDivEl.innerHTML;
-			setIcon(iconDivEl, "search", 20);
+			setIcon(iconDivEl, "search");
 			searchIcon = iconDivEl.innerHTML;
 		}
-		setIcon(iconDivEl, "lucide-arrow-left-right", 20);
+		setIcon(iconDivEl, "lucide-arrow-left-right");
 		switchIcon = iconDivEl.innerHTML;
 	});
 	$: headerTitle = title == "" ? `Tags: ${vaultname}` : `Items: ${title}`;

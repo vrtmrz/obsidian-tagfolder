@@ -1,3 +1,4 @@
+import { tagInfo } from "store";
 import {
 	EPOCH_DAY,
 	EPOCH_HOUR,
@@ -108,11 +109,25 @@ export function isSpecialTag(tagSrc: string) {
 	return tag == "_untagged" || tag in tagDispDict;
 }
 
+let tagDispAlternativeDict: { [key: string]: string } = {};
+tagInfo.subscribe(tagInfo => {
+	tagDispAlternativeDict = { ...tagDispDict };
+	if (tagInfo == null) {
+		return;
+	}
+	const items = Object.entries(tagInfo);
+	for (const [key, info] of items) {
+		if ("alt" in info) {
+			tagDispAlternativeDict[key] = info.alt;
+		}
+	}
+});
+
 export function renderSpecialTag(tagSrc: string) {
 	const tag = tagSrc.startsWith(SUBTREE_MARK)
 		? tagSrc.substring(SUBTREE_MARK.length)
 		: tagSrc;
-	return tag in tagDispDict ? tagDispDict[tag] : tagSrc;
+	return tag in tagDispAlternativeDict ? tagDispAlternativeDict[tag] : tagSrc;
 
 }
 

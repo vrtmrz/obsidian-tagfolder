@@ -28,8 +28,10 @@ export interface TagInfoDict {
 	[key: string]: TagInfo;
 }
 export interface TagInfo {
-	key: string;
+	key?: string;
 	mark?: string;
+	alt?: string;
+	redirect?: string;
 }
 
 import { DISPLAY_METHOD, HIDE_ITEMS_TYPE } from "./main";

@@ -1,6 +1,36 @@
-.workspace-leaf-content[data-type="tagfolder-view"] > .view-content,
-.workspace-leaf-content[data-type="tagfolder-view-list"] > .view-content {
+.workspace-leaf-content[data-type="tagfolder-view"]>.view-content,
+.workspace-leaf-content[data-type="tagfolder-view-list"]>.view-content {
 	padding: 0;
 	height: 100%;
 	overflow: unset;
+}
+
+.override-input {
+	flex-direction: column-reverse;
+}
+
+.tagfolder-tag::before {
+	all: inherit;
+	color: inherit;
+	font: inherit;
+}
+
+.tagfolder-tag.tag-tag::before {
+	margin-left: 0px;
+	margin-right: 0px;
+}
+
+.tagfolder-tag.tag-nested-tag:empty {
+	display: none;
+}
+
+.tagfolder-tag.tag-nested-tag:first-child:not(:empty):before {
+	content: "#";
+	margin-left: 0.3em;
+}
+
+.tagfolder-tag.tag-nested-tag::before {
+	content: "→ ";
+	margin-left: 0;
+	margin-right: 0;
 }

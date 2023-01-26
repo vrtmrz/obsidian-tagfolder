@@ -11,6 +11,20 @@ import {
 } from "./types";
 import { maxDepth, selectedTags } from "./store";
 import { ancestorToLongestTag, ancestorToTags, isSpecialTag, omittedTags, renderSpecialTag } from "./util";
+import { askString } from "dialog";
+
+function toggleObjectProp(obj: { [key: string]: any }, propName: string, value: string | false) {
+    if (value === false) {
+        const newTagInfoEntries = Object.entries(obj || {}).filter(([key]) => key != propName);
+        if (newTagInfoEntries.length == 0) {
+            return {};
+        } else {
+            return Object.fromEntries(newTagInfoEntries);
+        }
+    } else {
+        return { ...(obj ?? {}), [propName]: value };
+    }
+}
 export abstract class TagFolderViewBase extends ItemView {
     component: TagFolderViewComponent;
     plugin: TagFolderPlugin;
@@ -177,16 +191,12 @@ export abstract class TagFolderViewBase extends ItemView {
             if (this.plugin.settings.useTagInfo && this.plugin.tagInfo != null) {
                 const tag = entry.ancestors[entry.ancestors.length - 1];
 
-                if (tag in this.plugin.tagInfo && this.plugin.tagInfo[tag]) {
+                if (tag in this.plugin.tagInfo && "key" in this.plugin.tagInfo[tag]) {
                     menu.addItem((item) =>
                         item.setTitle(`Unpin`)
                             .setIcon("pin")
                             .onClick(async () => {
-                                this.plugin.tagInfo =
-                                {
-                                    ...this.plugin.tagInfo,
-                                    [tag]: undefined
-                                };
+                                this.plugin.tagInfo[tag] = toggleObjectProp(this.plugin.tagInfo[tag], "key", false);
                                 this.plugin.applyTagInfo();
                                 await this.plugin.saveTagInfo();
                             })
@@ -197,16 +207,48 @@ export abstract class TagFolderViewBase extends ItemView {
                         item.setTitle(`Pin`)
                             .setIcon("pin")
                             .onClick(async () => {
-                                this.plugin.tagInfo =
-                                {
-                                    ...this.plugin.tagInfo,
-                                    [tag]: { key: "" }
-                                };
+                                this.plugin.tagInfo[tag] = toggleObjectProp(this.plugin.tagInfo[tag], "key", "");
                                 this.plugin.applyTagInfo();
                                 await this.plugin.saveTagInfo();
                             })
                     })
                 }
+                menu.addItem((item) => {
+                    item.setTitle(`Set an alternative label`)
+                        .setIcon("pencil")
+                        .onClick(async () => {
+                            const oldAlt = tag in this.plugin.tagInfo ? (this.plugin.tagInfo[tag].alt ?? "") : "";
+                            const label = await askString(this.app, "", "", oldAlt);
+                            if (label === false) return;
+                            this.plugin.tagInfo[tag] = toggleObjectProp(this.plugin.tagInfo[tag], "alt", label == "" ? false : label);
+                            this.plugin.applyTagInfo();
+                            await this.plugin.saveTagInfo();
+                        })
+                });
+                menu.addItem((item) => {
+                    item.setTitle(`Change the mark`)
+                        .setIcon("pencil")
+                        .onClick(async () => {
+                            const oldMark = tag in this.plugin.tagInfo ? (this.plugin.tagInfo[tag].mark ?? "") : "";
+                            const mark = await askString(this.app, "", "", oldMark);
+                            if (mark === false) return;
+                            this.plugin.tagInfo[tag] = toggleObjectProp(this.plugin.tagInfo[tag], "mark", mark == "" ? false : mark);
+                            this.plugin.applyTagInfo();
+                            await this.plugin.saveTagInfo();
+                        })
+                });
+                menu.addItem((item) => {
+                    item.setTitle(`Redirect this tag to ...`)
+                        .setIcon("pencil")
+                        .onClick(async () => {
+                            const oldRedirect = tag in this.plugin.tagInfo ? (this.plugin.tagInfo[tag].redirect ?? "") : "";
+                            const redirect = await askString(this.app, "", "", oldRedirect);
+                            if (redirect === false) return;
+                            this.plugin.tagInfo[tag] = toggleObjectProp(this.plugin.tagInfo[tag], "redirect", redirect == "" ? false : redirect);
+                            this.plugin.applyTagInfo();
+                            await this.plugin.saveTagInfo();
+                })
+                });
                 menu.addItem(item => {
                     item.setTitle(`Open scroll view`)
                         .setIcon("sheets-in-box")

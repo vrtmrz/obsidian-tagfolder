@@ -12,7 +12,6 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
-	stringifyYaml,
 	TFile,
 	TFolder,
 	WorkspaceLeaf,
@@ -45,6 +44,7 @@ import {
 	omittedTags,
 	renderSpecialTag,
 	secondsToFreshness,
+	unique,
 } from "./util";
 import { ScrollView } from "./ScrollView";
 import { TagFolderView } from "./TagFolderView";
@@ -391,8 +391,11 @@ function getCompareMethodTags(settings: TagFolderSettings) {
 	switch (settings.sortTypeTag) {
 		case "ITEMS_ASC":
 		case "ITEMS_DESC":
-			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) =>
-				(a.itemsCount - b.itemsCount) * invert;
+			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) => {
+				const aCount = a.itemsCount - ((settings.useTagInfo && (a.tag in tagInfo && "key" in tagInfo[a.tag])) ? 100000 * invert : 0);
+				const bCount = b.itemsCount - ((settings.useTagInfo && (b.tag in tagInfo && "key" in tagInfo[b.tag])) ? 100000 * invert : 0);
+				return (aCount - bCount) * invert;
+			}
 		case "NAME_ASC":
 		case "NAME_DESC":
 			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) =>
@@ -917,8 +920,16 @@ export default class TagFolderPlugin extends Plugin {
 				continue;
 			}
 			await doEvents();
-			const allTagsDocs = [...new Set(getAllTags(fileCache.metadata) ?? [])];
-			let allTags = allTagsDocs.map((e) => e.substring(1));
+			const tagRedirectList = {} as { [key: string]: string };
+			if (this.settings.useTagInfo && this.tagInfo) {
+				for (const [key, taginfo] of Object.entries(this.tagInfo)) {
+					if ("redirect" in taginfo) {
+						tagRedirectList[key] = taginfo.redirect;
+					}
+				}
+			}
+			const allTagsDocs = unique(getAllTags(fileCache.metadata) ?? []);
+			let allTags = unique(allTagsDocs.map((e) => e.substring(1)).map(e => e in tagRedirectList ? tagRedirectList[e] : e));
 			if (this.settings.disableNestedTags) {
 				allTags = allTags.map((e) => e.split("/")).flat();
 			}
@@ -1243,12 +1254,12 @@ export default class TagFolderPlugin extends Plugin {
 				const w = yamlData[key];
 				if (!w) continue;
 				if (typeof (w) != "object") continue;
-				if (!("key" in w)) continue;
-				// snip unexpected entries.
-				newTagInfo[key] = {
-					key: w.key,
-					mark: w.mark ?? undefined,
-				};
+				// snip unexpected keys
+				// but we can use xkey, xmark or something like that for preserving entries.
+				const keys = ["key", "mark", "alt", "redirect"];
+				const entries = Object.entries(w).filter(([key]) => keys.some(e => key.contains(e)));
+				if (entries.length == 0) continue;
+				newTagInfo[key] = Object.fromEntries(entries);
 			}
 			this.tagInfo = newTagInfo;
 			this.applyTagInfo();
@@ -1262,18 +1273,20 @@ export default class TagFolderPlugin extends Plugin {
 	async saveTagInfo() {
 		if (!this.settings.useTagInfo) return;
 		if (this.tagInfo == null) return;
-		const file = this.getTagInfoFile();
-		const yaml = stringifyYaml({ ...this.tagInfoFrontMatterBuffer, ...this.tagInfo });
-		const w = `---
-${yaml}---
-${this.tagInfoBody}`;
-
-		this.skipOnce = true;
+		let file = this.getTagInfoFile();
 		if (file == null) {
-			await this.app.vault.create(this.getTagInfoFilename(), w);
-		} else {
-			await this.app.vault.modify(file, w);
+			file = await this.app.vault.create(this.getTagInfoFilename(), "");
 		}
+		await app.fileManager.processFrontMatter(file, matter => {
+			const ti = Object.entries(this.tagInfo);
+			for (const [key, value] of ti) {
+				if (value === undefined) {
+					delete matter[key];
+				} else {
+					matter[key] = value;
+				}
+			}
+		});
 	}
 
 	async loadSettings() {

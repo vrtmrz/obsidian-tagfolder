@@ -13,6 +13,7 @@
 		SUBTREE_MARK,
 		TagFolderSettings,
 		DEFAULT_SETTINGS,
+		TagInfo,
 	} from "./types";
 	import {
 		ancestorToLongestTag,
@@ -159,21 +160,34 @@
 	});
 	$: curTaginfo =
 		"tag" in entry && entry.tag in _tagInfo ? _tagInfo[entry.tag] : null;
-	$: tagMark = !curTaginfo
-		? ""
-		: "mark" in curTaginfo && curTaginfo.mark
-		? curTaginfo.mark
-		: "📌";
+
+	function getTagMark(tagInfo: TagInfo) {
+		if (!tagInfo) return "";
+		if ("key" in tagInfo) {
+			if ("mark" in tagInfo && tagInfo.mark != "") {
+				return tagInfo.mark;
+			} else {
+				return "📌";
+			}
+		} else {
+			if ("mark" in tagInfo && tagInfo.mark != "") {
+				return tagInfo.mark;
+			} else {
+				return "";
+			}
+		}
+	}
+	$: tagMark = getTagMark(curTaginfo);
 
 	let tagTitle = "";
 
 	let showOnlyChildren = false;
-	let ellipsisMark = "";
+	let ellipsisMarks = [] as string[][];
 	let omitTags = [] as string[];
 	let omitTagSrc = [] as string[];
 	$: {
 		showOnlyChildren = false;
-		ellipsisMark = "";
+		ellipsisMarks = [];
 		omitTags = [];
 		omitTagSrc = [];
 		if ("tag" in entry) {
@@ -189,8 +203,7 @@
 							.join("/")
 					),
 				];
-				ellipsisMark =
-					" " + omitTags.join(" ").replace(/\//g, SUBTREE_MARK);
+				ellipsisMarks = omitTags.map((e) => e.split("/"));
 			}
 		}
 	}
@@ -206,6 +219,46 @@
 						: ""
 			  }${tagMark}${convertedTag}`
 			: "";
+	const escapeStringToHTML = (str: string) => {
+		if (!str) return "";
+		return str.replace(/[<>&"'`]/g, (match) => {
+			const escape: any = {
+				"<": "&lt;",
+				">": "&gt;",
+				"&": "&amp;",
+				'"': "&quot;",
+				"'": "&#39;",
+				"`": "&#x60;",
+			};
+			return escape[match];
+		});
+	};
+	let tagsTitleDispHtml = "";
+	$: {
+		let tagsTitleDisp = [
+			...tagTitle
+				.split(SUBTREE_MARK)
+				.join("/")
+				.split(" ")
+				.map((e) => e.split("/")),
+			...ellipsisMarks,
+		];
+		// To make performance better, we have to prepare a HTML piece.
+		tagsTitleDispHtml = tagsTitleDisp
+			.map(
+				(e) =>
+					`<span class="tagfolder-tag tag-tag">${e
+						.map(
+							(ee) =>
+								`<span class="tagfolder-tag tag-nested-tag">${escapeStringToHTML(
+									ee
+								)}</span>`
+						)
+						.join("")}</span>`
+			)
+			.join("");
+	}
+
 	let children: TagFolderItem[] = [];
 	$: {
 		let cx: TagFolderItem[] = [];
@@ -302,7 +355,7 @@
 				</div>
 				<div class="nav-folder-title-content lsl-f">
 					<div class="tagfolder-titletagname">
-						{tagTitle}{ellipsisMark}
+						{@html tagsTitleDispHtml}
 					</div>
 					<div
 						class="tagfolder-quantity itemscount"
@@ -365,8 +418,8 @@
 		flex-direction: row;
 		display: flex;
 		flex-grow: 1;
-		overflow: visible;
-		max-width: calc(100% - var(--nav-item-parent-padding));
+		overflow: hidden;
+		max-width: calc(100%);
 	}
 	.tags {
 		background-color: var(--background-secondary-alt);
@@ -382,10 +435,7 @@
 	}
 	.tagfolder-titletagname {
 		flex-grow: 1;
-		max-width: calc(100% - 2em);
-		width: calc(100% - 2em);
 		text-overflow: ellipsis;
-		overflow: hidden;
 		white-space: nowrap;
 		overflow: hidden;
 	}
@@ -402,6 +452,7 @@
 		width: 3em;
 		text-align: right;
 		cursor: pointer;
+		margin-left: auto;
 	}
 
 	.tag-folder-title {
