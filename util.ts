@@ -142,17 +142,45 @@ export function secondsToFreshness(totalAsMSec: number) {
 	return FRESHNESS_5
 }
 
-
 const queues = [] as (() => void)[];
 
-function pump() {
-	requestAnimationFrame(() => {
-		const proc = queues.shift();
-		if (proc) {
-			proc();
-			pump();
-		}
-	});
+function waitForRequestAnimationFrame() {
+	return new Promise<void>(res => requestAnimationFrame(() => res()));
+}
+function delay() {
+	return new Promise<void>(res => setTimeout(() => res(), 5));
+}
+// This is based on nothing.
+const waits = [waitForRequestAnimationFrame, waitForRequestAnimationFrame, delay];
+let waitIdx = 0;
+let pumping = false;
+let startContinuousProcessing = Date.now();
+
+async function pump() {
+	if (pumping) return;
+	try {
+		pumping = true;
+		do {
+			const proc = queues.shift();
+			if (proc) {
+				proc();
+				const now = Date.now();
+				if (now - startContinuousProcessing > 22) {
+					const w = waits[waitIdx];
+					waitIdx = (waitIdx + 1) % waits.length;
+					await w();
+					startContinuousProcessing = Date.now();
+				}
+			} else {
+				break;
+			}
+			// eslint-disable-next-line no-constant-condition
+		} while (true);
+	} finally {
+		pumping = false;
+	}
+
+
 }
 
 // The message pump having ancient name.
