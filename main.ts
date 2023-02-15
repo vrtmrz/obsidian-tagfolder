@@ -531,7 +531,7 @@ export default class TagFolderPlugin extends Plugin {
 						for (const child of entry.children) {
 							if ("tag" in child) {
 								const autoExp = isAutoExpandTree(child, this.settings);
-								const nextDepth = autoExp ? maxDepth : maxDepth - 1;
+								const nextDepth = (autoExp || child.isDedicatedTree) ? maxDepth : maxDepth - 1;
 								if (path.indexOf(child.tag) == -1) {
 									await this.expandLastExpandedFolders(child, false, [...path, entry.tag], openedTags, nextDepth);
 								}
