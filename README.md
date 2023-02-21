@@ -76,16 +76,16 @@ We can pin the tag if we enable this option.
 When this feature is enabled, the pin information is saved in the file set in the next configuration.  
 Pinned tags are sorted according to `key` in the frontmatter of `taginfo.md`.
 
-#### Pin information file.
+#### Pin information file
 We can change the name of the file in which pin information is saved.
 This can be configured also from the context-menu.
 
-| Item     | Meaning of the value                                                          |
-| -------- | ----------------------------------------------------------------------------- |
-| key      | If exists, the tag is pinned.                                                 |
-| mark     | The label which is shown instead of `📌`.                                      |
-| alt      | The tag will be shown as this. But they will not be merged into the same one. |
-| redirect | The tag will be redirected to the configured one and will be merged.          |
+| Item     | Meaning of the value                                                                           |
+| -------- | ---------------------------------------------------------------------------------------------- |
+| key      | If exists, the tag is pinned.                                                                  |
+| mark     | The label which is shown instead of `📌`.                                                       |
+| alt      | The tag will be shown as this. But they will not be merged into the same one. No `#` required. |
+| redirect | The tag will be redirected to the configured one and will be merged. No `#` required.          |
 
 
 #### Merge redundant combinations
