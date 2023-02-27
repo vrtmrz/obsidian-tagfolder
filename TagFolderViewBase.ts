@@ -28,6 +28,7 @@ function toggleObjectProp(obj: { [key: string]: any }, propName: string, value: 
 export abstract class TagFolderViewBase extends ItemView {
     component: TagFolderViewComponent;
     plugin: TagFolderPlugin;
+    navigation: false;
 
     showOrder(evt: MouseEvent) {
         const menu = new Menu();
@@ -247,7 +248,7 @@ export abstract class TagFolderViewBase extends ItemView {
                             this.plugin.tagInfo[tag] = toggleObjectProp(this.plugin.tagInfo[tag], "redirect", redirect == "" ? false : redirect);
                             this.plugin.applyTagInfo();
                             await this.plugin.saveTagInfo();
-                })
+                        })
                 });
                 menu.addItem(item => {
                     item.setTitle(`Open scroll view`)

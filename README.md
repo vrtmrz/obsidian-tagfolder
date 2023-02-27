@@ -80,12 +80,12 @@ Pinned tags are sorted according to `key` in the frontmatter of `taginfo.md`.
 We can change the name of the file in which pin information is saved.
 This can be configured also from the context-menu.
 
-| Item     | Meaning of the value                                                                           |
-| -------- | ---------------------------------------------------------------------------------------------- |
-| key      | If exists, the tag is pinned.                                                                  |
-| mark     | The label which is shown instead of `📌`.                                                       |
-| alt      | The tag will be shown as this. But they will not be merged into the same one. No `#` required. |
-| redirect | The tag will be redirected to the configured one and will be merged. No `#` required.          |
+| Item     | Meaning of the value                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------- |
+| key      | If exists, the tag is pinned.                                                                     |
+| mark     | The label which is shown instead of `📌`.                                                          |
+| alt      | The tag will be shown as this. But they will not be merged into the same one. No `#` is required. |
+| redirect | The tag will be redirected to the configured one and will be merged. No `#` is required.          |
 
 
 #### Merge redundant combinations

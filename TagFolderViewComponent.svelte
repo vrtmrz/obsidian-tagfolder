@@ -157,24 +157,24 @@
 		{/if}
 	</div>
 </div>
+{#if showSearch && isMainTree}
+	<div class="search-input-container">
+		<input
+			type="search"
+			spellcheck="false"
+			placeholder="Type to start search..."
+			bind:value={search}
+		/>
+		<!-- svelte-ignore a11y-click-events-have-key-events -->
+		<div
+			class="search-input-clear-button"
+			aria-label="Clear search"
+			style="display:{search.trim() == '' ? 'none' : ''};"
+			on:click={clearSearch}
+		/>
+	</div>
+{/if}
 <div class="nav-files-container">
-	{#if showSearch && isMainTree}
-		<div class="search-input-container">
-			<input
-				type="text"
-				spellcheck="false"
-				placeholder="Type to start search..."
-				bind:value={search}
-			/>
-			<!-- svelte-ignore a11y-click-events-have-key-events -->
-			<div
-				class="search-input-clear-button"
-				aria-label="Clear search"
-				style="display:{search.trim() == '' ? 'none' : ''};"
-				on:click={clearSearch}
-			/>
-		</div>
-	{/if}
 	<div class="nav-folder mod-root">
 		<div class="nav-folder-title">
 			<div class="nav-folder-collapse-indicator collapse-icon" />
@@ -204,9 +204,6 @@
 </div>
 
 <style>
-	.nav-folder {
-		padding-bottom: 64px;
-	}
 	.nav-files-container {
 		height: 100%;
 	}
