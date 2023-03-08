@@ -138,7 +138,8 @@
 			</div>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<div
-				class="clickable-icon nav-action-button"
+				class={"clickable-icon nav-action-button" +
+					(showSearch ? " is-active" : "")}
 				aria-label="Search"
 				on:click={toggleSearch}
 			>

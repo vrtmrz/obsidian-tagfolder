@@ -433,18 +433,18 @@
 		padding-left: 1em;
 		overflow: hidden;
 	}
+	.taglist span {
+		color: var(--nav-item-color);
+	}
 	.tagfolder-titletagname {
 		flex-grow: 1;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		overflow: hidden;
 	}
-	.nav-folder-title-content:hover .tagfolder-quantity span {
-		background-color: var(--interactive-accent-hover);
-		color: var(--text-on-accent);
-	}
 	.tagfolder-quantity span {
 		background-color: var(--background-secondary-alt);
+		color: var(--nav-item-color);
 		border-radius: 4px;
 		padding: 2px 4px;
 	}
@@ -454,8 +454,19 @@
 		cursor: pointer;
 		margin-left: auto;
 	}
-
 	.tag-folder-title {
 		max-width: 100%;
+	}
+
+	/* for ellipsis dots. */
+	.nav-folder-title:hover .tagfolder-quantity,
+	.nav-file-title:hover .taglist {
+		color: var(--text-on-accent);
+	}
+
+	.nav-folder-title:hover .tagfolder-quantity span,
+	.nav-file-title:hover .taglist .tags {
+		color: var(--text-on-accent);
+		background-color: var(--interactive-accent-hover);
 	}
 </style>
