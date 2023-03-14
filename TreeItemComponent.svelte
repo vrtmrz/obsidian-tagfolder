@@ -297,6 +297,9 @@
 				),
 			];
 			let filteredTags = [...tempTags];
+			if (entry.extraTags) {
+				filteredTags = [...filteredTags, ...entry.extraTags];
+			}
 			for (const removeTag of removeTags) {
 				const part = removeTag.split("/");
 				for (const piece of part)

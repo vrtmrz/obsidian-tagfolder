@@ -1,5 +1,6 @@
 export interface ViewItem {
 	tags: string[];
+	extraTags: string[];
 	path: string;
 	displayName: string;
 	ancestors: string[];
@@ -10,6 +11,7 @@ export interface ViewItem {
 
 export interface TreeItem {
 	tag: string;
+	extraTags: string[];
 	children: Array<TagFolderItem>;
 	ancestors: string[];
 	descendants: Array<ViewItem>;
@@ -71,6 +73,7 @@ export interface TagFolderSettings {
 	overrideTagClicking: boolean;
 	useMultiPaneList: boolean;
 	archiveTags: string;
+	disableNarrowingDown: boolean;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -98,6 +101,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	overrideTagClicking: false,
 	useMultiPaneList: false,
 	archiveTags: "",
+	disableNarrowingDown: false,
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";

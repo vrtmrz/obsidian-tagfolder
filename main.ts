@@ -4,7 +4,9 @@ import {
 	App,
 	CachedMetadata,
 	debounce,
+	Editor,
 	getAllTags,
+	MarkdownView,
 	normalizePath,
 	Notice,
 	parseYaml,
@@ -194,6 +196,7 @@ const expandTree = async (node: TreeItem, reduceNestedParent: boolean): Promise<
 
 		const newLeaf: TreeItem = {
 			tag: tag,
+			extraTags: node.extraTags,
 			children: newChildren,
 			ancestors: [...ancestor, tag],
 			descendants: null,
@@ -279,6 +282,7 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 				if (!parent) {
 					const newGrandchild: TreeItem = {
 						tag: tagCdr,
+						extraTags: tempEntry.extraTags,//?
 						children: [...tempChildren],
 						ancestors: [
 							...newAncestorsBase,
@@ -292,6 +296,7 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 					};
 					const newChild: TreeItem = {
 						tag: tagCar,
+						extraTags: tempEntry.extraTags,//?
 						children: [newGrandchild],
 						ancestors: [...newAncestorsBase, tagCar],
 						descendants: null,
@@ -320,6 +325,7 @@ const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: Tre
 					} else {
 						const x: TreeItem = {
 							tag: tagCdr,
+							extraTags: tempEntry.extraTags,//?
 							children: [...tempChildren],
 							ancestors: [
 								...newAncestorsBase,
@@ -636,6 +642,16 @@ export default class TagFolderPlugin extends Plugin {
 			name: "Show Tag Folder",
 			callback: () => {
 				this.activateView();
+			},
+		});
+		this.addCommand({
+			id: "tagfolder-create-similar",
+			name: "Create a new note with the same tags",
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+				const tags = getAllTags(this.app.metadataCache.getFileCache(view.file));
+				//@ts-ignore
+				const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
+				await this.app.vault.append(ww, tags.join(" "));
 			},
 		});
 		this.metadataCacheChanged = this.metadataCacheChanged.bind(this);
@@ -984,15 +1000,31 @@ export default class TagFolderPlugin extends Plugin {
 			allTags = allTags.filter(
 				(tag) => !ignoreTags.contains(tag.toLocaleLowerCase())
 			);
-			items.push({
-				tags: allTags,
-				path: fileCache.file.path,
-				displayName: this.getDisplayName(fileCache.file),
-				ancestors: [],
-				mtime: fileCache.file.stat.mtime,
-				ctime: fileCache.file.stat.ctime,
-				filename: fileCache.file.basename,
-			});
+			if (this.settings.disableNarrowingDown) {
+				for (const tags of allTags) {
+					items.push({
+						tags: [tags],
+						extraTags: allTags.filter(e => e != tags),
+						path: fileCache.file.path,
+						displayName: this.getDisplayName(fileCache.file),
+						ancestors: [],
+						mtime: fileCache.file.stat.mtime,
+						ctime: fileCache.file.stat.ctime,
+						filename: fileCache.file.basename,
+					});
+				}
+			} else {
+				items.push({
+					tags: allTags,
+					extraTags: [],
+					path: fileCache.file.path,
+					displayName: this.getDisplayName(fileCache.file),
+					ancestors: [],
+					mtime: fileCache.file.stat.mtime,
+					ctime: fileCache.file.stat.ctime,
+					filename: fileCache.file.basename,
+				});
+			}
 		}
 		return items;
 	}
@@ -1008,6 +1040,7 @@ export default class TagFolderPlugin extends Plugin {
 		const archivedNotes = archiveTags.map(archiveTag => ([archiveTag, items.filter(item => item.tags.some(tag => tag.toLocaleLowerCase() == archiveTag))])) as [string, ViewItem[]][]
 		const root: TreeItem = {
 			tag: "root",
+			extraTags: [],
 			children: [...items.filter(e => e.tags.every(tag => !archiveTags.contains(tag.toLocaleLowerCase())))],
 			ancestors: ["root"],
 			descendants: null,
@@ -1020,6 +1053,7 @@ export default class TagFolderPlugin extends Plugin {
 		for (const [archiveTag, items] of archivedNotes) {
 			root.children.push(
 				{
+					extraTags: [],
 					tag: archiveTag,
 					children: items,
 					ancestors: ["root", archiveTag],
@@ -1419,6 +1453,19 @@ class TagFolderSettingTab extends PluginSettingTab {
 						if (this.plugin.settings.useTagInfo) {
 							await this.plugin.loadTagInfo();
 						}
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Disable narrowing down")
+			.setDesc(
+				"When this feature is enabled, relevant tags will be shown with the title instead of making a sub-structure."
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.disableNarrowingDown)
+					.onChange(async (value) => {
+						this.plugin.settings.disableNarrowingDown = value;
 						await this.plugin.saveSettings();
 					});
 			});
