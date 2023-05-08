@@ -74,6 +74,7 @@ export interface TagFolderSettings {
 	useMultiPaneList: boolean;
 	archiveTags: string;
 	disableNarrowingDown: boolean;
+	expandUntaggedToRoot: boolean;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -102,6 +103,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	useMultiPaneList: false,
 	archiveTags: "",
 	disableNarrowingDown: false,
+	expandUntaggedToRoot: false,
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";

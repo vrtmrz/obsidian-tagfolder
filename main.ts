@@ -843,6 +843,13 @@ export default class TagFolderPlugin extends Plugin {
 		this.snipEmpty(root);
 		this.sortTree(root);
 		if (this.settings.mergeRedundantCombination) this.mergeRedundantCombination(root);
+		if (this.settings.expandUntaggedToRoot) {
+			const untagged = root?.children?.find(e => "tag" in e && e.tag == "_untagged") as TreeItem;
+			if (untagged) {
+				root.children.push(...untagged.allDescendants.map(e => ({ ...e, tags: [] })));
+				root.children.remove(untagged);
+			}
+		}
 		this.root = root;
 		this.getView()?.setTreeRoot(root);
 	}
@@ -972,6 +979,7 @@ export default class TagFolderPlugin extends Plugin {
 			// filter the items
 			const w = searchItems.map((searchItem) => {
 				let bx = false;
+				if (allTags.length == 0) return false;
 				for (const search of searchItem) {
 					if (search.startsWith("-")) {
 						bx =
@@ -1658,6 +1666,17 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.reduceNestedParent)
 					.onChange(async (value) => {
 						this.plugin.settings.reduceNestedParent = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("Keep untagged items on the root")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.expandUntaggedToRoot)
+					.onChange(async (value) => {
+						this.plugin.settings.expandUntaggedToRoot = value;
 						await this.plugin.saveSettings();
 					});
 			});

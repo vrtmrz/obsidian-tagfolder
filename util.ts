@@ -98,7 +98,7 @@ export function ancestorToTags(ancestors: string[]): string[] {
 }
 
 export function ancestorToLongestTag(ancestors: string[]): string[] {
-	return ancestors.reduceRight((a: string[], e) => !a ? [e] : (a[0].startsWith(e) ? a : [e, ...a]), null)
+	return ancestors.reduceRight((a: string[], e) => !a ? [e] : (a[0]?.startsWith(e) ? a : [e, ...a]), [])
 }
 
 

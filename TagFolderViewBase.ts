@@ -59,12 +59,11 @@ export abstract class TagFolderViewBase extends ItemView {
                                 ) {
                                     item.setIcon("checkmark");
                                 }
-
-                                menu2.showAtMouseEvent(evt);
                                 return item;
                             });
                         }
                     }
+                    menu2.showAtPosition({ x: evt.x, y: evt.y });
                 });
             return item;
         });
@@ -92,12 +91,11 @@ export abstract class TagFolderViewBase extends ItemView {
                                 ) {
                                     item.setIcon("checkmark");
                                 }
-
-                                menu2.showAtMouseEvent(evt);
                                 return item;
                             });
                         }
                     }
+                    menu2.showAtPosition({ x: evt.x, y: evt.y });
                 });
             return item;
         });
