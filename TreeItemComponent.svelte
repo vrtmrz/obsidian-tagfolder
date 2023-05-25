@@ -343,20 +343,21 @@
 			{/each}
 		{/if}
 	{:else if "tag" in entry && (currentDepth <= _maxDepth || entry.tag.startsWith(SUBTREE_MARK))}
-		<div class="nav-folder" class:is-collapsed={collapsed}>
+		<div class="tree-item nav-folder" class:is-collapsed={collapsed}>
 			<div
-				class="nav-folder-title tag-folder-title"
+				class="tree-item-self is-clickable mod-collapsible nav-folder-title tag-folder-title"
 				class:is-active={entry.children && collapsed && isSelected}
 				on:click={(evt) => toggleFolder(evt, entry)}
 				on:contextmenu={contextMenuFunc(entry)}
 			>
 				<div
-					class="nav-folder-collapse-indicator collapse-icon"
+					class="tree-item-icon collapse-icon nav-folder-collapse-indicator"
+					class:is-collapsed={collapsed}
 					on:click={(evt) => toggleFolderExpandOnly(evt, entry)}
 				>
 					{@html folderIcon}
 				</div>
-				<div class="nav-folder-title-content lsl-f">
+				<div class="tree-item-inner nav-folder-title-content lsl-f">
 					<div class="tagfolder-titletagname">
 						{@html tagsTitleDispHtml}
 					</div>
@@ -369,7 +370,7 @@
 				</div>
 			</div>
 			{#if children.length > 0}
-				<div class="nav-folder-children">
+				<div class="tree-item-children nav-folder-children">
 					{#each children as item}
 						<svelte:self
 							entry={item}
@@ -392,9 +393,9 @@
 			{/if}
 		</div>
 	{:else if "path" in entry && ((setting.useMultiPaneList && !isMainTree) || !setting.useMultiPaneList)}
-		<div class="nav-file">
+		<div class="tree-item nav-file">
 			<div
-				class="nav-file-title"
+				class="tree-item-self is-clickable nav-file-title"
 				class:is-active={isSelected}
 				on:click={(evt) => openfileLocal(entry, evt)}
 				on:mouseover={(e) => handleMouseover(e, entry)}
@@ -403,7 +404,7 @@
 				}}
 				on:contextmenu={contextMenuFunc(entry)}
 			>
-				<div class="nav-file-title-content lsl-f">
+				<div class="tree-item-inner nav-file-title-content lsl-f">
 					{entry.displayName}
 				</div>
 				<div class="taglist">
@@ -423,6 +424,7 @@
 		flex-grow: 1;
 		overflow: hidden;
 		max-width: calc(100%);
+		width: 50%;
 	}
 	.tags {
 		background-color: var(--background-secondary-alt);
@@ -435,6 +437,12 @@
 		text-overflow: ellipsis;
 		padding-left: 1em;
 		overflow: hidden;
+		display: inline-block;
+		flex-shrink: 2;
+		flex-grow: 1;
+		width: auto;
+		min-width: 5em;
+		text-align: right;
 	}
 	.taglist span {
 		color: var(--nav-item-color);

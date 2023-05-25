@@ -60,7 +60,7 @@ When using this filter, this plugin shows only "Pear" (Sweet but not red) and "T
 
 ##### Always Open
 
-Open Tag Folder when obsidian launched automatically.
+Place TagFolder on the left pane and activate it at every Obsidian launch.
 
 ##### Use pinning
 We can pin the tag if we enable this option.  

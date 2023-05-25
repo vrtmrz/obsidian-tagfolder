@@ -81,7 +81,7 @@
 		}
 	}
 	let iconDivEl: HTMLDivElement;
-	let documentIcon = "";
+	let newNoteIcon = "";
 	let folderIcon = "";
 	let upAndDownArrowsIcon = "";
 	let stackedLevels = "";
@@ -91,8 +91,8 @@
 	onMount(async () => {
 		setIcon(iconDivEl, "right-triangle");
 		folderIcon = `${iconDivEl.innerHTML}`;
-		setIcon(iconDivEl, "document");
-		documentIcon = `${iconDivEl.innerHTML}`;
+		setIcon(iconDivEl, "lucide-edit");
+		newNoteIcon = `${iconDivEl.innerHTML}`;
 		if (isMainTree) {
 			setIcon(iconDivEl, "lucide-sort-asc");
 			upAndDownArrowsIcon = iconDivEl.innerHTML;
@@ -117,7 +117,7 @@
 			aria-label="New note"
 			on:click={newNote}
 		>
-			{@html documentIcon}
+			{@html newNoteIcon}
 		</div>
 		{#if isMainTree}
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -175,13 +175,14 @@
 		/>
 	</div>
 {/if}
-<div class="nav-files-container">
-	<div class="nav-folder mod-root">
-		<div class="nav-folder-title">
-			<div class="nav-folder-collapse-indicator collapse-icon" />
-			<div class="nav-folder-title-content">{headerTitle}</div>
+<div class="nav-files-container node-insert-event">
+	<div class="tree-item nav-folder mod-root">
+		<div class="tree-item-self nav-folder-title">
+			<div class="tree-item-inner nav-folder-title-content">
+				{headerTitle}
+			</div>
 		</div>
-		<div class="nav-folder-children">
+		<div class="tree-item-children nav-folder-children">
 			{#each items as entry}
 				<TreeItemComponent
 					{entry}

@@ -633,6 +633,7 @@ export default class TagFolderPlugin extends Plugin {
 			(leaf) => new ScrollView(leaf, this)
 		);
 		this.app.workspace.onLayoutReady(async () => {
+			await this.initView();
 			if (this.settings.alwaysOpen) {
 				await this.activateView();
 			}
@@ -1125,11 +1126,7 @@ export default class TagFolderPlugin extends Plugin {
 
 	}
 
-	onunload() {
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_TAGFOLDER);
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_TAGFOLDER_LIST);
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_SCROLL);
-	}
+	onunload() { }
 
 	async openScrollView(leaf: WorkspaceLeaf, title: string, tagPath: string, files: string[]) {
 		if (!leaf) {
@@ -1221,19 +1218,31 @@ export default class TagFolderPlugin extends Plugin {
 
 	}
 
+	async initView() {
+		this.loadFileInfo();
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TAGFOLDER);
+		if (leaves.length == 0) {
+			await this.app.workspace.getLeftLeaf(false).setViewState({
+				type: VIEW_TYPE_TAGFOLDER,
+				active: true,
+			});
+		} else {
+			leaves[0].setViewState({
+				type: VIEW_TYPE_TAGFOLDER,
+				active: true,
+			})
+		}
+	}
 
 	async activateView() {
-		this.loadFileInfo();
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_TAGFOLDER);
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TAGFOLDER);
+		await this.initView();
+		if (leaves.length > 0) {
+			this.app.workspace.revealLeaf(
+				leaves[0]
+			);
+		}
 
-		await this.app.workspace.getLeftLeaf(false).setViewState({
-			type: VIEW_TYPE_TAGFOLDER,
-			active: true,
-		});
-
-		this.app.workspace.revealLeaf(
-			this.app.workspace.getLeavesOfType(VIEW_TYPE_TAGFOLDER)[0]
-		);
 	}
 
 	tagInfo: TagInfoDict = null;
@@ -1424,7 +1433,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 		containerEl.createEl("h3", { text: "Behavior" });
 		new Setting(containerEl)
 			.setName("Always Open")
-			.setDesc("Open TagFolder automatically when obsidian has been launched")
+			.setDesc("Place TagFolder on the left pane and activate it at every Obsidian launch")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.alwaysOpen)
