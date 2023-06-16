@@ -921,6 +921,10 @@ export default class TagFolderPlugin extends Plugin {
 
 
 		const today = Date.now();
+		const archiveTags = this.settings.archiveTags
+			.toLocaleLowerCase()
+			.replace(/[\n ]/g, "")
+			.split(",");
 
 		for (const fileCache of this.fileCaches) {
 			if (
@@ -1010,7 +1014,9 @@ export default class TagFolderPlugin extends Plugin {
 				(tag) => !ignoreTags.contains(tag.toLocaleLowerCase())
 			);
 			if (this.settings.disableNarrowingDown) {
-				for (const tags of allTags) {
+				const archiveTagsMatched = allTags.filter(e => archiveTags.contains(e.toLocaleLowerCase()));
+				const targetTags = archiveTagsMatched.length == 0 ? allTags : archiveTags;
+				for (const tags of targetTags) {
 					items.push({
 						tags: [tags],
 						extraTags: allTags.filter(e => e != tags),

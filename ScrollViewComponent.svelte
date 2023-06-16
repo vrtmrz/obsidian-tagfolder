@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { writable, Writable } from "svelte/store";
+	import { writable, type Writable } from "svelte/store";
 
-	import { ScrollViewFile, ScrollViewState } from "types";
+	import { type ScrollViewFile, type ScrollViewState } from "types";
 	import { renderSpecialTag } from "./util";
 
 	import ScrollViewMarkdown from "ScrollViewMarkdownComponent.svelte";

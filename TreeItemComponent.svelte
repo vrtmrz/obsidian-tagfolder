@@ -7,13 +7,13 @@
 		selectedTags,
 	} from "./store";
 	import {
-		TreeItem,
-		TagFolderItem,
+		type TreeItem,
+		type TagFolderItem,
 		SUBTREE_MARK_REGEX,
 		SUBTREE_MARK,
-		TagFolderSettings,
+		type TagFolderSettings,
 		DEFAULT_SETTINGS,
-		TagInfo,
+		type TagInfo,
 	} from "./types";
 	import {
 		ancestorToLongestTag,

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { searchString, treeRoot } from "./store";
-	import { TreeItem, TagFolderItem } from "./types";
+	import { type TreeItem, type TagFolderItem } from "./types";
 	import TreeItemComponent from "./TreeItemComponent.svelte";
 	import { onMount } from "svelte";
 	import { setIcon } from "obsidian";
