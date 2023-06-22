@@ -1015,7 +1015,7 @@ export default class TagFolderPlugin extends Plugin {
 			);
 			if (this.settings.disableNarrowingDown) {
 				const archiveTagsMatched = allTags.filter(e => archiveTags.contains(e.toLocaleLowerCase()));
-				const targetTags = archiveTagsMatched.length == 0 ? allTags : archiveTags;
+				const targetTags = archiveTagsMatched.length == 0 ? allTags : archiveTagsMatched;
 				for (const tags of targetTags) {
 					items.push({
 						tags: [tags],
