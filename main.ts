@@ -1230,12 +1230,10 @@ export default class TagFolderPlugin extends Plugin {
 		if (leaves.length == 0) {
 			await this.app.workspace.getLeftLeaf(false).setViewState({
 				type: VIEW_TYPE_TAGFOLDER,
-				active: true,
 			});
 		} else {
 			leaves[0].setViewState({
 				type: VIEW_TYPE_TAGFOLDER,
-				active: true,
 			})
 		}
 	}
