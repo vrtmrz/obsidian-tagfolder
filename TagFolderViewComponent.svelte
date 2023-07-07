@@ -1,24 +1,23 @@
 <script lang="ts">
-	import { searchString, treeRoot } from "./store";
-	import { type TreeItem, type TagFolderItem } from "./types";
-	import TreeItemComponent from "./TreeItemComponent.svelte";
+	import { allViewItems, searchString, tagFolderSetting } from "./store";
+	import { type ViewItem, type TagFolderSettings } from "./types";
+	import V2TreeFolderComponent from "./V2TreeFolderComponent.svelte";
 	import { onMount } from "svelte";
 	import { setIcon } from "obsidian";
-	import { pickEntry } from "./util";
+	import { trimTrailingSlash } from "./util";
 
-	export let items: Array<TagFolderItem> = [];
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
-	export let openfile: (path: string, specialKey: boolean) => void;
-	export let expandFolder: (entry: TagFolderItem, expanded: boolean) => void;
-	export let vaultname: string = "";
+	export let openFile: (path: string, specialKey: boolean) => void;
+	export let vaultName: string = "";
 	export let title: string = "";
 	export let tags: string[] = [];
+
 	export let showMenu: (
 		evt: MouseEvent,
-		path: string,
-		entry: TagFolderItem
+		trail: string[],
+		targetTag?: string,
+		targetItems?: ViewItem[]
 	) => void;
-
 	export let showLevelSelect: (evt: MouseEvent) => void;
 
 	export let showOrder: (evt: MouseEvent) => void;
@@ -34,22 +33,11 @@
 
 	export let isViewSwitchable: boolean;
 	export let switchView: () => void;
+	let isMainTree: boolean;
 
-	treeRoot.subscribe((root: TreeItem) => {
-		if (tags.length == 0) {
-			items = root?.children ?? [];
-		} else {
-			const pickedRoot = pickEntry(root, tags);
-			if (pickedRoot && "tag" in pickedRoot) {
-				items =
-					pickedRoot.allDescendants ||
-					pickedRoot.children.filter((e) => "tags" in e);
-			} else {
-				console.warn(`Could not pick root:${tags.join(", ")}`);
-				console.warn(root);
-				items = [];
-			}
-		}
+	let viewItemsSrc = [] as ViewItem[];
+	allViewItems.subscribe((items) => {
+		viewItemsSrc = items;
 	});
 	let search = "";
 
@@ -63,6 +51,11 @@
 			}
 			search = newSearch;
 		}
+	});
+
+	let _setting = $tagFolderSetting as TagFolderSettings;
+	tagFolderSetting.subscribe((setting) => {
+		_setting = setting;
 	});
 	let showSearch = false;
 	function toggleSearch() {
@@ -104,7 +97,45 @@
 		setIcon(iconDivEl, "lucide-arrow-left-right");
 		switchIcon = iconDivEl.innerHTML;
 	});
-	$: headerTitle = title == "" ? `Tags: ${vaultname}` : `Items: ${title}`;
+	$: headerTitle = title == "" ? `Tags: ${vaultName}` : `Items: ${title}`;
+	let viewItems = [] as ViewItem[];
+	$: {
+		if (viewItemsSrc) {
+			if (isMainTree) {
+				viewItems = viewItemsSrc;
+			} else {
+				let items = viewItemsSrc;
+				const lowerTags = tags.map((e) => e.toLocaleLowerCase());
+				for (const tag of lowerTags) {
+					items = items.filter((e) =>
+						e.tags.some((e) =>
+							(e.toLocaleLowerCase() + "/").startsWith(tag)
+						)
+					);
+				}
+
+				const firstLevel = trimTrailingSlash(
+					tags.first() ?? ""
+				).toLocaleLowerCase();
+
+				// Processing archive tags
+				const archiveTags = _setting.archiveTags
+					.toLocaleLowerCase()
+					.replace(/[\n ]/g, "")
+					.split(",");
+
+				if (!archiveTags.contains(firstLevel)) {
+					items = items.filter(
+						(item) =>
+							!item.tags.some((e) =>
+								archiveTags.contains(e.toLocaleLowerCase())
+							)
+					);
+				}
+				viewItems = items;
+			}
+		}
+	}
 	$: isMainTree = tags.length == 0;
 </script>
 
@@ -183,24 +214,18 @@
 			</div>
 		</div>
 		<div class="tree-item-children nav-folder-children">
-			{#each items as entry}
-				<TreeItemComponent
-					{entry}
-					{hoverPreview}
-					{openfile}
-					{expandFolder}
-					{showMenu}
-					skippedTag={""}
-					path="/"
-					{openScrollView}
-					{folderIcon}
-					{isMainTree}
-					parentTags={[
-						...tags,
-						"tag" in entry ? entry.tag : undefined,
-					]}
-				/>
-			{/each}
+			<V2TreeFolderComponent
+				items={viewItems}
+				{folderIcon}
+				thisName={""}
+				isRoot={true}
+				{showMenu}
+				{openFile}
+				{isMainTree}
+				{hoverPreview}
+				{openScrollView}
+				depth={1}
+			/>
 		</div>
 	</div>
 </div>

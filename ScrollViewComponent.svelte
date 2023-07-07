@@ -2,7 +2,7 @@
 	import { writable, type Writable } from "svelte/store";
 
 	import { type ScrollViewFile, type ScrollViewState } from "types";
-	import { renderSpecialTag } from "./util";
+	import { renderSpecialTag, trimTrailingSlash } from "./util";
 
 	import ScrollViewMarkdown from "ScrollViewMarkdownComponent.svelte";
 	import { onDestroy, onMount } from "svelte";
@@ -14,7 +14,6 @@
 	});
 	export let openfile: (path: string, specialKey: boolean) => void;
 	let state: ScrollViewState = { files: [], title: "", tagPath: "" };
-
 	$: {
 		store.subscribe((_state) => {
 			state = { ..._state };
@@ -23,9 +22,16 @@
 	}
 	$: files = state.files;
 	$: tagPath = state.tagPath
-		.split("/")
-		.map((e) => renderSpecialTag(e))
-		.join("/");
+		.split(", ")
+		.map(
+			(e) =>
+				"#" +
+				trimTrailingSlash(e)
+					.split("/")
+					.map((e) => renderSpecialTag(e.trim()))
+					.join("/")
+		)
+		.join(", ");
 	function handleOpenFile(e: MouseEvent, file: ScrollViewFile) {
 		openfile(file.path, false);
 		e.preventDefault();
@@ -60,7 +66,7 @@
 
 <div class="x">
 	<div class="header">
-		Files in {tagPath}
+		Files with {tagPath}
 	</div>
 	<hr />
 	{#each files as file}

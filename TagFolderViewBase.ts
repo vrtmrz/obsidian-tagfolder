@@ -5,12 +5,12 @@ import {
     OrderDirection,
     OrderKeyItem,
     OrderKeyTag,
-    TagFolderItem,
     VIEW_TYPE_TAGFOLDER,
-    VIEW_TYPE_TAGFOLDER_LIST
+    VIEW_TYPE_TAGFOLDER_LIST,
+    type ViewItem
 } from "./types";
 import { maxDepth, selectedTags } from "./store";
-import { ancestorToLongestTag, ancestorToTags, isSpecialTag, omittedTags, renderSpecialTag } from "./util";
+import { ancestorToLongestTag, ancestorToTags, isSpecialTag, renderSpecialTag, joinPartialPath, removeIntermediatePath, trimTrailingSlash } from "./util";
 import { askString } from "dialog";
 
 function toggleObjectProp(obj: { [key: string]: any }, propName: string, value: string | false) {
@@ -51,7 +51,6 @@ export abstract class TagFolderViewBase extends ItemView {
                                     this.plugin.settings.sortTypeTag =
                                         newSetting;
                                     await this.plugin.saveSettings();
-                                    this.plugin.setRoot(this.plugin.root);
                                 });
                                 if (
                                     newSetting ==
@@ -84,7 +83,6 @@ export abstract class TagFolderViewBase extends ItemView {
                                     //@ts-ignore
                                     this.plugin.settings.sortType = newSetting;
                                     await this.plugin.saveSettings();
-                                    this.plugin.setRoot(this.plugin.root);
                                 });
                                 if (
                                     newSetting == this.plugin.settings.sortType
@@ -108,7 +106,6 @@ export abstract class TagFolderViewBase extends ItemView {
             this.plugin.settings.expandLimit = level;
             await this.plugin.saveSettings();
             maxDepth.set(level);
-            this.plugin.setRoot(this.plugin.root);
         };
         for (const level of [2, 3, 4, 5]) {
             menu.addItem((item) => {
@@ -137,18 +134,9 @@ export abstract class TagFolderViewBase extends ItemView {
 
     abstract getViewType(): string;
 
-    showMenu(evt: MouseEvent, path: string, entry: TagFolderItem) {
+    showMenu(evt: MouseEvent, trail: string[], targetTag?: string, targetItems?: ViewItem[]) {
 
-        const entryPath = "tag" in entry ? [...ancestorToTags(entry.ancestors)] : ['root', ...entry.tags];
-
-        if ("tag" in entry) {
-            const oTags = omittedTags(entry, this.plugin.settings);
-            if (oTags != false) {
-                entryPath.push(...oTags);
-            }
-        }
-        entryPath.shift()
-        const expandedTagsAll = ancestorToLongestTag(ancestorToTags(entryPath));
+        const expandedTagsAll = ancestorToLongestTag(ancestorToTags(joinPartialPath(removeIntermediatePath(trail)))).map(e => trimTrailingSlash(e));
         const expandedTags = expandedTagsAll
             .map(e => e.split("/")
                 .filter(ee => !isSpecialTag(ee))
@@ -178,7 +166,7 @@ export abstract class TagFolderViewBase extends ItemView {
         }
         menu.addItem((item) =>
             item
-                .setTitle(`New note ${"tag" in entry ? "in here" : "as like this"}`)
+                .setTitle(`New note ${targetTag ? "in here" : "as like this"}`)
                 .setIcon("create-new")
                 .onClick(async () => {
                     //@ts-ignore
@@ -186,9 +174,9 @@ export abstract class TagFolderViewBase extends ItemView {
                     await this.app.vault.append(ww, expandedTags);
                 })
         );
-        if ("tag" in entry) {
+        if (targetTag) {
             if (this.plugin.settings.useTagInfo && this.plugin.tagInfo != null) {
-                const tag = entry.ancestors[entry.ancestors.length - 1];
+                const tag = targetTag;
 
                 if (tag in this.plugin.tagInfo && "key" in this.plugin.tagInfo[tag]) {
                     menu.addItem((item) =>
@@ -248,28 +236,29 @@ export abstract class TagFolderViewBase extends ItemView {
                             await this.plugin.saveTagInfo();
                         })
                 });
-                menu.addItem(item => {
-                    item.setTitle(`Open scroll view`)
-                        .setIcon("sheets-in-box")
-                        .onClick(async () => {
-                            const files = entry.allDescendants.map(e => e.path);
-                            const tagPath = entry.ancestors.join("/");
-                            await this.plugin.openScrollView(null, displayExpandedTags, tagPath, files);
-                        })
-                })
-                menu.addItem(item => {
-                    item.setTitle(`Open list`)
-                        .setIcon("sheets-in-box")
-                        .onClick(async () => {
-                            selectedTags.set(
-                                entry.ancestors
-                            );
-                        })
-                })
+                if (targetItems) {
+                    menu.addItem(item => {
+                        item.setTitle(`Open scroll view`)
+                            .setIcon("sheets-in-box")
+                            .onClick(async () => {
+                                const files = targetItems.map(e => e.path);
+                                await this.plugin.openScrollView(null, displayExpandedTags, expandedTagsAll.join(", "), files);
+                            })
+                    })
+                    menu.addItem(item => {
+                        item.setTitle(`Open list`)
+                            .setIcon("sheets-in-box")
+                            .onClick(async () => {
+                                selectedTags.set(
+                                    expandedTagsAll
+                                );
+                            })
+                    })
+                }
             }
         }
-        if ("path" in entry) {
-            const path = entry.path;
+        if (!targetTag && targetItems && targetItems.length == 1) {
+            const path = targetItems[0].path;
             const file = this.app.vault.getAbstractFileByPath(path);
             // Trigger
             this.app.workspace.trigger(
@@ -280,14 +269,15 @@ export abstract class TagFolderViewBase extends ItemView {
             );
         }
 
-        if ("tags" in entry) {
+        if (!targetTag && targetItems && targetItems.length == 1) {
+            const path = targetItems[0].path;
             menu.addSeparator();
             menu.addItem((item) =>
                 item
                     .setTitle(`Open in new tab`)
                     .setIcon("lucide-file-plus")
                     .onClick(async () => {
-                        app.workspace.openLinkText(entry.path, entry.path, "tab");
+                        app.workspace.openLinkText(path, path, "tab");
                     })
             );
             menu.addItem((item) =>
@@ -295,7 +285,7 @@ export abstract class TagFolderViewBase extends ItemView {
                     .setTitle(`Open to the right`)
                     .setIcon("lucide-separator-vertical")
                     .onClick(async () => {
-                        app.workspace.openLinkText(entry.path, entry.path, "split");
+                        app.workspace.openLinkText(path, path, "split");
                     })
             );
         }
@@ -309,6 +299,7 @@ export abstract class TagFolderViewBase extends ItemView {
                 y: evt.nativeEvent.locationY,
             });
         }
+        evt.preventDefault();
         // menu.showAtMouseEvent(evt);
     }
 

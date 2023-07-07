@@ -7,91 +7,35 @@ import {
 	FRESHNESS_3,
 	FRESHNESS_4,
 	FRESHNESS_5,
-	SUBTREE_MARK,
 	tagDispDict,
-	TagFolderItem,
-	TagFolderSettings,
-	TreeItem,
-	ViewItem
+	type TagFolderSettings,
+	type TagInfo,
+	type TagInfoDict,
+	type ViewItem
 } from "types";
 
 export function unique<T>(items: T[]) {
 	return [...new Set<T>([...items])];
 }
 
-export function allTags(entry: TagFolderItem): string[] {
-	if ("tags" in entry) return entry.tags;
-	return unique([...(entry?.descendants ?? []).flatMap(e => e.tags), ...entry.children.flatMap(e => "tag" in e ? allTags(e) : e.tags).filter(e => e)]);
+export function trimSlash(src: string, keepStart = false, keepEnd = false) {
+	const st = keepStart ? 0 : (src[0] == "/" ? 1 : 0);
+	const end = keepEnd ? undefined : (src.endsWith("/") ? -1 : undefined);
+	if (st == 0 && end == undefined) return src;
+	return src.slice(st, end);
 }
 
-export function isAutoExpandTree(entry: TreeItem, setting: TagFolderSettings) {
-	if (setting.doNotSimplifyTags) return false;
-	if ("tag" in entry) {
-
-		const childrenTags = entry.children.filter(
-			(e) => "tag" in e
-		) as TreeItem[];
-		const childrenItems = (entry.allDescendants ?? entry.children).filter(
-			(e) => "tags" in e
-		) as ViewItem[];
-		if (childrenTags.length == 0) return false;
-		if (entry.itemsCount == 1) return true;
-		if (childrenTags.length == 1 && childrenItems.length == 0) {
-			// Only one tag and no children
-			return true;
-		}
-
-		if (childrenTags.length == 1 && childrenItems.length > 1) {
-			// Check all children can be unified
-			const sTags = allTags(entry).join("-").toLocaleLowerCase();
-			for (const child of childrenItems) {
-				const cTags = allTags(child).join("-").toLocaleLowerCase();
-				if (sTags != cTags) {
-					return false;
-				}
-			}
-			return true;
-		}
-	}
-	return false;
-}
-
-export function omittedTags(entry: TreeItem, setting: TagFolderSettings): false | string[] {
-	if (setting.doNotSimplifyTags) return false;
-	const childrenTags = entry.children.filter(
-		(e) => "tag" in e
-	) as TreeItem[];
-	const childrenItems = (entry.allDescendants ?? entry.children).filter(
-		(e) => "tags" in e
-	) as ViewItem[];
-
-	// If children is already parsed, pass.
-	if (childrenTags.length > 0) return false;
-	// If child has been identified unique.
-	const tx = childrenItems.map((e) => [...e.tags].sort().join("-"));
-	if (tx.length != 1 && entry.itemsCount != 1) return false;
-	// When any tags are left, add mark to title.
-	const tags = unique(childrenItems.flatMap(e => e.tags));
-	const ancestorTags = ancestorToTags(entry.ancestors).map(e => e.toLocaleLowerCase());
-	const lastT = tags.filter((e) => !ancestorTags.contains(e.toLocaleLowerCase()));
-
-	if (lastT.length) {
-		return lastT;
-	}
-	return false;
-}
 
 export function ancestorToTags(ancestors: string[]): string[] {
-	const SUBTREE_MARK_LENGTH = SUBTREE_MARK.length;
 	return ancestors.reduce(
 		(p, i) =>
-			!i.startsWith(SUBTREE_MARK)
+			i[0] != "/"
 				? [...p, i]
 				: [
 					...p,
 					p.pop() +
 					"/" +
-					i.substring(SUBTREE_MARK_LENGTH),
+					i.substring(1),
 				],
 		[]
 	)
@@ -101,11 +45,8 @@ export function ancestorToLongestTag(ancestors: string[]): string[] {
 	return ancestors.reduceRight((a: string[], e) => !a ? [e] : (a[0]?.startsWith(e) ? a : [e, ...a]), [])
 }
 
-
 export function isSpecialTag(tagSrc: string) {
-	const tag = tagSrc.startsWith(SUBTREE_MARK)
-		? tagSrc.substring(SUBTREE_MARK.length)
-		: tagSrc;
+	const tag = trimSlash(tagSrc);
 	return tag == "_untagged" || tag in tagDispDict;
 }
 
@@ -124,11 +65,8 @@ tagInfo.subscribe(tagInfo => {
 });
 
 export function renderSpecialTag(tagSrc: string) {
-	const tag = tagSrc.startsWith(SUBTREE_MARK)
-		? tagSrc.substring(SUBTREE_MARK.length)
-		: tagSrc;
+	const tag = trimSlash(tagSrc);
 	return tag in tagDispAlternativeDict ? tagDispAlternativeDict[tag] : tagSrc;
-
 }
 
 export function secondsToFreshness(totalAsMSec: number) {
@@ -150,6 +88,7 @@ function waitForRequestAnimationFrame() {
 function delay() {
 	return new Promise<void>(res => setTimeout(() => res(), 5));
 }
+
 // This is based on nothing.
 const waits = [waitForRequestAnimationFrame, waitForRequestAnimationFrame, delay];
 let waitIdx = 0;
@@ -165,7 +104,7 @@ async function pump() {
 			if (proc) {
 				proc();
 				const now = Date.now();
-				if (now - startContinuousProcessing > 22) {
+				if (now - startContinuousProcessing > 120) {
 					const w = waits[waitIdx];
 					waitIdx = (waitIdx + 1) % waits.length;
 					await w();
@@ -200,30 +139,233 @@ export const compare = (Intl && Intl.Collator) ? (new Intl.Collator().compare) :
 	(x: string, y: string) => (`${x ?? ""}`).localeCompare(`${y ?? ""}`);
 
 
-//TODO:TIDY
-export function pickEntry(entry: TagFolderItem, path: string | string[], past: string[] = []): TagFolderItem | null {
-	const paths = typeof path == "string" ? path.split("/").slice(1) : path;
-	const [head, ...tail] = paths;
+export function getTagName(tagName: string, subtreePrefix: string, tagInfo: TagInfoDict, invert: number) {
+	if (tagInfo == null) return tagName;
+	const prefix = invert == -1 ? `\uffff` : `\u0001`;
+	const unpinned = invert == 1 ? `\uffff` : `\u0001`;
 
-	if (!entry) return null;
-	if (!head) return entry;
-
-	if (!("children" in entry)) {
-		if (past.contains(head)) {
-			return pickEntry(entry, tail, [...past, head.toLocaleLowerCase()]);
-		} else {
-			console.log("Picked leaf is not leaf")
-			return null;
+	if (tagName in tagInfo && tagInfo[tagName]) {
+		if ("key" in tagInfo[tagName]) {
+			return `${prefix}_-${tagInfo[tagName].key}__${subtreePrefix}_${tagName}`;
 		}
 	}
-	const next = entry.children.find(e => "tag" in e && compare(e.tag, head) == 0);
-	if (!next) {
-		if (past.contains(head)) {
-			return pickEntry(entry, tail, [...past, head.toLocaleLowerCase()]);
-		} else {
-			console.log("Picking leaf looks something wrong")
-			return null;
+	return `${prefix}_${unpinned}_${subtreePrefix}_${tagName}`
+}
+
+function llc(str: string) {
+	return str.toLocaleLowerCase();
+}
+
+/**
+ * returns paths without intermediate paths.
+ * i.e.) "test", "test/a" and "test/b/c" should be "test/a" and "test/b/c";
+ * @param paths array of path
+ */
+export function removeIntermediatePath(paths: string[]) {
+	const out = [...paths];
+	const pathEntries = paths.sort((a, b) => a.length - b.length);
+	const removeList = [] as string[];
+	for (const el of pathEntries) {
+		const elLower = llc(el);
+		const elCapped = elLower.endsWith("/") ? elLower : (elLower + "/");
+		if (out.some(e => llc(e).startsWith(elCapped) && llc(e) !== elCapped)) {
+			removeList.push(el);
 		}
 	}
-	return pickEntry(next, tail, [...past, head.toLocaleLowerCase()]);
+	return out.filter(e => removeList.indexOf(e) == -1)
+}
+
+export function getTagMark(tagInfo: TagInfo) {
+	if (!tagInfo) return "";
+	if ("key" in tagInfo) {
+		if ("mark" in tagInfo && tagInfo.mark != "") {
+			return tagInfo.mark;
+		} else {
+			return "📌";
+		}
+	} else {
+		if ("mark" in tagInfo && tagInfo.mark != "") {
+			return tagInfo.mark;
+		} else {
+			return "";
+		}
+	}
+}
+
+export function escapeStringToHTML(str: string) {
+	if (!str) return "";
+	return str.replace(/[<>&"'`]/g, (match) => {
+		const escape: Record<string, string> = {
+			"<": "&lt;",
+			">": "&gt;",
+			"&": "&amp;",
+			'"': "&quot;",
+			"'": "&#39;",
+			"`": "&#x60;",
+		};
+		return escape[match];
+	});
+}
+
+export type V2FolderItem = [tag: string, tagName: string, tagNameDisp: string[], children: ViewItem[]];
+export const V2FI_IDX_TAG = 0;
+export const V2FI_IDX_TAGNAME = 1;
+export const V2FI_IDX_TAGDISP = 2;
+export const V2FI_IDX_CHILDREN = 3;
+
+
+/**
+ * Select compare methods for tags from configurations and tag information.
+ * @param settings 
+ * @param tagInfo 
+ * @returns 
+ */
+export function selectCompareMethodTags(settings: TagFolderSettings, tagInfo: TagInfoDict) {
+	const _tagInfo = tagInfo;
+	const invert = settings.sortTypeTag.contains("_DESC") ? -1 : 1;
+	const subTreeChar: Record<typeof invert, string> = {
+		[-1]: `\u{10ffff}`,
+		[1]: `_`
+	}
+		;
+	const sortByName = (a: V2FolderItem, b: V2FolderItem) => {
+		const isASubTree = a[V2FI_IDX_TAG].endsWith("/" + a[V2FI_IDX_TAGNAME]);
+		const isBSubTree = b[V2FI_IDX_TAG].endsWith("/" + b[V2FI_IDX_TAGNAME]);
+		const aName = a[V2FI_IDX_TAGNAME];
+		const bName = b[V2FI_IDX_TAGNAME];
+		const aPrefix = isASubTree ? subTreeChar[invert] : "";
+		const bPrefix = isBSubTree ? subTreeChar[invert] : "";
+		return compare(getTagName(aName, aPrefix, settings.useTagInfo ? _tagInfo : null, invert), getTagName(bName, bPrefix, settings.useTagInfo ? _tagInfo : null, invert)) * invert;
+	}
+	switch (settings.sortTypeTag) {
+		case "ITEMS_ASC":
+		case "ITEMS_DESC":
+			return (a: V2FolderItem, b: V2FolderItem) => {
+				const aName = a[V2FI_IDX_TAGNAME];
+				const bName = b[V2FI_IDX_TAGNAME];
+				const aCount = a[V2FI_IDX_CHILDREN].length - ((settings.useTagInfo && (aName in _tagInfo && "key" in _tagInfo[aName])) ? 100000 * invert : 0);
+				const bCount = b[V2FI_IDX_CHILDREN].length - ((settings.useTagInfo && (bName in _tagInfo && "key" in _tagInfo[bName])) ? 100000 * invert : 0);
+				if (aCount == bCount) return sortByName(a, b);
+				return (aCount - bCount) * invert;
+			}
+		case "NAME_ASC":
+		case "NAME_DESC":
+			return sortByName
+		default:
+			console.warn("Compare method (tags) corrupted");
+			return (a: V2FolderItem, b: V2FolderItem) => {
+				const isASubTree = a[V2FI_IDX_TAG].endsWith("/" + a[V2FI_IDX_TAGNAME]);
+				const isBSubTree = b[V2FI_IDX_TAG].endsWith("/" + b[V2FI_IDX_TAGNAME]);
+				const aName = a[V2FI_IDX_TAGNAME];
+				const bName = b[V2FI_IDX_TAGNAME];
+				const aPrefix = isASubTree ? subTreeChar[invert] : "";
+				const bPrefix = isBSubTree ? subTreeChar[invert] : "";
+				return compare(aPrefix + aName, bPrefix + bName) * invert;
+			}
+	}
+}
+
+/**
+ * Extracts unique set in case insensitive.
+ * @param pieces 
+ * @returns 
+ */
+export function uniqueCaseIntensive(pieces: string[]): string[] {
+	const delMap = new Set<string>();
+	const ret = [];
+	for (const piece of pieces) {
+		if (!delMap.has(piece.toLocaleLowerCase())) {
+			ret.push(piece);
+			delMap.add(piece.toLocaleLowerCase());
+		}
+	}
+	return ret;
+}
+
+export function _sorterTagLength(a: string, b: string, invert: boolean) {
+	const lenA = a.split("/").length;
+	const lenB = b.split("/").length;
+	const diff = lenA - lenB;
+	if (diff != 0) return diff * (invert ? -1 : 1);
+	return (a.length - b.length) * (invert ? -1 : 1);
+}
+
+export function getExtraTags(tags: string[], trail: string[], reduceNestedParent: boolean) {
+	let tagsLeft = uniqueCaseIntensive(tags);
+	let removeTrailItems = [] as string[];
+
+	if (reduceNestedParent) {
+		removeTrailItems = trail.sort((a, b) => _sorterTagLength(a, b, true));
+	} else {
+		removeTrailItems = removeIntermediatePath(trail);
+	}
+
+	for (const t of removeTrailItems) {
+		const inDedicatedTree = t.endsWith("/");
+		const trimLength = inDedicatedTree ? t.length : t.length;
+		// If reduceNestedParent is enabled, we have to remove prefix of all tags.
+		// Note: if the nested parent has been reduced, the prefix will be appeared only once in the trail.
+		// In that case, if `test/a`, `test/b` exist and expanded as test -> a -> b, trails should be `test/` `test/a` `test/b`
+		if (reduceNestedParent) {
+			tagsLeft = tagsLeft.map((e) =>
+				(e + "/").toLocaleLowerCase().startsWith(t.toLocaleLowerCase())
+					? e.substring(trimLength)
+					: e
+			);
+		} else {
+			// Otherwise, we have to remove the prefix only of the first one.
+			// test -> a test -> b, trails should be `test/` `test/a` `test/` `test/b`
+			const f = tagsLeft.findIndex((e) =>
+				(e + "/")
+					.toLocaleLowerCase()
+					.startsWith(t.toLocaleLowerCase())
+			);
+			if (f !== -1) {
+				tagsLeft[f] = tagsLeft[f].substring(trimLength);
+			}
+		}
+	}
+	return tagsLeft.filter((e) => e.trim() != "");
+}
+
+
+export function trimTrailingSlash(src: string) {
+	return trimSlash(src, true, false);
+}
+
+export function joinPartialPath(path: string[]) {
+	return path.reduceRight((p, c) => (c.endsWith("/") && p.length > 0) ? [c + p[0], ...p.slice(1)] : [c, ...p], [] as string[]);
+}
+
+export function pathMatch(haystack: string, needle: string) {
+	const haystackLC = haystack.toLocaleLowerCase();
+	const needleLC = needle.toLocaleLowerCase();
+	if (needleLC.endsWith("/")) {
+		if ((haystackLC + "/").indexOf(needleLC) === 0) return true;
+	}
+	//return (haystackLC).indexOf(needleLC)===0;
+	return haystackLC == needleLC;
+}
+
+export function parseTagName(thisName: string, _tagInfo: TagInfoDict): [string, string[]] {
+	let tagNameDisp = [""];
+	const names = thisName.split("/").filter((e) => e.trim() != "");
+	let inSubTree = false;
+	let tagName = "";
+	if (names.length > 1) {
+		tagName = `${names[names.length - 1]}`;
+		inSubTree = true;
+	} else {
+		tagName = thisName;
+	}
+	if (tagName.endsWith("/")) {
+		tagName = tagName.substring(0, tagName.length - 1);
+	}
+	const tagInfo = tagName in _tagInfo ? _tagInfo[tagName] : undefined;
+	const tagMark = getTagMark(tagInfo);
+	tagNameDisp = [`${tagMark}${renderSpecialTag(tagName)}`];
+	if (inSubTree)
+		tagNameDisp = [`${tagMark}`, `${renderSpecialTag(tagName)}`];
+
+	return [tagName, tagNameDisp]
 }

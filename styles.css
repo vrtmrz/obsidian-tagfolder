@@ -34,3 +34,75 @@
 	margin-left: 0;
 	margin-right: 0;
 }
+
+.tf-tags {
+	background-color: var(--background-secondary-alt);
+	border-radius: 4px;
+	padding: 2px 4px;
+	margin-left: 4px;
+}
+
+.tf-taglist {
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	padding-left: 1em;
+	overflow: hidden;
+	display: inline-block;
+	flex-shrink: 2;
+	flex-grow: 1;
+	width: auto;
+	min-width: 5em;
+	text-align: right;
+	max-width: 30%;
+}
+
+.tf-taglist span {
+	color: var(--nav-item-color);
+}
+
+.nav-folder-title:hover .tagfolder-quantity,
+.nav-file-title:hover .tf-taglist {
+	color: var(--text-on-accent);
+}
+
+.nav-folder-title:hover .tagfolder-quantity span,
+.nav-file-title:hover .tf-taglist .tf-tags {
+	color: var(--text-on-accent);
+	background-color: var(--interactive-accent-hover);
+}
+
+
+.lsl-f {
+	flex-direction: row;
+	display: flex;
+	flex-grow: 1;
+	overflow: hidden;
+	max-width: calc(100%);
+	width: 50%;
+	flex-grow: 1;
+}
+
+.tagfolder-titletagname {
+	flex-grow: 1;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.tagfolder-quantity span {
+	background-color: var(--background-secondary-alt);
+	color: var(--nav-item-color);
+	border-radius: 4px;
+	padding: 2px 4px;
+}
+
+.tagfolder-quantity {
+	width: 3em;
+	text-align: right;
+	cursor: pointer;
+	margin-left: auto;
+}
+
+.tag-folder-title {
+	max-width: 100%;
+}

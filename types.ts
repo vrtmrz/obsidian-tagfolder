@@ -8,24 +8,6 @@ export interface ViewItem {
 	ctime: number;
 	filename: string;
 }
-
-export interface TreeItem {
-	tag: string;
-	extraTags: string[];
-	children: Array<TagFolderItem>;
-	ancestors: string[];
-	descendants: Array<ViewItem>;
-	isDedicatedTree: boolean;
-	itemsCount: number;
-	allDescendants: Array<ViewItem>;
-	descendantsMemo?: Array<ViewItem>;
-}
-
-export type TagFolderItem = TreeItem | ViewItem;
-
-export const SUBTREE_MARK = "→ ";
-export const SUBTREE_MARK_REGEX = /\/→ /g;
-
 export interface TagInfoDict {
 	[key: string]: TagInfo;
 }
@@ -36,7 +18,7 @@ export interface TagInfo {
 	redirect?: string;
 }
 
-import { DISPLAY_METHOD, HIDE_ITEMS_TYPE } from "./main";
+import { type DISPLAY_METHOD, type HIDE_ITEMS_TYPE } from "./main";
 
 export interface TagFolderSettings {
 	displayMethod: DISPLAY_METHOD;
@@ -145,7 +127,7 @@ export const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
 export const VIEW_TYPE_TAGFOLDER_LIST = "tagfolder-view-list";
 
 export const OrderKeyTag: Record<string, string> = {
-	NAME: "File name",
+	NAME: "Tag name",
 	ITEMS: "Count of items",
 };
 export const OrderDirection: Record<string, string> = {

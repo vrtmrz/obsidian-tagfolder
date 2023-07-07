@@ -1,12 +1,10 @@
-import { Menu, TFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
+import { Menu, TFile, type ViewStateResult, WorkspaceLeaf } from "obsidian";
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 import {
-	TagFolderListState,
-	TreeItem,
+	type TagFolderListState,
 	VIEW_TYPE_TAGFOLDER_LIST
 } from "./types";
-import { isSpecialTag } from "./util";
-import { treeRoot } from "./store";
+import { isSpecialTag, trimTrailingSlash } from "./util";
 import TagFolderPlugin from "./main";
 import { TagFolderViewBase } from "./TagFolderViewBase";
 
@@ -58,7 +56,7 @@ export class TagFolderList extends TagFolderViewBase {
 
 	async newNote(evt: MouseEvent) {
 
-		const expandedTags = this.state.tags
+		const expandedTags = this.state.tags.map(e => trimTrailingSlash(e))
 			.map(e => e.split("/")
 				.filter(ee => !isSpecialTag(ee))
 				.join("/")).filter(e => e != "")
@@ -83,28 +81,22 @@ export class TagFolderList extends TagFolderViewBase {
 		this.component = new TagFolderViewComponent({
 			target: this.contentEl,
 			props: {
-				openfile: this.plugin.focusFile,
+				openFile: this.plugin.focusFile,
 				hoverPreview: this.plugin.hoverPreview,
-				expandFolder: this.plugin.expandFolder,
 				title: "",
 				showMenu: this.showMenu,
 				showLevelSelect: this.showLevelSelect,
 				showOrder: this.showOrder,
 				newNote: this.newNote,
 				openScrollView: this.plugin.openScrollView,
-				items: [],
 				isViewSwitchable: this.plugin.settings.useMultiPaneList,
-				switchView: this.switchView
+				switchView: this.switchView,
 			},
 		});
 	}
 
 	async onClose() {
 		this.component.$destroy();
-	}
-
-	setTreeRoot(root: TreeItem) {
-		treeRoot.set(root);
 	}
 
 }

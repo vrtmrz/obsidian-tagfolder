@@ -2,7 +2,7 @@
 
 import {
 	App,
-	CachedMetadata,
+	type CachedMetadata,
 	debounce,
 	Editor,
 	getAllTags,
@@ -24,26 +24,20 @@ import {
 	OrderDirection,
 	OrderKeyItem,
 	OrderKeyTag,
-	ScrollViewFile,
-	ScrollViewState,
-	SUBTREE_MARK,
-	TagFolderItem,
-	TagFolderListState,
-	TagFolderSettings,
-	TagInfoDict,
-	TreeItem,
+	type ScrollViewFile,
+	type ScrollViewState,
+	type TagFolderListState,
+	type TagFolderSettings,
+	type TagInfoDict,
 	VIEW_TYPE_SCROLL,
 	VIEW_TYPE_TAGFOLDER,
 	VIEW_TYPE_TAGFOLDER_LIST,
-	ViewItem
+	type ViewItem
 } from "types";
-import { currentFile, maxDepth, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
+import { allViewItems, currentFile, maxDepth, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
 import {
-	ancestorToTags,
 	compare,
 	doEvents,
-	isAutoExpandTree,
-	omittedTags,
 	renderSpecialTag,
 	secondsToFreshness,
 	unique,
@@ -54,7 +48,7 @@ import { TagFolderList } from "./TagFolderList";
 
 export type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
 
-// The `Intermidiate` is spelled incorrectly, but it is already used as key of the configuration.
+// The `Intermidiate` is spelt incorrectly, but it is already used as the key of the configuration.
 // Leave it to the future.
 export type HIDE_ITEMS_TYPE = "NONE" | "DEDICATED_INTERMIDIATES" | "ALL_EXCEPT_BOTTOM";
 
@@ -65,352 +59,8 @@ const HideItemsType: Record<string, string> = {
 };
 
 
-const dotted = (object: any, notation: string) => {
+function dotted(object: any, notation: string) {
 	return notation.split('.').reduce((a, b) => (a && (b in a)) ? a[b] : null, object);
-}
-
-const rippleDirty = (entry: TreeItem): boolean => {
-	// Mark "needs rebuild" itself if the children need to rebuild.
-	for (const child of entry.children) {
-		if ("tag" in child) {
-			if (rippleDirty(child)) {
-				entry.descendants = null;
-				entry.allDescendants = null;
-				entry.descendantsMemo = null;
-			}
-		}
-	}
-	if (entry.descendants == null) return true;
-};
-const retrieveAllDescendants = (entry: TagFolderItem): ViewItem[] => {
-	return (
-		"tag" in entry
-			? entry.children.map(
-				(e) =>
-					"tag" in e
-						? [...e.descendants, ...retrieveAllDescendants(e)]
-						: [e]
-				// eslint-disable-next-line no-mixed-spaces-and-tabs
-			)
-			: [entry]
-	).flat() as ViewItem[];
-};
-const retrieveChildren = (entry: TagFolderItem): ViewItem[] => {
-	return (
-		"tag" in entry
-			? entry.children.map(
-				(e) =>
-					"tag" in e
-						? [...retrieveChildren(e)]
-						: [e]
-			)
-			: [entry]
-	).flat() as ViewItem[];
-};
-const expandDescendants = (
-	entry: TreeItem,
-	hideItems: HIDE_ITEMS_TYPE
-): ViewItem[] => {
-	const ret: ViewItem[] = [];
-	for (const v of entry.children) {
-		if ("tag" in v) {
-			if (v.descendants == null) {
-				const w = expandDescendants(v, hideItems).filter(
-					(e) => !ret.contains(e)
-				);
-				ret.push(...w);
-			} else {
-				const w = v.descendants.filter((e) => !ret.contains(e));
-				ret.push(...w);
-			}
-		} else {
-			if (!ret.contains(v)) ret.push(v);
-		}
-	}
-
-	// Find descendants with skipping over children.
-	const leafs =
-		entry.descendantsMemo != null
-			? entry.descendantsMemo // if memo is exists, use it.
-			: (entry.descendantsMemo = [...new Set(entry.children // or retrieve all and memorize
-				.map((e) =>
-					"tag" in e
-						? e.children
-							.map((ee) =>
-								retrieveAllDescendants(ee).flat()
-							)
-							.flat()
-						: []
-				)
-				.flat())]);
-	if (
-		(hideItems == "DEDICATED_INTERMIDIATES" && entry.isDedicatedTree) ||
-		hideItems == "ALL_EXCEPT_BOTTOM"
-	) {
-		entry.descendants = ret.filter((e) => !leafs.contains(e));
-	} else {
-		entry.descendants = ret;
-	}
-	entry.allDescendants = ret;
-	entry.itemsCount = new Set([...ret, ...leafs]).size;
-	return ret;
-};
-const expandTree = async (node: TreeItem, reduceNestedParent: boolean): Promise<boolean> => {
-	let modified = false;
-	const tree = node.children;
-	const ancestor = [...node.ancestors];
-
-	const tags = Array.from(
-		new Set(
-			node.children
-				.filter((e) => "tags" in e)
-				.map((e) => (e as ViewItem).tags)
-				.flat()
-		)
-	);
-	const ancestorAsTags = ancestorToTags(ancestor);
-	for (const tag of tags) {
-		if (
-			ancestorAsTags
-				.map((e) => e.toLocaleLowerCase())
-				.contains(tag.toLocaleLowerCase())
-		)
-			continue;
-		const newChildren = node.children.filter(
-			(e) =>
-				"tags" in e &&
-				e.tags
-					.map((e) => e.toLocaleLowerCase())
-					.contains(tag.toLocaleLowerCase())
-		);
-		// If already exists in children, skip.
-		if (
-			tree.find(
-				(e) =>
-					"tag" in e &&
-					e.tag.toLocaleLowerCase() == tag.toLocaleLowerCase()
-			)
-		) {
-			continue;
-		}
-
-		const newLeaf: TreeItem = {
-			tag: tag,
-			extraTags: node.extraTags,
-			children: newChildren,
-			ancestors: [...ancestor, tag],
-			descendants: null,
-			isDedicatedTree: false,
-			itemsCount: newChildren.length,
-			allDescendants: null,
-		};
-		tree.push(newLeaf);
-		// modified = await splitTag(newLeaf, reduceNestedParent);
-	}
-	modified = await splitTag(node, reduceNestedParent) || modified;
-	if (modified) {
-		await expandTree(node, reduceNestedParent);
-	}
-	return modified;
-};
-
-const splitTag = async (entry: TreeItem, reduceNestedParent: boolean, root?: TreeItem): Promise<boolean> => {
-	let modified = false;
-	const xRoot = root || entry;
-	await doEvents();
-	entry.children = entry.children.sort((a, b) => {
-		if ("tag" in a && "tag" in b) {
-			return a.tag.split("/").length - b.tag.split("/").length;
-		} else {
-			return 0;
-		}
-	});
-	for (const curEntry of entry.children) {
-		if ("tag" in curEntry) {
-			modified = (await splitTag(curEntry, reduceNestedParent, xRoot)) || modified;
-			if (curEntry.tag.contains("/")) {
-				const tempEntry = curEntry;
-				entry.children.remove(tempEntry);
-				const tagsArray = tempEntry.tag.split("/");
-				const tagCar = tagsArray.shift();
-				const tagCdr = SUBTREE_MARK + tagsArray.join("/");
-				const ancestors = curEntry.ancestors.map(e => e.toLocaleLowerCase());
-				const newAncestorsBase = tempEntry.ancestors.filter(e => e != tempEntry.tag);
-				const idxCar = ancestors.indexOf(tagCar.toLocaleLowerCase());
-				const idxCdr = ancestors.indexOf(tagCdr.toLocaleLowerCase());
-				if (idxCar != -1) {
-					if (idxCar < idxCdr) {
-						// Same condition found.
-						// In this case, entry.children can be empty. in that case, we have to snip this entry.
-						modified = true;
-						continue;
-					} else {
-						if (reduceNestedParent) {
-							// Skip to make parent and expand this immediately.
-							modified = true;
-							const replacer: TreeItem = {
-								...tempEntry,
-								tag: tagCdr,
-								ancestors: [
-									...newAncestorsBase,
-									tagCar,
-									tagCdr,
-								],
-								itemsCount: 0,
-								descendants: null,
-								allDescendants: null,
-								isDedicatedTree: tempEntry.isDedicatedTree,
-							}
-							// Look up for the entry which to be removed.
-							const old = entry.children.find(e => "tag" in e && e.tag == tagCdr) as null | TreeItem;
-							if (old) {
-								entry.children.remove(old);
-								// Merge children into new entry.
-								replacer.children = [...replacer.children, ...old.children]
-							}
-							entry.children.push(replacer);
-							continue;
-						}
-					}
-				}
-				const parent = entry.children.find(
-					(e) =>
-						"tag" in e &&
-						e.tag.toLocaleLowerCase() == tagCar.toLocaleLowerCase()
-				) as TreeItem;
-				const tempChildren = tempEntry.children;
-				if (!parent) {
-					const newGrandchild: TreeItem = {
-						tag: tagCdr,
-						extraTags: tempEntry.extraTags,//?
-						children: [...tempChildren],
-						ancestors: [
-							...newAncestorsBase,
-							tagCar,
-							tagCdr,
-						],
-						itemsCount: 0,
-						descendants: null,
-						allDescendants: null,
-						isDedicatedTree: false,
-					};
-					const newChild: TreeItem = {
-						tag: tagCar,
-						extraTags: tempEntry.extraTags,//?
-						children: [newGrandchild],
-						ancestors: [...newAncestorsBase, tagCar],
-						descendants: null,
-						allDescendants: null,
-						isDedicatedTree: true,
-						itemsCount: 0,
-					};
-					newChild.children = [newGrandchild];
-					entry.children.push(newChild);
-					await splitTag(entry, reduceNestedParent, xRoot);
-					modified = true;
-				} else {
-					const oldIx = parent.children.find(
-						(e) =>
-							"tag" in e &&
-							e.tag.toLocaleLowerCase() ==
-							tagCdr.toLocaleLowerCase()
-					) as TreeItem;
-					if (oldIx != null) {
-						oldIx.children.push(
-							...tempChildren.filter(
-								(e) => !oldIx.children.contains(e)
-							)
-						);
-						await splitTag(oldIx, reduceNestedParent, xRoot);
-					} else {
-						const x: TreeItem = {
-							tag: tagCdr,
-							extraTags: tempEntry.extraTags,//?
-							children: [...tempChildren],
-							ancestors: [
-								...newAncestorsBase,
-								// tempEntry.tag,
-								tagCar,
-								tagCdr,
-							],
-							descendants: null,
-							allDescendants: null,
-							isDedicatedTree: false,
-							itemsCount: 0,
-						};
-						parent.children.push(x);
-						// If it was dedicated tree, check all children are still inside.
-						// For cases as below:
-						// (Before) 
-						//  A
-						//  +-> B
-						//      + DOC 1
-						// (After)
-						//   A
-						//   +-B        <-- This level should be back to normal tree.
-						//   | +DOC 1
-						//   +-DOC 2
-						if (!parent.isDedicatedTree) {
-							const p = retrieveChildren(parent).map(e => e.path)
-							const c = retrieveChildren(tempEntry).map(e => e.path);
-							if (c.some(entry => !p.contains(entry))) {
-								parent.isDedicatedTree = false;
-							} else {
-								parent.isDedicatedTree = true;
-							}
-						}
-						await splitTag(parent, reduceNestedParent, xRoot);
-					}
-					modified = true;
-				}
-			}
-		}
-	}
-
-	if (modified) {
-		modified = await splitTag(entry, reduceNestedParent, xRoot);
-	}
-	if (modified) {
-		// If entry became back as not dedicated tree, disable it.
-		if (entry.isDedicatedTree && entry.children.some(e => "tags" in e)) {
-			entry.isDedicatedTree = false;
-		}
-	}
-	return modified;
-};
-
-function getTagName(tagName: string, tagInfo: TagInfoDict, invert: number) {
-	if (tagInfo == null) return tagName;
-	const prefix = invert == -1 ? `\uffff` : `\u0001`;
-	const unpinned = invert == 1 ? `\uffff` : `\u0001`;
-
-	if (tagName in tagInfo && tagInfo[tagName]) {
-		if ("key" in tagInfo[tagName]) {
-			return `${prefix}_-${tagInfo[tagName].key}__${tagName}`;
-		}
-	}
-	return `${prefix}_${unpinned}_${tagName}`
-}
-
-function getCompareMethodTags(settings: TagFolderSettings) {
-	const invert = settings.sortTypeTag.contains("_DESC") ? -1 : 1;
-	switch (settings.sortTypeTag) {
-		case "ITEMS_ASC":
-		case "ITEMS_DESC":
-			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) => {
-				const aCount = a.itemsCount - ((settings.useTagInfo && (a.tag in tagInfo && "key" in tagInfo[a.tag])) ? 100000 * invert : 0);
-				const bCount = b.itemsCount - ((settings.useTagInfo && (b.tag in tagInfo && "key" in tagInfo[b.tag])) ? 100000 * invert : 0);
-				return (aCount - bCount) * invert;
-			}
-		case "NAME_ASC":
-		case "NAME_DESC":
-			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) =>
-				compare(getTagName(a.tag, settings.useTagInfo ? tagInfo : null, invert), getTagName(b.tag, settings.useTagInfo ? tagInfo : null, invert)) * invert;
-		default:
-			console.warn("Compare method (tags) corrupted");
-			return (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) =>
-				compare(a.tag, b.tag) * invert;
-	}
 }
 
 function getCompareMethodItems(settings: TagFolderSettings) {
@@ -455,16 +105,14 @@ export default class TagFolderPlugin extends Plugin {
 	// Folder opening status.
 	expandedFolders: string[] = ["root"];
 
-	// The Tag Tree.
-	root: TreeItem;
-
 	// The File that now opening
 	currentOpeningFile = "";
 
 	searchString = "";
 
+	allViewItems = [] as ViewItem[];
+
 	compareItems: (a: ViewItem, b: ViewItem) => number;
-	compareTags: (a: TreeItem, b: TreeItem, tagInfo: TagInfoDict) => number;
 
 	getView(): TagFolderView {
 		for (const leaf of this.app.workspace.getLeavesOfType(
@@ -509,69 +157,6 @@ export default class TagFolderPlugin extends Plugin {
 		searchString.set(search);
 	}
 
-	async expandLastExpandedFolders(entry: TagFolderItem, force?: boolean, path: string[] = [], openedTags: { [key: string]: Set<string> } = {}, maxDepth = 1) {
-		if (maxDepth < 0) {
-			return;
-		}
-		if ("tag" in entry) {
-			if (path.indexOf(entry.tag) !== -1) return;
-			if (omittedTags(entry, this.settings)) return;
-			const key = entry.ancestors.join("/");
-			for (const tags of this.expandedFolders) {
-				const tagPrefixToOpen = [];
-				const tagArray = tags.split("/");
-				for (const f of tagArray) {
-					tagPrefixToOpen.push(f);
-					const tagPrefix: string = tagPrefixToOpen.join("/");
-					if (!(tagPrefix in openedTags)) {
-						openedTags[tagPrefix] = new Set();
-					}
-					if (openedTags[tagPrefix].has(key)) {
-						continue;
-					}
-					if (key.startsWith(tagPrefix) || force) {
-						openedTags[tagPrefix].add(key);
-						await expandTree(entry, this.settings.reduceNestedParent);
-						await splitTag(entry, this.settings.reduceNestedParent);
-
-						for (const child of entry.children) {
-							if ("tag" in child) {
-								const autoExp = isAutoExpandTree(child, this.settings);
-								const nextDepth = (autoExp || child.isDedicatedTree) ? maxDepth : maxDepth - 1;
-								if (path.indexOf(child.tag) == -1) {
-									await this.expandLastExpandedFolders(child, false, [...path, entry.tag], openedTags, nextDepth);
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Expand the folder (called from Tag pane.)
-	readonly expandFolder = async (entry: TagFolderItem, expanded: boolean) => {
-		if ("tag" in entry) {
-			const key = [...entry.ancestors].join("/");
-			if (expanded) {
-				this.expandedFolders = Array.from(
-					new Set([...this.expandedFolders, key])
-				);
-				this.expandedFolders = this.expandedFolders.sort(
-					(a, b) => a.split("/").length - b.split("/").length
-				);
-			} else {
-				this.expandedFolders = this.expandedFolders.filter(
-					(e) => e != key
-				);
-			}
-			// apply to tree opened status.
-			await this.expandLastExpandedFolders(entry);
-			// apply to pane.
-			this.setRoot(this.root);
-		}
-	}
-
 	getFileTitle(file: TFile): string {
 		if (!this.settings.useTitle) return file.basename;
 		const metadata = this.app.metadataCache.getCache(file.path);
@@ -609,7 +194,6 @@ export default class TagFolderPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.hoverPreview = this.hoverPreview.bind(this);
-		this.sortChildren = this.sortChildren.bind(this);
 		this.modifyFile = this.modifyFile.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
 		this.openScrollView = this.openScrollView.bind(this);
@@ -781,80 +365,6 @@ export default class TagFolderPlugin extends Plugin {
 		metadata: CachedMetadata;
 	}[] = [];
 
-	sortChildren(a: TreeItem | ViewItem, b: TreeItem | ViewItem) {
-		if ("tag" in a && !("tag" in b)) {
-			return -1;
-		} else if (!("tag" in a) && "tag" in b) {
-			return 1;
-		} else {
-			if ("tag" in a && "tag" in b) {
-				return this.compareTags(a, b, this.tagInfo);
-			} else if ("tags" in a && "tags" in b) {
-				return this.compareItems(a, b);
-			} else {
-				return 0;
-			}
-		}
-	}
-
-	sortTree(entry: TreeItem) {
-		entry.children = entry.children.sort(this.sortChildren);
-		for (const child of entry.children) {
-			if ("tag" in child) {
-				this.sortTree(child);
-			}
-		}
-		entry.descendants = entry.descendants.sort(this.sortChildren);
-	}
-
-	snipEmpty(root: TreeItem) {
-		for (const v of root.children) {
-			if ("tag" in v) this.snipEmpty(v);
-		}
-		root.children = root.children.filter(e => !("tag" in e && e.children.length == 0));
-	}
-
-	mergeRedundantCombination(root: TreeItem) {
-		const existentChild = {} as { [key: string]: TreeItem };
-		const removeChildren = [] as TreeItem[];
-		for (const entry of root.children) {
-			if (!("tag" in entry)) continue;
-			// snip children's tree first.
-			if ("tag" in entry) this.mergeRedundantCombination(entry);
-		}
-		for (const entry of root.children) {
-			// apply only TreeItem
-			if (!("tag" in entry)) continue;
-			const tags = [...new Set(retrieveAllDescendants(entry))].map(e => e.path).sort().join("-");
-			if (tags in existentChild) {
-				removeChildren.push(entry);
-			} else {
-				existentChild[tags] = entry;
-			}
-		}
-		for (const v of removeChildren) {
-			root.children.remove(v);
-		}
-		root.children = [...root.children];
-	}
-
-	setRoot(root: TreeItem) {
-		rippleDirty(root);
-		expandDescendants(root, this.settings.hideItems);
-		this.snipEmpty(root);
-		this.sortTree(root);
-		if (this.settings.mergeRedundantCombination) this.mergeRedundantCombination(root);
-		if (this.settings.expandUntaggedToRoot) {
-			const untagged = root?.children?.find(e => "tag" in e && e.tag == "_untagged") as TreeItem;
-			if (untagged) {
-				root.children.push(...untagged.allDescendants.map(e => ({ ...e, tags: [] })));
-				root.children.remove(untagged);
-			}
-		}
-		this.root = root;
-		this.getView()?.setTreeRoot(root);
-	}
-
 	oldFileCache = "";
 
 	updateFileCaches(diff?: TFile) {
@@ -1013,6 +523,11 @@ export default class TagFolderPlugin extends Plugin {
 			allTags = allTags.filter(
 				(tag) => !ignoreTags.contains(tag.toLocaleLowerCase())
 			);
+
+			// if (this.settings.reduceNestedParent) {
+			// 	allTags = mergeSameParents(allTags);
+			// }
+
 			if (this.settings.disableNarrowingDown) {
 				const archiveTagsMatched = allTags.filter(e => archiveTags.contains(e.toLocaleLowerCase()));
 				const targetTags = archiveTagsMatched.length == 0 ? allTags : archiveTagsMatched;
@@ -1043,55 +558,6 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		return items;
 	}
-
-	async buildUpTree(items: ViewItem[]): Promise<TreeItem> {
-
-		// Pick notes which tagged with archiveTags
-		const archiveTags = this.settings.archiveTags
-			.toLocaleLowerCase()
-			.replace(/[\n ]/g, "")
-			.split(",");
-
-		const archivedNotes = archiveTags.map(archiveTag => ([archiveTag, items.filter(item => item.tags.some(tag => tag.toLocaleLowerCase() == archiveTag))])) as [string, ViewItem[]][]
-		const root: TreeItem = {
-			tag: "root",
-			extraTags: [],
-			children: [...items.filter(e => e.tags.every(tag => !archiveTags.contains(tag.toLocaleLowerCase())))],
-			ancestors: ["root"],
-			descendants: null,
-			allDescendants: null,
-			itemsCount: 0,
-			isDedicatedTree: false,
-		};
-		// Make branches of archived tags.
-
-		for (const [archiveTag, items] of archivedNotes) {
-			root.children.push(
-				{
-					extraTags: [],
-					tag: archiveTag,
-					children: items,
-					ancestors: ["root", archiveTag],
-					descendants: null,
-					allDescendants: null,
-					itemsCount: 0,
-					isDedicatedTree: false,
-				}
-			)
-		}
-
-		await expandTree(root, this.settings.reduceNestedParent);
-
-		// Omit items on root
-		root.children = root.children.filter((e) => "tag" in e);
-
-		// Split tag that having slashes.
-		await splitTag(root, this.settings.reduceNestedParent);
-		// restore opened folder
-		await this.expandLastExpandedFolders(root, true);
-		return root;
-	}
-
 
 	lastSettings = "";
 	lastSearchString = "";
@@ -1126,8 +592,9 @@ export default class TagFolderPlugin extends Plugin {
 		}
 
 		const items = await this.getItemsList();
-		const root = await this.buildUpTree(items);
-		this.setRoot(root);
+		const itemsSorted = items.sort(this.compareItems);
+		this.allViewItems = itemsSorted;
+		allViewItems.set(this.allViewItems);
 		await this.applyUpdateIntoScroll(diff);
 
 	}
@@ -1150,36 +617,15 @@ export default class TagFolderPlugin extends Plugin {
 		);
 	}
 
-	findTreeItemFromPath(tagPath: string, root?: TreeItem): TreeItem | null {
-		// debugger;
-		if (!root) {
-			root = this.root;
-		}
-
-		//If this is the bottom, return.
-		if (root.children.some(e => !("tag" in e))) {
-			return root;
-		}
-		const paths = tagPath.split("/");
-		paths.shift();
-		const path = [] as string[];
-
-		while (paths.length > 0) {
-			path.push(paths.shift());
-			const child = root.children.find(e => "tag" in e && e.tag == path.join("/")) as TreeItem;
-			if (child) {
-				return this.findTreeItemFromPath(paths.join("/"), child);
-			}
-		}
-		return null;
-	}
-
-
 	async applyUpdateIntoScroll(file?: TFile) {
 		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_SCROLL);
 		for (const leaf of leaves) {
 			const view = leaf.view as ScrollView;
-			const viewStat = { ...leaf.getViewState(), state: { ...view.getScrollViewState() } }
+			if (!view) continue;
+			const viewState = leaf.getViewState();
+			const scrollViewState = view?.getScrollViewState();
+			if (!viewState || !scrollViewState) continue;
+			const viewStat = { ...viewState, state: { ...scrollViewState } }
 			if (file && view.isFileOpened(file.path)) {
 
 				const newStat = {
@@ -1194,34 +640,51 @@ export default class TagFolderPlugin extends Plugin {
 				}
 				await leaf.setViewState(newStat);
 			}
-			// Check files that included in the Scroll view.
-			const openedNode = this.findTreeItemFromPath(viewStat.state.tagPath);
-			if (openedNode) {
-				const newFilesArray = openedNode.allDescendants.map(e => e.path);
-				const newFiles = newFilesArray.sort().join("-");
-				const oldFiles = viewStat.state.files.map(e => e.path).sort().join("-");
-				if (newFiles != oldFiles) {
-					// List has changed
-					const newStat = {
-						...viewStat,
-						state: {
-							...viewStat.state,
-							files: newFilesArray.map(path => {
-								const old = viewStat.state.files.find(e => e.path == path);
-								if (old) return old;
-								return {
-									path: path
-								} as ScrollViewFile;
+			const tagPath = viewStat.state.tagPath;
+			const tags = tagPath.split(", ");
+
+			let matchedFiles = this.allViewItems;
+			for (const tag of tags) {
+				matchedFiles = matchedFiles.filter((item) =>
+					item.tags
+						.map((tag) => tag.toLocaleLowerCase())
+						.some(
+							(itemTag) =>
+								itemTag ==
+								tag.toLocaleLowerCase() ||
+								(itemTag + "/").startsWith(
+									tag.toLocaleLowerCase() +
+									(tag.endsWith("/")
+										? ""
+										: "/")
+								)
+						)
+				)
+			}
+
+			const newFilesArray = matchedFiles.map(e => e.path);
+			const newFiles = newFilesArray.sort().join("-");
+			const oldFiles = viewStat.state.files.map(e => e.path).sort().join("-");
+			if (newFiles != oldFiles) {
+				// List has changed
+				const newStat = {
+					...viewStat,
+					state: {
+						...viewStat.state,
+						files: newFilesArray.map(path => {
+							const old = viewStat.state.files.find(e => e.path == path);
+							if (old) return old;
+							return {
+								path: path
+							} as ScrollViewFile;
 
 
-							}) as ScrollViewFile[]
-						}
+						}) as ScrollViewFile[]
 					}
-					await leaf.setViewState(newStat);
 				}
+				await leaf.setViewState(newStat);
 			}
 		}
-
 	}
 
 	async initView() {
@@ -1281,9 +744,6 @@ export default class TagFolderPlugin extends Plugin {
 		if (this.tagInfo == null) return;
 		if (!this.settings.useTagInfo) return;
 		tagInfo.set(this.tagInfo);
-		setTimeout(() => {
-			if (this.root) this.setRoot(this.root);
-		}, 10);
 	}
 
 	async loadTagInfo() {
@@ -1353,7 +813,7 @@ export default class TagFolderPlugin extends Plugin {
 		await this.loadTagInfo();
 		tagFolderSetting.set(this.settings);
 		this.compareItems = getCompareMethodItems(this.settings);
-		this.compareTags = getCompareMethodTags(this.settings);
+		// this.compareTags = getCompareMethodTags(this.settings);
 	}
 
 	async saveSettings() {
@@ -1361,7 +821,11 @@ export default class TagFolderPlugin extends Plugin {
 		await this.saveTagInfo();
 		tagFolderSetting.set(this.settings);
 		this.compareItems = getCompareMethodItems(this.settings);
-		this.compareTags = getCompareMethodTags(this.settings);
+		if (this.allViewItems) {
+			this.allViewItems = this.allViewItems.sort(this.compareItems);
+			allViewItems.set(this.allViewItems);
+		}
+		// this.compareTags = getCompareMethodTags(this.settings);
 	}
 
 	async openListView(tagSrc: string[]) {
@@ -1407,7 +871,7 @@ export default class TagFolderPlugin extends Plugin {
 			active: true,
 			state: { tags: tags, title: title } as TagFolderListState
 		});
-		(theLeaf.view as TagFolderList).setTreeRoot(this.root);
+		// (theLeaf.view as TagFolderList).setTreeRoot(this.root);
 
 		this.app.workspace.revealLeaf(
 			theLeaf
@@ -1515,7 +979,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 			//@ts-ignore
 			this.plugin.settings.sortType = `${key}_${order}`;
 			await this.plugin.saveSettings();
-			this.plugin.setRoot(this.plugin.root);
+			// this.plugin.setRoot(this.plugin.root);
 		};
 		new Setting(containerEl)
 			.setName("Order method")
@@ -1565,7 +1029,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 			//@ts-ignore
 			this.plugin.settings.sortTypeTag = `${key}_${order}`;
 			await this.plugin.saveSettings();
-			this.plugin.setRoot(this.plugin.root);
+			// this.plugin.setRoot(this.plugin.root);
 		};
 		new Setting(containerEl)
 			.setName("Order method")
@@ -1793,7 +1257,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setButtonText("Copy tags")
 					.setDisabled(false)
 					.onClick(async () => {
-						const items = this.plugin.root.allDescendants.map(e => e.tags.filter(e => e != "_untagged")).filter(e => e.length);
+						const itemsAll = await this.plugin.getItemsList();
+						const items = itemsAll.map(e => e.tags.filter(e => e != "_untagged")).filter(e => e.length);
 						await navigator.clipboard.writeText(items.map(e => e.map(e => `#${e}`).join(", ")).join("\n"));
 						new Notice("Copied to clipboard");
 					}))
@@ -1804,7 +1269,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.onClick(async () => {
 						const x = new Map<string, number>();
 						let i = 0;
-						const items = this.plugin.root.allDescendants.map(e => e.tags.filter(e => e != "_untagged").map(e => x.has(e) ? x.get(e) : (x.set(e, i++), i))).filter(e => e.length);
+						const itemsAll = await this.plugin.getItemsList();
+						const items = itemsAll.map(e => e.tags.filter(e => e != "_untagged").map(e => x.has(e) ? x.get(e) : (x.set(e, i++), i))).filter(e => e.length);
 						await navigator.clipboard.writeText(items.map(e => e.map(e => `#tag${e}`).join(", ")).join("\n"));
 						new Notice("Copied to clipboard");
 					})

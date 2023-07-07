@@ -1,7 +1,6 @@
 import { WorkspaceLeaf } from "obsidian";
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
-import { TreeItem, VIEW_TYPE_TAGFOLDER } from "./types";
-import { treeRoot } from "./store";
+import { VIEW_TYPE_TAGFOLDER } from "./types";
 import TagFolderPlugin from "./main";
 import { TagFolderViewBase } from "./TagFolderViewBase";
 
@@ -40,17 +39,16 @@ export class TagFolderView extends TagFolderViewBase {
 		this.component = new TagFolderViewComponent({
 			target: this.containerEl,
 			props: {
-				openfile: this.plugin.focusFile,
+				openFile: this.plugin.focusFile,
 				hoverPreview: this.plugin.hoverPreview,
-				expandFolder: this.plugin.expandFolder,
-				vaultname: this.app.vault.getName(),
+				vaultName: this.app.vault.getName(),
 				showMenu: this.showMenu,
 				showLevelSelect: this.showLevelSelect,
 				showOrder: this.showOrder,
 				newNote: this.newNote,
 				openScrollView: this.plugin.openScrollView,
 				isViewSwitchable: this.plugin.settings.useMultiPaneList,
-				switchView: this.switchView
+				switchView: this.switchView,
 			},
 		});
 	}
@@ -59,7 +57,4 @@ export class TagFolderView extends TagFolderViewBase {
 		this.component.$destroy();
 	}
 
-	setTreeRoot(root: TreeItem) {
-		treeRoot.set(root);
-	}
 }
