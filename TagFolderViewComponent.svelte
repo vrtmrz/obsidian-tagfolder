@@ -5,6 +5,7 @@
 	import { onMount } from "svelte";
 	import { setIcon } from "obsidian";
 	import { trimTrailingSlash } from "./util";
+	import { setContext } from "svelte";
 
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
 	export let openFile: (path: string, specialKey: boolean) => void;
@@ -137,6 +138,10 @@
 		}
 	}
 	$: isMainTree = tags.length == 0;
+	let scrollParent: HTMLDivElement;
+	setContext("tf-list", {
+		getScrollParent: () => scrollParent,
+	});
 </script>
 
 <div hidden bind:this={iconDivEl} />
@@ -206,7 +211,7 @@
 		/>
 	</div>
 {/if}
-<div class="nav-files-container node-insert-event">
+<div class="nav-files-container node-insert-event" bind:this={scrollParent}>
 	<div class="tree-item nav-folder mod-root">
 		<div class="tree-item-self nav-folder-title">
 			<div class="tree-item-inner nav-folder-title-content">

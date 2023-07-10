@@ -53,32 +53,27 @@
 		// To improve the performance, prepare an HTML piece.
 		extraTagsHtml = `<div class="tf-taglist">${tagsLeft
 			.map(
-				(e) =>
-					`<span class="tf-tags">${escapeStringToHTML(
-						renderSpecialTag(e)
-					)}</span>`
+				(e) => `<span>${escapeStringToHTML(renderSpecialTag(e))}</span>`
 			)
 			.join("")}</div>`;
 	}
 </script>
 
-<div class="tree-item nav-file">
-	<!-- svelte-ignore a11y-click-events-have-key-events -->
-	<div
-		class="tree-item-self is-clickable nav-file-title"
-		class:is-active={isActive}
-		on:click={(evt) => openFile(item.path, evt.metaKey || evt.ctrlKey)}
-		on:mouseover={(e) => {
-			handleMouseover(e, item.path);
-		}}
-		on:focus={() => {
-			/* ignore aria complaint */
-		}}
-		on:contextmenu={(evt) => showMenu(evt, trail, undefined, [item])}
-	>
-		<div class="tree-item-inner nav-file-title-content lsl-f">
-			{item.displayName}
-		</div>
-		{@html extraTagsHtml}
+<!-- svelte-ignore a11y-click-events-have-key-events -->
+<div
+	class="tree-item-self is-clickable nav-file-title"
+	class:is-active={isActive}
+	on:click={(evt) => openFile(item.path, evt.metaKey || evt.ctrlKey)}
+	on:mouseover={(e) => {
+		handleMouseover(e, item.path);
+	}}
+	on:focus={() => {
+		/* ignore aria complaint */
+	}}
+	on:contextmenu={(evt) => showMenu(evt, trail, undefined, [item])}
+>
+	<div class="tree-item-inner nav-file-title-content lsl-f">
+		{item.displayName}
 	</div>
+	{@html extraTagsHtml}
 </div>

@@ -29,6 +29,7 @@
 		v2expandedTags,
 	} from "./store";
 	import TreeItemItemComponent from "V2TreeItemComponent.svelte";
+	import OnDemandRender from "OnDemandRender.svelte";
 
 	// -- Props --
 
@@ -79,8 +80,13 @@
 	// The key for keep toggling
 	$: trailKey = trail.join("*");
 	$: collapsed = !isRoot && !$v2expandedTags.has(trailKey);
+
 	v2expandedTags.subscribe((expTags) => {
-		collapsed = !expTags.has(trailKey);
+		if (trailKey == undefined) return;
+		const collapsedNew = !expTags.has(trailKey);
+		if (collapsed != collapsedNew) {
+			collapsed = collapsedNew;
+		}
 	});
 
 	// Watch them to realise the configurations to display immediately
@@ -500,16 +506,25 @@
 		{/each}
 	{/if}
 	{#each leftOverItems as item}
-		<TreeItemItemComponent
-			{item}
-			{openFile}
-			trail={[...trail, ...suppressLevels]}
-			{showMenu}
-			{hoverPreview}
-		/>
+		<OnDemandRender
+			wrapperClass="tree-item nav-file"
+			placeHolderClass="tf-file-ph"
+		>
+			<TreeItemItemComponent
+				{item}
+				{openFile}
+				trail={[...trail, ...suppressLevels]}
+				{showMenu}
+				{hoverPreview}
+			/>
+		</OnDemandRender>
 	{/each}
 {:else}
-	<div class="tree-item nav-folder" class:is-collapsed={collapsed}>
+	<OnDemandRender
+		wrapperClass={`tree-item nav-folder ${collapsed ? "is-collapsed" : ""}`}
+		placeHolderClass="tf-folder-ph"
+		force={!collapsed}
+	>
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
 		<div
 			class="tree-item-self is-clickable mod-collapsible nav-folder-title tag-folder-title"
@@ -565,15 +580,20 @@
 					/>
 				{/each}
 				{#each leftOverItems as item}
-					<TreeItemItemComponent
-						{item}
-						{openFile}
-						trail={[...trail, ...suppressLevels]}
-						{showMenu}
-						{hoverPreview}
-					/>
+					<OnDemandRender
+						wrapperClass="tree-item nav-file"
+						placeHolderClass="tf-folder-ph"
+					>
+						<TreeItemItemComponent
+							{item}
+							{openFile}
+							trail={[...trail, ...suppressLevels]}
+							{showMenu}
+							{hoverPreview}
+						/>
+					</OnDemandRender>
 				{/each}
 			{/if}
 		</div>
-	</div>
+	</OnDemandRender>
 {/if}

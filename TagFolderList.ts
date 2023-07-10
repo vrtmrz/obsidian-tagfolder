@@ -78,8 +78,9 @@ export class TagFolderList extends TagFolderViewBase {
 	}
 
 	async onOpen() {
+		this.containerEl.empty();
 		this.component = new TagFolderViewComponent({
-			target: this.contentEl,
+			target: this.containerEl,
 			props: {
 				openFile: this.plugin.focusFile,
 				hoverPreview: this.plugin.hoverPreview,
@@ -96,7 +97,9 @@ export class TagFolderList extends TagFolderViewBase {
 	}
 
 	async onClose() {
-		this.component.$destroy();
+		if (this.component) {
+			this.component.$destroy();
+		}
 	}
 
 }
