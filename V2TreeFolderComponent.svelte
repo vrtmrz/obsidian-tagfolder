@@ -29,6 +29,7 @@
 		v2expandedTags,
 	} from "./store";
 	import TreeItemItemComponent from "V2TreeItemComponent.svelte";
+	import OnDemandRender from "OnDemandRender.svelte";
 
 	// -- Props --
 
@@ -510,43 +511,61 @@
 	{/each}
 {:else}
 	<div class={`tree-item nav-folder${collapsed ? " is-collapsed" : ""}`}>
-		<!-- svelte-ignore a11y-click-events-have-key-events -->
-		<div
-			class="tree-item-self is-clickable mod-collapsible nav-folder-title tag-folder-title"
-			class:is-active={isActive}
-			on:click={toggleFolder}
-			on:contextmenu={(evt) => {
-				showMenu(evt, [...trail, ...suppressLevels], tagName, items);
-			}}
-		>
+		<OnDemandRender>
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<div
-				class="tree-item-icon collapse-icon nav-folder-collapse-indicator"
-				class:is-collapsed={collapsed}
+				class="tree-item-self is-clickable mod-collapsible nav-folder-title tag-folder-title"
+				class:is-active={isActive}
 				on:click={toggleFolder}
+				on:contextmenu={(evt) => {
+					showMenu(
+						evt,
+						[...trail, ...suppressLevels],
+						tagName,
+						items
+					);
+				}}
 			>
-				{@html folderIcon}
-			</div>
-			<div class="tree-item-inner nav-folder-title-content lsl-f">
-				<div class="tagfolder-titletagname">
-					{@html tagsDispHtml}
-				</div>
 				<div
-					class="tagfolder-quantity itemscount"
-					on:click={(e) =>
-						handleOpenScroll(
-							e,
-							trail,
-							items.map((e) => e.path)
-						)}
+					class="tree-item-icon collapse-icon nav-folder-collapse-indicator"
+					class:is-collapsed={collapsed}
+					on:click={toggleFolder}
 				>
-					<span class="itemscount">{items?.length ?? 0}</span>
+					{@html folderIcon}
+				</div>
+				<div class="tree-item-inner nav-folder-title-content lsl-f">
+					<div class="tagfolder-titletagname">
+						{@html tagsDispHtml}
+					</div>
+					<div
+						class="tagfolder-quantity itemscount"
+						on:click={(e) =>
+							handleOpenScroll(
+								e,
+								trail,
+								items.map((e) => e.path)
+							)}
+					>
+						<span class="itemscount">{items?.length ?? 0}</span>
+					</div>
 				</div>
 			</div>
-		</div>
-
+			<div
+				slot="placeholder"
+				class="tree-item-self nav-folder-title tag-folder-title"
+				class:is-active={isActive}
+			>
+				<div
+					class="tree-item-icon collapse-icon nav-folder-collapse-indicator is-collapsed"
+				/>
+				<div class="tree-item-inner nav-folder-title-content lsl-f">
+					<div class="tagfolder-titletagname">...</div>
+				</div>
+			</div>
+		</OnDemandRender>
 		<!-- Tags and leftover items -->
-		<div class="tree-item-children nav-folder-children">
-			{#if !collapsed}
+		{#if !collapsed}
+			<div class="tree-item-children nav-folder-children">
 				{#each children as [f, tagName, tagNameDisp, subitems]}
 					<svelte:self
 						items={subitems}
@@ -573,7 +592,7 @@
 						{hoverPreview}
 					/>
 				{/each}
-			{/if}
-		</div>
+			</div>
+		{/if}
 	</div>
 {/if}
