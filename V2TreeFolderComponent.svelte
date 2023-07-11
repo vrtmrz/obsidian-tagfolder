@@ -29,7 +29,6 @@
 		v2expandedTags,
 	} from "./store";
 	import TreeItemItemComponent from "V2TreeItemComponent.svelte";
-	import OnDemandRender from "OnDemandRender.svelte";
 
 	// -- Props --
 
@@ -435,12 +434,7 @@
 		.map(
 			(e) =>
 				`<span class="tagfolder-tag tag-tag">${e
-					.map(
-						(ee) =>
-							`<span class="tagfolder-tag tag-nested-tag">${escapeStringToHTML(
-								ee
-							)}</span>`
-					)
+					.map((ee) => `<span>${escapeStringToHTML(ee)}</span>`)
 					.join("")}</span>`
 		)
 		.join("");
@@ -506,25 +500,16 @@
 		{/each}
 	{/if}
 	{#each leftOverItems as item}
-		<OnDemandRender
-			wrapperClass="tree-item nav-file"
-			placeHolderClass="tf-file-ph"
-		>
-			<TreeItemItemComponent
-				{item}
-				{openFile}
-				trail={[...trail, ...suppressLevels]}
-				{showMenu}
-				{hoverPreview}
-			/>
-		</OnDemandRender>
+		<TreeItemItemComponent
+			{item}
+			{openFile}
+			trail={[...trail, ...suppressLevels]}
+			{showMenu}
+			{hoverPreview}
+		/>
 	{/each}
 {:else}
-	<OnDemandRender
-		wrapperClass={`tree-item nav-folder ${collapsed ? "is-collapsed" : ""}`}
-		placeHolderClass="tf-folder-ph"
-		force={!collapsed}
-	>
+	<div class={`tree-item nav-folder${collapsed ? " is-collapsed" : ""}`}>
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
 		<div
 			class="tree-item-self is-clickable mod-collapsible nav-folder-title tag-folder-title"
@@ -580,20 +565,15 @@
 					/>
 				{/each}
 				{#each leftOverItems as item}
-					<OnDemandRender
-						wrapperClass="tree-item nav-file"
-						placeHolderClass="tf-folder-ph"
-					>
-						<TreeItemItemComponent
-							{item}
-							{openFile}
-							trail={[...trail, ...suppressLevels]}
-							{showMenu}
-							{hoverPreview}
-						/>
-					</OnDemandRender>
+					<TreeItemItemComponent
+						{item}
+						{openFile}
+						trail={[...trail, ...suppressLevels]}
+						{showMenu}
+						{hoverPreview}
+					/>
 				{/each}
 			{/if}
 		</div>
-	</OnDemandRender>
+	</div>
 {/if}

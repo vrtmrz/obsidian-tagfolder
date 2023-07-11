@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { allViewItems, searchString, tagFolderSetting } from "./store";
+	import { allViewItems, performHide, searchString, tagFolderSetting } from "./store";
 	import { type ViewItem, type TagFolderSettings } from "./types";
 	import V2TreeFolderComponent from "./V2TreeFolderComponent.svelte";
 	import { onMount } from "svelte";
@@ -97,6 +97,12 @@
 		}
 		setIcon(iconDivEl, "lucide-arrow-left-right");
 		switchIcon = iconDivEl.innerHTML;
+		const int = setInterval(()=>{
+			performHide.set(Date.now());
+		},5000);
+		return ()=>{
+			clearInterval(int);
+		}
 	});
 	$: headerTitle = title == "" ? `Tags: ${vaultName}` : `Items: ${title}`;
 	let viewItems = [] as ViewItem[];

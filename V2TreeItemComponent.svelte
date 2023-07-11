@@ -1,4 +1,6 @@
 <script lang="ts">
+	import OnDemandRender from "OnDemandRender.svelte";
+
 	import type { TagFolderSettings, ViewItem } from "types";
 	import {
 		renderSpecialTag,
@@ -60,20 +62,32 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<div
-	class="tree-item-self is-clickable nav-file-title"
-	class:is-active={isActive}
-	on:click={(evt) => openFile(item.path, evt.metaKey || evt.ctrlKey)}
-	on:mouseover={(e) => {
-		handleMouseover(e, item.path);
-	}}
-	on:focus={() => {
-		/* ignore aria complaint */
-	}}
-	on:contextmenu={(evt) => showMenu(evt, trail, undefined, [item])}
->
-	<div class="tree-item-inner nav-file-title-content lsl-f">
-		{item.displayName}
-	</div>
-	{@html extraTagsHtml}
+<div class="tree-item nav-file">
+	<OnDemandRender>
+		<div
+			class="tree-item-self is-clickable nav-file-title"
+			class:is-active={isActive}
+			on:click={(evt) => openFile(item.path, evt.metaKey || evt.ctrlKey)}
+			on:mouseover={(e) => {
+				handleMouseover(e, item.path);
+			}}
+			on:focus={() => {
+				/* ignore aria complaint */
+			}}
+			on:contextmenu={(evt) => showMenu(evt, trail, undefined, [item])}
+		>
+			<div class="tree-item-inner nav-file-title-content lsl-f">
+				{item.displayName}
+			</div>
+			{@html extraTagsHtml}
+		</div>
+		<div slot="placeholder">
+			<div class="tree-item-self is-clickable nav-file-title">
+				<div class="tree-item-inner nav-file-title-content lsl-f">
+					...
+				</div>
+				<div class="tf-taglist">-</div>
+			</div>
+		</div>
+	</OnDemandRender>
 </div>
