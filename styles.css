@@ -80,6 +80,10 @@
 	flex-grow: 1;
 }
 
+.lsl-f:empty::before {
+	content: "...";
+}
+
 .tagfolder-titletagname {
 	flex-grow: 1;
 	text-overflow: ellipsis;
@@ -104,4 +108,3 @@
 .tag-folder-title {
 	max-width: 100%;
 }
-

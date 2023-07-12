@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { allViewItems, performHide, searchString, tagFolderSetting } from "./store";
+	import {
+		allViewItems,
+		performHide,
+		searchString,
+		tagFolderSetting,
+	} from "./store";
 	import { type ViewItem, type TagFolderSettings } from "./types";
 	import V2TreeFolderComponent from "./V2TreeFolderComponent.svelte";
 	import { onMount } from "svelte";
@@ -82,7 +87,7 @@
 	let searchIcon = "";
 	let switchIcon = "";
 
-	onMount(async () => {
+	onMount(() => {
 		setIcon(iconDivEl, "right-triangle");
 		folderIcon = `${iconDivEl.innerHTML}`;
 		setIcon(iconDivEl, "lucide-edit");
@@ -97,12 +102,12 @@
 		}
 		setIcon(iconDivEl, "lucide-arrow-left-right");
 		switchIcon = iconDivEl.innerHTML;
-		const int = setInterval(()=>{
+		const int = setInterval(() => {
 			performHide.set(Date.now());
-		},5000);
-		return ()=>{
+		}, 5000);
+		return () => {
 			clearInterval(int);
-		}
+		};
 	});
 	$: headerTitle = title == "" ? `Tags: ${vaultName}` : `Items: ${title}`;
 	let viewItems = [] as ViewItem[];
@@ -154,6 +159,7 @@
 <div class="nav-header">
 	<div class="nav-buttons-container tagfolder-buttons-container">
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
+		<!-- svelte-ignore a11y-no-static-element-interactions -->
 		<div
 			class="clickable-icon nav-action-button"
 			aria-label="New note"
@@ -163,6 +169,7 @@
 		</div>
 		{#if isMainTree}
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
 			<div
 				class="clickable-icon nav-action-button"
 				aria-label="Change sort order"
@@ -171,6 +178,7 @@
 				{@html upAndDownArrowsIcon}
 			</div>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
 			<div
 				class="clickable-icon nav-action-button"
 				aria-label="Expand limit"
@@ -179,6 +187,7 @@
 				{@html stackedLevels}
 			</div>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
 			<div
 				class={"clickable-icon nav-action-button" +
 					(showSearch ? " is-active" : "")}
@@ -190,6 +199,7 @@
 		{/if}
 		{#if isViewSwitchable}
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
 			<div
 				class="clickable-icon nav-action-button"
 				aria-label="Switch List/Tree"
@@ -209,6 +219,7 @@
 			bind:value={search}
 		/>
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
+		<!-- svelte-ignore a11y-no-static-element-interactions -->
 		<div
 			class="search-input-clear-button"
 			aria-label="Clear search"

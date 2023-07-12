@@ -24,10 +24,15 @@ export function trimSlash(src: string, keepStart = false, keepEnd = false) {
 	if (st == 0 && end == undefined) return src;
 	return src.slice(st, end);
 }
-
+export function trimPrefix(source: string, prefix: string) {
+	if (source.startsWith(prefix)) {
+		return source.substring(prefix.length);
+	}
+	return source;
+}
 
 export function ancestorToTags(ancestors: string[]): string[] {
-	return ancestors.reduce(
+	return [...ancestors].reduce(
 		(p, i) =>
 			i[0] != "/"
 				? [...p, i]
@@ -337,9 +342,7 @@ export function joinPartialPath(path: string[]) {
 	return path.reduceRight((p, c) => (c.endsWith("/") && p.length > 0) ? [c + p[0], ...p.slice(1)] : [c, ...p], [] as string[]);
 }
 
-export function pathMatch(haystack: string, needle: string) {
-	const haystackLC = haystack.toLocaleLowerCase();
-	const needleLC = needle.toLocaleLowerCase();
+export function pathMatch(haystackLC: string, needleLC: string) {
 	if (needleLC.endsWith("/")) {
 		if ((haystackLC + "/").indexOf(needleLC) === 0) return true;
 	}

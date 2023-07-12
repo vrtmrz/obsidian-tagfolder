@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { performHide } from "store";
 	import { getContext, onMount } from "svelte";
-
-	let isVisible = false;
+	export let cssClass = "";
+	export let isVisible = false;
 	let hidingScheduled = false;
 	let observer: IntersectionObserver;
 
@@ -26,7 +26,10 @@
 	function startObserving() {
 		observer = new IntersectionObserver((ex) => {
 			if (ex.some((e) => e.isIntersecting)) {
-				setIsVisible(true);
+				// Just a trick
+				setTimeout(() => {
+					setIsVisible(true);
+				}, 10);
 			} else {
 				setIsVisible(false);
 			}
@@ -67,10 +70,6 @@
 	}
 </script>
 
-<div bind:this={el}>
-	{#if isVisible}
-		<slot />
-	{:else}
-		<slot name="placeholder"><div>...</div></slot>
-	{/if}
+<div class={cssClass} bind:this={el}>
+	<slot {isVisible} />
 </div>

@@ -20,6 +20,8 @@
 		V2FI_IDX_CHILDREN,
 		V2FI_IDX_TAGDISP,
 		V2FI_IDX_TAGNAME,
+		trimPrefix,
+		trimSlash,
 	} from "./util";
 	import {
 		currentFile,
@@ -120,22 +122,36 @@
 		);
 		e.preventDefault();
 	}
-	function toggleFolder(evt: MouseEvent) {
-		evt.preventDefault();
-		evt.stopPropagation();
-
-		// Do not toggle this tree directly.
-		if (_setting.useMultiPaneList) {
-			selectedTags.set(trail);
+	function shouldResponsibleFor(evt: MouseEvent) {
+		if (
+			evt.target instanceof Element &&
+			evt.target.matchParent(
+				".is-clickable.mod-collapsible.nav-folder-title"
+			)
+		) {
+			return true;
 		}
-		v2expandedTags.update((evt) => {
-			if (evt.has(trailKey)) {
-				evt.delete(trailKey);
-			} else {
-				evt.add(trailKey);
+		return false;
+	}
+
+	function toggleFolder(evt: MouseEvent) {
+		if (shouldResponsibleFor(evt)) {
+			evt.preventDefault();
+			evt.stopPropagation();
+
+			// Do not toggle this tree directly.
+			if (_setting.useMultiPaneList) {
+				selectedTags.set(trail);
 			}
-			return evt;
-		});
+			v2expandedTags.update((evt) => {
+				if (evt.has(trailKey)) {
+					evt.delete(trailKey);
+				} else {
+					evt.add(trailKey);
+				}
+				return evt;
+			});
+		}
 	}
 
 	// All tags that this node have.
@@ -209,6 +225,22 @@
 					)
 				);
 
+				// Remove itself
+				existTags = existTags.filter(
+					(tag) =>
+						tag.toLocaleLowerCase() !=
+							thisName.toLocaleLowerCase() &&
+						tag.toLocaleLowerCase() != tagName.toLocaleLowerCase()
+				);
+				existTags = existTags.filter(
+					(tag) =>
+						!tag
+							.toLocaleLowerCase()
+							.endsWith(
+								"/" + trimSlash(thisName).toLocaleLowerCase()
+							)
+				);
+
 				if (isInDedicatedTag) {
 					// Dedicated tag does not accept other items on the intermediate places.
 
@@ -272,10 +304,17 @@
 							return piece;
 						})
 					);
-					existTagsFiltered1 = tagsOnNextLevel;
+					existTagsFiltered1 = tagsOnNextLevel.filter((tag) =>
+						// Remove tags which in trail again.
+						trail.every(
+							(trail) =>
+								trimTrailingSlash(tag.toLocaleLowerCase()) !==
+								trimTrailingSlash(trail.toLocaleLowerCase())
+						)
+					);
 				}
 
-				// For using as filter, if in dedicated level, previous level should be included in tags list.
+				// To use as a filter, the previous level should be included in the tags list if in the dedicated level.
 				if (isInDedicatedTag) {
 					existTagsFiltered1 = existTagsFiltered1.map(
 						(e) => previousTrail + e
@@ -291,13 +330,29 @@
 						? e + "/"
 						: e
 				);
-
-				// I forgot why doing uniqueCaseInsensitive twice, it will be investigated.
 				const existTagsFiltered3 =
 					uniqueCaseIntensive(existTagsFiltered2);
-				tags = uniqueCaseIntensive(
-					removeIntermediatePath(existTagsFiltered3)
-				);
+				if (previousTrail.endsWith("/")) {
+					const existTagsFiltered4 = [] as string[];
+					for (const tag of existTagsFiltered3) {
+						if (
+							!existTagsFiltered3
+								.map((e) => e.toLocaleLowerCase())
+								.contains(
+									(previousTrail + tag).toLocaleLowerCase()
+								)
+						) {
+							existTagsFiltered4.push(tag);
+						}
+					}
+					tags = uniqueCaseIntensive(
+						removeIntermediatePath(existTagsFiltered4)
+					);
+				} else {
+					tags = uniqueCaseIntensive(
+						removeIntermediatePath(existTagsFiltered3)
+					);
+				}
 			}
 		}
 	}
@@ -327,20 +382,27 @@
 				_setting.reduceNestedParent
 			);
 		} else {
+			const previousTrailLC = previousTrail.toLocaleLowerCase();
 			let wChildren = tags
-				.map(
-					(tag) =>
-						[
-							tag,
-							...parseTagName(tag, _tagInfo),
-							items.filter((item) =>
-								item.tags.some((itemTag) =>
-									pathMatch(itemTag, tag)
-								)
-							),
-						] as V2FolderItem
-				)
-				.filter((child) => child[3].length != 0);
+				.map((tag) => {
+					const tagLC = tag.toLocaleLowerCase();
+					const tagNestedLC = trimPrefix(tagLC, previousTrailLC);
+					return [
+						tag,
+						...parseTagName(tag, _tagInfo),
+						items.filter((item) =>
+							item.tags.some((itemTag) => {
+								const itemTagLC = itemTag.toLocaleLowerCase();
+								return (
+									pathMatch(itemTagLC, tagLC) || // Exact matched item
+									// `b` should be contained in `a/b` under `a/`, if the level is mixed level.
+									pathMatch(itemTagLC, tagNestedLC)
+								);
+							})
+						),
+					] as V2FolderItem;
+				})
+				.filter((child) => child[V2FI_IDX_CHILDREN].length != 0);
 
 			wChildren = wChildren.sort(sortFunc);
 			// -- Check redundant combination if configured.
@@ -431,14 +493,18 @@
 		}
 	}
 	// To improve performance, make HTML in advance.
-	$: tagsDispHtml = tagsDisp
-		.map(
-			(e) =>
-				`<span class="tagfolder-tag tag-tag">${e
-					.map((ee) => `<span>${escapeStringToHTML(ee)}</span>`)
-					.join("")}</span>`
-		)
-		.join("");
+	$: tagsDispHtml = isFolderVisible
+		? tagsDisp
+				.map(
+					(e) =>
+						`<span class="tagfolder-tag tag-tag">${e
+							.map(
+								(ee) => `<span>${escapeStringToHTML(ee)}</span>`
+							)
+							.join("")}</span>`
+				)
+				.join("")
+		: "";
 
 	// -- Filter the items by already shown ones to make the list that is shown in this level directly.
 	$: {
@@ -478,6 +544,7 @@
 			}
 		}
 	}
+	let isFolderVisible = false;
 </script>
 
 {#if isRoot || !isMainTree}
@@ -510,56 +577,52 @@
 		/>
 	{/each}
 {:else}
-	<div class={`tree-item nav-folder${collapsed ? " is-collapsed" : ""}`}>
-		<OnDemandRender>
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
+	<!-- svelte-ignore a11y-no-static-element-interactions -->
+	<div
+		class={`tree-item nav-folder${collapsed ? " is-collapsed" : ""}`}
+		on:click|stopPropagation={toggleFolder}
+		on:contextmenu|stopPropagation={(evt) => {
+			if (shouldResponsibleFor(evt))
+				showMenu(evt, [...trail, ...suppressLevels], tagName, items);
+		}}
+	>
+		<OnDemandRender
+			cssClass={`tree-item-self is-clickable mod-collapsible nav-folder-title tag-folder-title${
+				isActive ? " is-active" : ""
+			}`}
+			bind:isVisible={isFolderVisible}
+		>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
 			<div
-				class="tree-item-self is-clickable mod-collapsible nav-folder-title tag-folder-title"
-				class:is-active={isActive}
+				class="tree-item-icon collapse-icon nav-folder-collapse-indicator"
+				class:is-collapsed={collapsed}
 				on:click={toggleFolder}
-				on:contextmenu={(evt) => {
-					showMenu(
-						evt,
-						[...trail, ...suppressLevels],
-						tagName,
-						items
-					);
-				}}
 			>
-				<div
-					class="tree-item-icon collapse-icon nav-folder-collapse-indicator"
-					class:is-collapsed={collapsed}
-					on:click={toggleFolder}
-				>
+				{#if isFolderVisible}
 					{@html folderIcon}
-				</div>
-				<div class="tree-item-inner nav-folder-title-content lsl-f">
+				{:else}
+					<svg class="svg-icon" />
+				{/if}
+			</div>
+			<div class="tree-item-inner nav-folder-title-content lsl-f">
+				{#if isFolderVisible}
 					<div class="tagfolder-titletagname">
 						{@html tagsDispHtml}
 					</div>
-					<div
-						class="tagfolder-quantity itemscount"
-						on:click={(e) =>
-							handleOpenScroll(
-								e,
-								trail,
-								items.map((e) => e.path)
-							)}
-					>
-						<span class="itemscount">{items?.length ?? 0}</span>
-					</div>
-				</div>
-			</div>
-			<div
-				slot="placeholder"
-				class="tree-item-self nav-folder-title tag-folder-title"
-				class:is-active={isActive}
-			>
-				<div
-					class="tree-item-icon collapse-icon nav-folder-collapse-indicator is-collapsed"
-				/>
-				<div class="tree-item-inner nav-folder-title-content lsl-f">
+				{:else}
 					<div class="tagfolder-titletagname">...</div>
+				{/if}
+				<div
+					class="tagfolder-quantity itemscount"
+					on:click={(e) =>
+						handleOpenScroll(
+							e,
+							trail,
+							items.map((e) => e.path)
+						)}
+				>
+					<span class="itemscount">{items?.length ?? 0}</span>
 				</div>
 			</div>
 		</OnDemandRender>
