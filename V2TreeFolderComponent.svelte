@@ -586,7 +586,13 @@
 			return;
 		}
 		try {
-			batchedLeftOverItems = splitArrayToBatch(items);
+			const allOfBatch = splitArrayToBatch(items);
+			if (
+				JSON.stringify(leftOverItemsDisp) == JSON.stringify(allOfBatch)
+			) {
+				return;
+			}
+			batchedLeftOverItems = allOfBatch;
 			queueLeftOverItems = [];
 			leftOverItemsDisp = [];
 			for (const batch of batchedLeftOverItems) {
@@ -616,7 +622,11 @@
 			return;
 		}
 		try {
-			batchedChildren = splitArrayToBatch(items);
+			const allOfBatch = splitArrayToBatch(items);
+			if (JSON.stringify(childrenDisp) == JSON.stringify(allOfBatch)) {
+				return;
+			}
+			batchedChildren = allOfBatch;
 			childrenDisp = [];
 			for (const batch of batchedChildren) {
 				childrenDisp = [...childrenDisp, batch];
