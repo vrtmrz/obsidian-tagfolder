@@ -22,6 +22,7 @@
 		V2FI_IDX_TAGNAME,
 		trimPrefix,
 		trimSlash,
+		doEvents,
 	} from "./util";
 	import {
 		currentFile,
@@ -32,6 +33,7 @@
 	} from "./store";
 	import TreeItemItemComponent from "V2TreeItemComponent.svelte";
 	import OnDemandRender from "OnDemandRender.svelte";
+	import { tick } from "svelte";
 
 	// -- Props --
 
@@ -167,10 +169,14 @@
 
 	// Sub-folders
 	let children = [] as V2FolderItem[];
+	// Sub-folders for display (Used for phased UI update)
+	let childrenDisp = [] as V2FolderItem[][];
 
 	// Items on this level; which had not been contained in sub-trees.
 	// **Be careful**: Please keep the order of this. This should be also already sorted.
 	let leftOverItems = [] as ViewItem[];
+	// and for display
+	let leftOverItemsDisp = [] as ViewItem[][];
 
 	// Current tag name for display.
 	let tagsDisp = [] as string[][];
@@ -499,7 +505,10 @@
 					(e) =>
 						`<span class="tagfolder-tag tag-tag">${e
 							.map(
-								(ee) => `<span>${escapeStringToHTML(ee)}</span>`
+								(ee) =>
+									`<span class="tf-tag-each">${escapeStringToHTML(
+										ee
+									)}</span>`
 							)
 							.join("")}</span>`
 				)
@@ -545,36 +554,127 @@
 		}
 	}
 	let isFolderVisible = false;
+
+	// -- Phased UI update --
+
+	// For preventing UI freezing, split items into batches and apply them at intervals.
+	const batchSize = 20;
+	function splitArrayToBatch<T>(items: T[]): T[][] {
+		const ret = [] as T[][];
+		if (items && items.length > 0) {
+			const applyItems = [...items];
+			do {
+				const batch = applyItems.splice(0, batchSize);
+				if (batch.length == 0) {
+					break;
+				}
+				ret.push(batch);
+				if (batch.length < batchSize) {
+					break;
+				}
+			} while (applyItems.length > 0);
+		}
+		return ret;
+	}
+
+	let queueLeftOverItems = [] as ViewItem[];
+	let batchedLeftOverItems = [] as ViewItem[][];
+	async function applyLeftOverItems(items: ViewItem[]) {
+		if (batchedLeftOverItems.length != 0) {
+			// Processing, queue for next
+			queueLeftOverItems = items;
+			return;
+		}
+		try {
+			batchedLeftOverItems = splitArrayToBatch(items);
+			queueLeftOverItems = [];
+			leftOverItemsDisp = [];
+			for (const batch of batchedLeftOverItems) {
+				leftOverItemsDisp = [...leftOverItemsDisp, batch];
+				if (batch.length == batchSize) {
+					await doEvents();
+					await tick();
+				}
+				if (queueLeftOverItems.length > 0) {
+					// If enqueued while processing, stop all process and leave it to next.
+					const p = queueLeftOverItems;
+					queueLeftOverItems = [];
+					batchedLeftOverItems = [];
+					return applyLeftOverItems(p);
+				}
+			}
+		} finally {
+			batchedLeftOverItems = [];
+		}
+	}
+	let queuedChildrenDisp = [] as V2FolderItem[];
+	let batchedChildren = [] as V2FolderItem[][];
+	async function applyChildren(items: V2FolderItem[]) {
+		if (batchedChildren.length != 0) {
+			// Processing, queue for next
+			queuedChildrenDisp = items;
+			return;
+		}
+		try {
+			batchedChildren = splitArrayToBatch(items);
+			childrenDisp = [];
+			for (const batch of batchedChildren) {
+				childrenDisp = [...childrenDisp, batch];
+				if (batch.length == batchSize) {
+					await doEvents();
+					await tick();
+				}
+				if (queuedChildrenDisp.length > 0) {
+					const p = queuedChildrenDisp;
+					queuedChildrenDisp = [];
+					batchedChildren = [];
+					return applyChildren(p);
+				}
+			}
+		} finally {
+			batchedChildren = [];
+		}
+	}
+	$: {
+		applyLeftOverItems(leftOverItems);
+	}
+	$: {
+		applyChildren(children);
+	}
 </script>
 
 {#if isRoot || !isMainTree}
 	{#if isRoot}
-		{#each children as [f, tagName, tagNameDisp, subitems]}
-			<svelte:self
-				items={subitems}
-				thisName={f}
-				trail={[f]}
-				{folderIcon}
-				{openFile}
-				{showMenu}
-				isRoot={false}
-				{isMainTree}
-				{openScrollView}
-				{hoverPreview}
-				{tagName}
-				{tagNameDisp}
-				depth={depth + 1}
-			/>
+		{#each childrenDisp as items}
+			{#each items as [f, tagName, tagNameDisp, subitems]}
+				<svelte:self
+					items={subitems}
+					thisName={f}
+					trail={[f]}
+					{folderIcon}
+					{openFile}
+					{showMenu}
+					isRoot={false}
+					{isMainTree}
+					{openScrollView}
+					{hoverPreview}
+					{tagName}
+					{tagNameDisp}
+					depth={depth + 1}
+				/>
+			{/each}
 		{/each}
 	{/if}
-	{#each leftOverItems as item}
-		<TreeItemItemComponent
-			{item}
-			{openFile}
-			trail={[...trail, ...suppressLevels]}
-			{showMenu}
-			{hoverPreview}
-		/>
+	{#each leftOverItemsDisp as items}
+		{#each items as item}
+			<TreeItemItemComponent
+				{item}
+				{openFile}
+				trail={[...trail, ...suppressLevels]}
+				{showMenu}
+				{hoverPreview}
+			/>
+		{/each}
 	{/each}
 {:else}
 	<!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -629,31 +729,35 @@
 		<!-- Tags and leftover items -->
 		{#if !collapsed}
 			<div class="tree-item-children nav-folder-children">
-				{#each children as [f, tagName, tagNameDisp, subitems]}
-					<svelte:self
-						items={subitems}
-						thisName={f}
-						trail={[...trail, ...suppressLevels, f]}
-						{folderIcon}
-						{openFile}
-						isRoot={false}
-						{showMenu}
-						{isMainTree}
-						{openScrollView}
-						{hoverPreview}
-						{tagName}
-						{tagNameDisp}
-						depth={isInDedicatedTag ? depth : depth + 1}
-					/>
+				{#each childrenDisp as items}
+					{#each items as [f, tagName, tagNameDisp, subitems]}
+						<svelte:self
+							items={subitems}
+							thisName={f}
+							trail={[...trail, ...suppressLevels, f]}
+							{folderIcon}
+							{openFile}
+							isRoot={false}
+							{showMenu}
+							{isMainTree}
+							{openScrollView}
+							{hoverPreview}
+							{tagName}
+							{tagNameDisp}
+							depth={isInDedicatedTag ? depth : depth + 1}
+						/>
+					{/each}
 				{/each}
-				{#each leftOverItems as item}
-					<TreeItemItemComponent
-						{item}
-						{openFile}
-						trail={[...trail, ...suppressLevels]}
-						{showMenu}
-						{hoverPreview}
-					/>
+				{#each leftOverItemsDisp as items}
+					{#each items as item}
+						<TreeItemItemComponent
+							{item}
+							{openFile}
+							trail={[...trail, ...suppressLevels]}
+							{showMenu}
+							{hoverPreview}
+						/>
+					{/each}
 				{/each}
 			</div>
 		{/if}

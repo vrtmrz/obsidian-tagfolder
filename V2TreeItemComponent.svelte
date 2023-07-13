@@ -60,7 +60,7 @@
 			extraTagsHtml = `${tagsLeft
 				.map(
 					(e) =>
-						`<span>${escapeStringToHTML(
+						`<span class="tf-tag">${escapeStringToHTML(
 							renderSpecialTag(e)
 						)}</span>`
 				)
