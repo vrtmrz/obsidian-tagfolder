@@ -38,6 +38,7 @@ export interface TagFolderSettings {
 	"CTIME_DESC" |
 	"FULLPATH_ASC" |
 	"FULLPATH_DESC";
+	sortExactFirst: boolean;
 	sortTypeTag: "NAME_ASC" | "NAME_DESC" | "ITEMS_ASC" | "ITEMS_DESC";
 	expandLimit: number;
 	disableNestedTags: boolean;
@@ -66,6 +67,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	ignoreTags: "",
 	hideOnRootTags: "",
 	sortType: "DISPNAME_ASC",
+	sortExactFirst: false,
 	sortTypeTag: "NAME_ASC",
 	expandLimit: 0,
 	disableNestedTags: false,

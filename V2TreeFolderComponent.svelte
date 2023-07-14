@@ -43,6 +43,7 @@
 	// All contained items.
 	// **Be careful**: Please keep the order of this. This should be already sorted.
 	export let items = [] as ViewItem[];
+	let _items = [] as ViewItem[];
 
 	// Name of this tag, we can use it to sort or something.
 	export let tagName = "";
@@ -184,10 +185,17 @@
 	// Just for convenience.
 	$: trailLower = trail.map((e) => e.toLocaleLowerCase());
 
+	// Change detection
+	$: {
+		if (JSON.stringify(items) !== JSON.stringify(_items)) {
+			_items = items;
+		}
+	}
+
 	// Updating structure
 	$: {
 		isInDedicatedTag = false;
-		if (items) {
+		if (_items) {
 			tags = [];
 			previousTrail = "";
 			if (trail.length >= 1 && trail[trail.length - 1].endsWith("/")) {
@@ -204,7 +212,7 @@
 				isSuppressibleLevel = false;
 
 				const tagsAll = uniqueCaseIntensive(
-					items.flatMap((e) => [...e.tags])
+					_items.flatMap((e) => [...e.tags])
 				);
 
 				const lastTrailTagLC =
@@ -266,13 +274,13 @@
 				let existTagsFiltered1 = [] as string[];
 				if (!_setting.doNotSimplifyTags) {
 					// If the note has only one item. it can be suppressible.
-					if (items.length == 1) {
+					if (_items.length == 1) {
 						existTagsFiltered1 = existTags;
 						isSuppressibleLevel = true;
 					} else {
 						// All tags under this note are the same. it can be suppressible
 						const allChildTags = uniqueCaseIntensive(
-							items.map((e) => e.tags.sort().join("**"))
+							_items.map((e) => e.tags.sort().join("**"))
 						);
 						if (allChildTags.length == 1) {
 							isSuppressibleLevel = true;
@@ -396,7 +404,7 @@
 					return [
 						tag,
 						...parseTagName(tag, _tagInfo),
-						items.filter((item) =>
+						_items.filter((item) =>
 							item.tags.some((itemTag) => {
 								const itemTagLC = itemTag.toLocaleLowerCase();
 								return (
@@ -466,7 +474,8 @@
 
 	// -- Displaying
 
-	$: isActive = items && items.some((e) => e.path == _currentActiveFilePath);
+	$: isActive =
+		_items && _items.some((e) => e.path == _currentActiveFilePath);
 	$: {
 		// I wonder actually this is meaningful; tagName and tagNameDisp should be shown
 		if (tagName == "" && tagNameDisp.length == 0) {
@@ -523,7 +532,7 @@
 			if (isRoot && isMainTree) {
 				// The root
 				if (_setting.expandUntaggedToRoot) {
-					leftOverItems = items.filter((e) =>
+					leftOverItems = _items.filter((e) =>
 						e.tags.contains("_untagged")
 					);
 				} else {
@@ -531,16 +540,16 @@
 				}
 			} else if (isRoot && !isMainTree) {
 				// Separated List;
-				leftOverItems = items;
+				leftOverItems = _items;
 			} else {
 				if (_setting.hideItems == "NONE") {
-					leftOverItems = items;
+					leftOverItems = _items;
 				} else if (
 					(_setting.hideItems == "DEDICATED_INTERMIDIATES" &&
 						isInDedicatedTag) ||
 					_setting.hideItems == "ALL_EXCEPT_BOTTOM"
 				) {
-					leftOverItems = items.filter(
+					leftOverItems = _items.filter(
 						(e) =>
 							!children
 								.map((e) => e[V2FI_IDX_CHILDREN])
@@ -548,9 +557,29 @@
 								.find((ee) => e.path == ee.path)
 					);
 				} else {
-					leftOverItems = items;
+					leftOverItems = _items;
 				}
 			}
+		}
+		if (_setting.sortExactFirst) {
+			// Now in PoC. Perhaps heavy but looks working.
+			const exactHereItems = _items.filter(
+				(e) =>
+					!children
+						.map((e) => e[V2FI_IDX_CHILDREN])
+						.flat()
+						.find((ee) => e.path == ee.path)
+			);
+			leftOverItems = [...leftOverItems].sort((a, b) => {
+				const aIsInChildren = exactHereItems.some(
+					(e) => e.path == a.path
+				);
+				const bIsInChildren = exactHereItems.some(
+					(e) => e.path == b.path
+				);
+
+				return (aIsInChildren ? -1 : 0) + (bIsInChildren ? 1 : 0);
+			});
 		}
 	}
 	let isFolderVisible = false;
@@ -585,6 +614,13 @@
 			queueLeftOverItems = items;
 			return;
 		}
+
+		// If once drawn, patching will work fine.
+		if (leftOverItemsDisp.length != 0) {
+			// TODO: If performance issue has occurred, check the ratio of the dirty ones.
+			leftOverItemsDisp = splitArrayToBatch(items);
+			return;
+		}
 		try {
 			const allOfBatch = splitArrayToBatch(items);
 			if (
@@ -615,10 +651,17 @@
 	}
 	let queuedChildrenDisp = [] as V2FolderItem[];
 	let batchedChildren = [] as V2FolderItem[][];
+	// Very similar as though it looks the same, now.
 	async function applyChildren(items: V2FolderItem[]) {
 		if (batchedChildren.length != 0) {
 			// Processing, queue for next
 			queuedChildrenDisp = items;
+			return;
+		}
+		// If once drawn, patching will work fine.
+		if (childrenDisp.length != 0) {
+			// TODO: If performance issue has occurred, check the ratio of the dirty ones.
+			childrenDisp = splitArrayToBatch(items);
 			return;
 		}
 		try {
@@ -694,7 +737,7 @@
 		on:click|stopPropagation={toggleFolder}
 		on:contextmenu|stopPropagation={(evt) => {
 			if (shouldResponsibleFor(evt))
-				showMenu(evt, [...trail, ...suppressLevels], tagName, items);
+				showMenu(evt, [...trail, ...suppressLevels], tagName, _items);
 		}}
 	>
 		<OnDemandRender
@@ -729,10 +772,10 @@
 						handleOpenScroll(
 							e,
 							trail,
-							items.map((e) => e.path)
+							_items.map((e) => e.path)
 						)}
 				>
-					<span class="itemscount">{items?.length ?? 0}</span>
+					<span class="itemscount">{_items?.length ?? 0}</span>
 				</div>
 			</div>
 		</OnDemandRender>

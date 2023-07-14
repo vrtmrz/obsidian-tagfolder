@@ -995,6 +995,17 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.onChange((order) => setOrderMethod(null, order));
 			});
 		new Setting(containerEl)
+			.setName("Prioritize items which are not contained in sub-folder")
+			.setDesc("If this has been enabled, the items which have no more extra tags are first.")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.sortExactFirst)
+					.onChange(async (value) => {
+						this.plugin.settings.sortExactFirst = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
 			.setName("Use title")
 			.setDesc(
 				"Use value in the frontmatter or first level one heading for `NAME`."
