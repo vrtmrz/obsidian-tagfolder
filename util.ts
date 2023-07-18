@@ -151,10 +151,10 @@ export function getTagName(tagName: string, subtreePrefix: string, tagInfo: TagI
 
 	if (tagName in tagInfo && tagInfo[tagName]) {
 		if ("key" in tagInfo[tagName]) {
-			return `${prefix}_-${tagInfo[tagName].key}__${subtreePrefix}_${tagName}`;
+			return `${prefix}_${subtreePrefix}_-${tagInfo[tagName].key}__${tagName}`;
 		}
 	}
-	return `${prefix}_${unpinned}_${subtreePrefix}_${tagName}`
+	return `${prefix}_${subtreePrefix}_${unpinned}_${tagName}`
 }
 
 function llc(str: string) {
@@ -164,9 +164,25 @@ function llc(str: string) {
 /**
  * returns paths without intermediate paths.
  * i.e.) "test", "test/a" and "test/b/c" should be "test/a" and "test/b/c";
+ *       However, "test", "test/a", "test/b/c", "test", should be "test/a", "test/b/c", "test"
  * @param paths array of path
  */
 export function removeIntermediatePath(paths: string[]) {
+	const passed = [] as string[];
+	for (const v of paths) {
+		const last = passed.pop();
+		if (last !== undefined) {
+			if (!v.toLocaleLowerCase().startsWith(last.toLocaleLowerCase())) {
+				// back to the stack
+				passed.push(last);
+			}
+		}
+		passed.push(v);
+	}
+	return passed;
+}
+
+export function removeIntermediatePathOld(paths: string[]) {
 	const out = [...paths];
 	const pathEntries = paths.sort((a, b) => a.length - b.length);
 	const removeList = [] as string[];
@@ -234,8 +250,8 @@ export function selectCompareMethodTags(settings: TagFolderSettings, tagInfo: Ta
 	}
 		;
 	const sortByName = (a: V2FolderItem, b: V2FolderItem) => {
-		const isASubTree = a[V2FI_IDX_TAG].endsWith("/" + a[V2FI_IDX_TAGNAME]);
-		const isBSubTree = b[V2FI_IDX_TAG].endsWith("/" + b[V2FI_IDX_TAGNAME]);
+		const isASubTree = a[V2FI_IDX_TAGDISP][0] == "";
+		const isBSubTree = b[V2FI_IDX_TAGDISP][0] == "";
 		const aName = a[V2FI_IDX_TAGNAME];
 		const bName = b[V2FI_IDX_TAGNAME];
 		const aPrefix = isASubTree ? subTreeChar[invert] : "";
@@ -259,8 +275,8 @@ export function selectCompareMethodTags(settings: TagFolderSettings, tagInfo: Ta
 		default:
 			console.warn("Compare method (tags) corrupted");
 			return (a: V2FolderItem, b: V2FolderItem) => {
-				const isASubTree = a[V2FI_IDX_TAG].endsWith("/" + a[V2FI_IDX_TAGNAME]);
-				const isBSubTree = b[V2FI_IDX_TAG].endsWith("/" + b[V2FI_IDX_TAGNAME]);
+				const isASubTree = a[V2FI_IDX_TAGDISP][0] == "";
+				const isBSubTree = b[V2FI_IDX_TAGDISP][0] == "";
 				const aName = a[V2FI_IDX_TAGNAME];
 				const bName = b[V2FI_IDX_TAGNAME];
 				const aPrefix = isASubTree ? subTreeChar[invert] : "";

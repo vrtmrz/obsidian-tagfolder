@@ -495,14 +495,19 @@ export default class TagFolderPlugin extends Plugin {
 			const w = searchItems.map((searchItem) => {
 				let bx = false;
 				if (allTags.length == 0) return false;
-				for (const search of searchItem) {
+				for (const searchSrc of searchItem) {
+					let search = searchSrc;
+					let func = "contains" as "contains" | "startsWith";
+					if (search.startsWith("#")) {
+						search = search.substring(1);
+						func = "startsWith";
+					}
 					if (search.startsWith("-")) {
 						bx =
 							bx ||
 							allTags.some((tag) =>
 								tag
-									.toLocaleLowerCase()
-									.contains(search.substring(1))
+									.toLocaleLowerCase()[func](search.substring(1))
 							);
 						// if (bx) continue;
 					} else {
@@ -510,7 +515,7 @@ export default class TagFolderPlugin extends Plugin {
 							bx ||
 							allTags.every(
 								(tag) =>
-									!tag.toLocaleLowerCase().contains(search)
+									!tag.toLocaleLowerCase()[func](search)
 							);
 						// if (bx) continue;
 					}

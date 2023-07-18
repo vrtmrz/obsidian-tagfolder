@@ -229,27 +229,19 @@
 	</div>
 {/if}
 <div class="nav-files-container node-insert-event" bind:this={scrollParent}>
-	<div class="tree-item nav-folder mod-root">
-		<div class="tree-item-self nav-folder-title">
-			<div class="tree-item-inner nav-folder-title-content">
-				{headerTitle}
-			</div>
-		</div>
-		<div class="tree-item-children nav-folder-children">
-			<V2TreeFolderComponent
-				items={viewItems}
-				{folderIcon}
-				thisName={""}
-				isRoot={true}
-				{showMenu}
-				{openFile}
-				{isMainTree}
-				{hoverPreview}
-				{openScrollView}
-				depth={1}
-			/>
-		</div>
-	</div>
+	<V2TreeFolderComponent
+		items={viewItems}
+		{folderIcon}
+		thisName={""}
+		isRoot={true}
+		{showMenu}
+		{openFile}
+		{isMainTree}
+		{hoverPreview}
+		{openScrollView}
+		depth={1}
+		{headerTitle}
+	/>
 </div>
 
 <style>

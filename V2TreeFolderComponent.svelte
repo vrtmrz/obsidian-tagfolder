@@ -66,6 +66,9 @@
 	// Icons (Just for layout)
 	export let folderIcon: string = "";
 
+	// The title (Only used at the root)
+	export let headerTitle: string = "";
+
 	// -- Callbacks --
 	export let showMenu: (
 		evt: MouseEvent,
@@ -195,6 +198,7 @@
 	// Updating structure
 	$: {
 		isInDedicatedTag = false;
+		let isMixedDedicatedTag = false;
 		if (_items) {
 			tags = [];
 			previousTrail = "";
@@ -202,6 +206,7 @@
 				// If in the middle of tag.
 				previousTrail = trail[trail.length - 1];
 				isInDedicatedTag = true;
+				isMixedDedicatedTag = true;
 			}
 
 			if (
@@ -255,18 +260,22 @@
 							)
 				);
 
+				let escapedPreviousTrail = previousTrail;
+
 				if (isInDedicatedTag) {
 					// Dedicated tag does not accept other items on the intermediate places.
 
 					existTags = existTags.filter((e) =>
 						(e + "/").startsWith(previousTrail)
 					);
-
-					// Just split for debugging.
-
+				}
+				if (isMixedDedicatedTag) {
+					// Escape slash to grouping tags.
+					escapedPreviousTrail = previousTrail.split("/").join("*");
 					existTags = existTags.map((e) =>
 						(e + "/").startsWith(previousTrail)
-							? e.substring(previousTrail.length)
+							? escapedPreviousTrail +
+							  e.substring(previousTrail.length)
 							: e
 					);
 				}
@@ -318,9 +327,10 @@
 							return piece;
 						})
 					);
+					const trailShortest = removeIntermediatePath(trail);
 					existTagsFiltered1 = tagsOnNextLevel.filter((tag) =>
 						// Remove tags which in trail again.
-						trail.every(
+						trailShortest.every(
 							(trail) =>
 								trimTrailingSlash(tag.toLocaleLowerCase()) !==
 								trimTrailingSlash(trail.toLocaleLowerCase())
@@ -329,9 +339,9 @@
 				}
 
 				// To use as a filter, the previous level should be included in the tags list if in the dedicated level.
-				if (isInDedicatedTag) {
-					existTagsFiltered1 = existTagsFiltered1.map(
-						(e) => previousTrail + e
+				if (isMixedDedicatedTag) {
+					existTagsFiltered1 = existTagsFiltered1.map((e) =>
+						e.replace(escapedPreviousTrail, previousTrail)
 					);
 				}
 
@@ -418,7 +428,6 @@
 				})
 				.filter((child) => child[V2FI_IDX_CHILDREN].length != 0);
 
-			wChildren = wChildren.sort(sortFunc);
 			// -- Check redundant combination if configured.
 			if (_setting.mergeRedundantCombination) {
 				let out = [] as typeof wChildren;
@@ -468,6 +477,7 @@
 					)
 					.filter((child) => child[V2FI_IDX_CHILDREN].length != 0);
 			}
+			wChildren = wChildren.sort(sortFunc);
 			children = wChildren;
 		}
 	}
@@ -529,8 +539,8 @@
 		if (_setting.useMultiPaneList && isMainTree) {
 			leftOverItems = [];
 		} else {
-			if (isRoot && isMainTree) {
-				// The root
+			if (isRoot && isMainTree && !isSuppressibleLevel) {
+				// The root, except not is suppressible.
 				if (_setting.expandUntaggedToRoot) {
 					leftOverItems = _items.filter((e) =>
 						e.tags.contains("_untagged")
@@ -696,54 +706,31 @@
 	}
 </script>
 
-{#if isRoot || !isMainTree}
-	{#if isRoot}
-		{#each childrenDisp as items}
-			{#each items as [f, tagName, tagNameDisp, subitems]}
-				<svelte:self
-					items={subitems}
-					thisName={f}
-					trail={[f]}
-					{folderIcon}
-					{openFile}
-					{showMenu}
-					isRoot={false}
-					{isMainTree}
-					{openScrollView}
-					{hoverPreview}
-					{tagName}
-					{tagNameDisp}
-					depth={depth + 1}
-				/>
-			{/each}
-		{/each}
-	{/if}
-	{#each leftOverItemsDisp as items}
-		{#each items as item}
-			<TreeItemItemComponent
-				{item}
-				{openFile}
-				trail={[...trail, ...suppressLevels]}
-				{showMenu}
-				{hoverPreview}
-			/>
-		{/each}
-	{/each}
-{:else}
-	<!-- svelte-ignore a11y-click-events-have-key-events -->
-	<!-- svelte-ignore a11y-no-static-element-interactions -->
-	<div
-		class={`tree-item nav-folder${collapsed ? " is-collapsed" : ""}`}
-		on:click|stopPropagation={toggleFolder}
-		on:contextmenu|stopPropagation={(evt) => {
-			if (shouldResponsibleFor(evt))
-				showMenu(evt, [...trail, ...suppressLevels], tagName, _items);
-		}}
-	>
+<!-- svelte-ignore a11y-click-events-have-key-events -->
+<!-- svelte-ignore a11y-no-static-element-interactions -->
+<div
+	class={`tree-item nav-folder${collapsed ? " is-collapsed" : ""}${
+		isRoot ? " mod-root" : ""
+	}`}
+	on:click|stopPropagation={toggleFolder}
+	on:contextmenu|stopPropagation={(evt) => {
+		if (shouldResponsibleFor(evt))
+			showMenu(evt, [...trail, ...suppressLevels], tagName, _items);
+	}}
+>
+	{#if isRoot || !isMainTree}
+		{#if isRoot}
+			<div class="tree-item-self nav-folder-title">
+				<div class="tree-item-inner nav-folder-title-content">
+					{headerTitle}
+				</div>
+			</div>
+		{/if}
+	{:else}
 		<OnDemandRender
-			cssClass={`tree-item-self is-clickable mod-collapsible nav-folder-title tag-folder-title${
-				isActive ? " is-active" : ""
-			}`}
+			cssClass={`tree-item-self${
+				!isRoot ? " is-clickable mod-collapsible" : ""
+			} nav-folder-title tag-folder-title${isActive ? " is-active" : ""}`}
 			bind:isVisible={isFolderVisible}
 		>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -779,40 +766,42 @@
 				</div>
 			</div>
 		</OnDemandRender>
-		<!-- Tags and leftover items -->
-		{#if !collapsed}
-			<div class="tree-item-children nav-folder-children">
-				{#each childrenDisp as items}
-					{#each items as [f, tagName, tagNameDisp, subitems]}
-						<svelte:self
-							items={subitems}
-							thisName={f}
-							trail={[...trail, ...suppressLevels, f]}
-							{folderIcon}
-							{openFile}
-							isRoot={false}
-							{showMenu}
-							{isMainTree}
-							{openScrollView}
-							{hoverPreview}
-							{tagName}
-							{tagNameDisp}
-							depth={isInDedicatedTag ? depth : depth + 1}
-						/>
-					{/each}
+	{/if}
+	<!-- Tags and leftover items -->
+	{#if !collapsed}
+		<div class="tree-item-children nav-folder-children">
+			{#each childrenDisp as items}
+				{#each items as [f, tagName, tagNameDisp, subitems]}
+					<svelte:self
+						items={subitems}
+						thisName={f}
+						trail={[...trail, ...suppressLevels, f]}
+						{folderIcon}
+						{openFile}
+						isRoot={false}
+						{showMenu}
+						{isMainTree}
+						{openScrollView}
+						{hoverPreview}
+						{tagName}
+						{tagNameDisp}
+						depth={isInDedicatedTag ? depth : depth + 1}
+					/>
 				{/each}
-				{#each leftOverItemsDisp as items}
-					{#each items as item}
-						<TreeItemItemComponent
-							{item}
-							{openFile}
-							trail={[...trail, ...suppressLevels]}
-							{showMenu}
-							{hoverPreview}
-						/>
-					{/each}
+			{/each}
+			{#each leftOverItemsDisp as items}
+				{#each items as item}
+					<TreeItemItemComponent
+						{item}
+						{openFile}
+						trail={isRoot
+							? [...trail]
+							: [...trail, ...suppressLevels]}
+						{showMenu}
+						{hoverPreview}
+					/>
 				{/each}
-			</div>
-		{/if}
-	</div>
-{/if}
+			{/each}
+		</div>
+	{/if}
+</div>
