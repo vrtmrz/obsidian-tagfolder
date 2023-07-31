@@ -172,14 +172,14 @@ export function removeIntermediatePath(paths: string[]) {
 	for (const v of paths) {
 		const last = passed.pop();
 		if (last !== undefined) {
-			if (!v.toLocaleLowerCase().startsWith(last.toLocaleLowerCase())) {
+			if (!(trimTrailingSlash(v.toLocaleLowerCase()) + "/").startsWith(trimTrailingSlash(last.toLocaleLowerCase()) + "/")) {
 				// back to the stack
 				passed.push(last);
 			}
 		}
 		passed.push(v);
 	}
-	return passed;
+	return passed.reverse();
 }
 
 export function removeIntermediatePathOld(paths: string[]) {

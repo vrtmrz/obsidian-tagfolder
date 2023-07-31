@@ -58,6 +58,7 @@ export interface TagFolderSettings {
 	archiveTags: string;
 	disableNarrowingDown: boolean;
 	expandUntaggedToRoot: boolean;
+	disableDragging: boolean;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -88,6 +89,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	archiveTags: "",
 	disableNarrowingDown: false,
 	expandUntaggedToRoot: false,
+	disableDragging: false,
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";

@@ -23,6 +23,9 @@
 		trimPrefix,
 		trimSlash,
 		doEvents,
+		ancestorToLongestTag,
+		ancestorToTags,
+		isSpecialTag,
 	} from "./util";
 	import {
 		currentFile,
@@ -704,6 +707,52 @@
 	$: {
 		applyChildren(children);
 	}
+	// -- Dragging ---
+	$: draggable = !_setting.disableDragging;
+
+	//@ts-ignore internal API
+	const dm = app.dragManager;
+
+	function dragStartFiles(args: DragEvent) {
+		if (!draggable) return;
+		const files = _items.map((e) =>
+			app.vault.getAbstractFileByPath(e.path)
+		);
+		const param = dm.dragFiles(args, files);
+		if (param) {
+			return dm.onDragStart(args, param);
+		}
+	}
+	function dragStartName(args: DragEvent) {
+		if (!draggable) return;
+		const expandedTagsAll = [
+			...ancestorToLongestTag(
+				ancestorToTags(
+					joinPartialPath(
+						removeIntermediatePath([...trail, ...suppressLevels])
+					)
+				)
+			),
+			,
+		].map((e) => trimTrailingSlash(e));
+		const expandedTags = expandedTagsAll
+			.map((e) =>
+				e
+					.split("/")
+					.filter((ee) => !isSpecialTag(ee))
+					.join("/")
+			)
+			.filter((e) => e != "")
+			.map((e) => "#" + e)
+			.join(" ")
+			.trim();
+		args.dataTransfer.setData("text/plain", expandedTags);
+		args.dataTransfer.setData("Text", expandedTags);
+		(args as any).title = expandedTags;
+		(args as any).draggable = true;
+
+		dm.onDragStart(args, args);
+	}
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -747,7 +796,11 @@
 			</div>
 			<div class="tree-item-inner nav-folder-title-content lsl-f">
 				{#if isFolderVisible}
-					<div class="tagfolder-titletagname">
+					<div
+						class="tagfolder-titletagname"
+						{draggable}
+						on:dragstart={dragStartName}
+					>
 						{@html tagsDispHtml}
 					</div>
 				{:else}
@@ -762,7 +815,12 @@
 							_items.map((e) => e.path)
 						)}
 				>
-					<span class="itemscount">{_items?.length ?? 0}</span>
+					<span
+						class="itemscount"
+						{draggable}
+						on:dragstart={dragStartFiles}
+						>{_items?.length ?? 0}</span
+					>
 				</div>
 			</div>
 		</OnDemandRender>

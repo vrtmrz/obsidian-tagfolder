@@ -67,6 +67,19 @@
 				.join("")}`;
 		}
 	}
+
+	$: draggable = !_setting.disableDragging;
+	//@ts-ignore internal API
+	const dm = app.dragManager;
+
+	function dragStartFile(args: DragEvent) {
+		if (!draggable) return;
+		const file = app.vault.getAbstractFileByPath(item.path);
+		const param = dm.dragFile(args, file);
+		if (param) {
+			return dm.onDragStart(args, param);
+		}
+	}
 </script>
 
 <OnDemandRender
@@ -79,6 +92,9 @@
 	<div
 		class="tree-item-self is-clickable nav-file-title"
 		class:is-active={isActive}
+		{draggable}
+		data-path={item.path}
+		on:dragstart={dragStartFile}
 		on:click={(evt) => openFile(item.path, evt.metaKey || evt.ctrlKey)}
 		on:mouseover={(e) => {
 			handleMouseover(e, item.path);

@@ -1260,7 +1260,17 @@ class TagFolderSettingTab extends PluginSettingTab {
 				text.inputEl.setAttribute("min", "250");
 				return text;
 			});
-
+		new Setting(containerEl)
+			.setName("Disable dragging tags")
+			.setDesc("The `Dragging tags` is using internal APIs. If something happens, please disable this once and try again.")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.disableDragging)
+					.onChange(async (value) => {
+						this.plugin.settings.disableDragging = value;
+						await this.plugin.saveSettings();
+					});
+			});
 		containerEl.createEl("h3", { text: "Utilities" });
 
 		new Setting(containerEl)
