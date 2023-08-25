@@ -275,6 +275,7 @@ export abstract class TagFolderViewBase extends ItemView {
             menu.addItem((item) =>
                 item
                     .setTitle(`Open in new tab`)
+				    .setSection("open")
                     .setIcon("lucide-file-plus")
                     .onClick(async () => {
                         app.workspace.openLinkText(path, path, "tab");
@@ -283,6 +284,7 @@ export abstract class TagFolderViewBase extends ItemView {
             menu.addItem((item) =>
                 item
                     .setTitle(`Open to the right`)
+				    .setSection("open")
                     .setIcon("lucide-separator-vertical")
                     .onClick(async () => {
                         app.workspace.openLinkText(path, path, "split");
