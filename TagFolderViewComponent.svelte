@@ -1,11 +1,16 @@
 <script lang="ts">
 	import {
 		allViewItems,
+		allViewItemsByLink,
 		performHide,
 		searchString,
 		tagFolderSetting,
 	} from "./store";
-	import { type ViewItem, type TagFolderSettings } from "./types";
+	import {
+		type ViewItem,
+		type TagFolderSettings,
+		type TREE_TYPE,
+	} from "./types";
 	import V2TreeFolderComponent from "./V2TreeFolderComponent.svelte";
 	import { onMount } from "svelte";
 	import { setIcon } from "obsidian";
@@ -39,12 +44,19 @@
 
 	export let isViewSwitchable: boolean;
 	export let switchView: () => void;
+	export let viewType: TREE_TYPE = "tags";
 	let isMainTree: boolean;
 
 	let viewItemsSrc = [] as ViewItem[];
-	allViewItems.subscribe((items) => {
-		viewItemsSrc = items;
-	});
+	if (viewType == "tags") {
+		allViewItems.subscribe((items) => {
+			viewItemsSrc = items;
+		});
+	} else if (viewType == "links") {
+		allViewItemsByLink.subscribe((items) => {
+			viewItemsSrc = items;
+		});
+	}
 	let search = "";
 
 	$: {
@@ -109,7 +121,10 @@
 			clearInterval(int);
 		};
 	});
-	$: headerTitle = title == "" ? `Tags: ${vaultName}` : `Items: ${title}`;
+	$: headerTitle =
+		title == ""
+			? `${viewType == "tags" ? "Tags" : "Links"}: ${vaultName}`
+			: `Items: ${title}`;
 	let viewItems = [] as ViewItem[];
 	$: {
 		if (viewItemsSrc) {
@@ -230,6 +245,7 @@
 {/if}
 <div class="nav-files-container node-insert-event" bind:this={scrollParent}>
 	<V2TreeFolderComponent
+		{viewType}
 		items={viewItems}
 		{folderIcon}
 		thisName={""}

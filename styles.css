@@ -24,8 +24,28 @@
 	display: none;
 }
 
-.tagfolder-tag.tag-tag span.tf-tag-each:first-child:not(:empty):before {
+.tagfolder-tag.tag-tag.tf-tag span.tf-tag-each:first-child:not(:empty):before {
 	content: "#";
+	margin-left: 0.3em;
+}
+
+.tagfolder-tag.tag-tag.tf-link span.tf-tag-each:first-child:not(:empty):before {
+	content: "";
+	margin-left: 0.3em;
+}
+
+.tagfolder-tag.tag-tag.tf-link.link-cross span.tf-tag-each:first-child:not(:empty):before {
+	content: "⇔ ";
+	margin-left: 0.3em;
+}
+
+.tagfolder-tag.tag-tag.tf-link.link-forward span.tf-tag-each:first-child:not(:empty):before {
+	content: "⇒ ";
+	margin-left: 0.3em;
+}
+
+.tagfolder-tag.tag-tag.tf-link.link-reverse span.tf-tag-each:first-child:not(:empty):before {
+	content: "⇐ ";
 	margin-left: 0.3em;
 }
 

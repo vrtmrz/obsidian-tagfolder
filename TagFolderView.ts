@@ -1,17 +1,22 @@
-import { WorkspaceLeaf } from "obsidian";
+import { WorkspaceLeaf, type ViewState } from "obsidian";
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
-import { VIEW_TYPE_TAGFOLDER } from "./types";
+import { VIEW_TYPE_TAGFOLDER, type TREE_TYPE, VIEW_TYPE_TAGFOLDER_LINK } from "./types";
 import TagFolderPlugin from "./main";
 import { TagFolderViewBase } from "./TagFolderViewBase";
 
+
+export interface TagFolderViewState extends ViewState {
+	treeViewType: TREE_TYPE
+}
 export class TagFolderView extends TagFolderViewBase {
 	icon: "stacked-levels";
+	treeViewType?: TREE_TYPE;
 
 	getIcon(): string {
 		return "stacked-levels";
 	}
 
-	constructor(leaf: WorkspaceLeaf, plugin: TagFolderPlugin) {
+	constructor(leaf: WorkspaceLeaf, plugin: TagFolderPlugin, viewType: TREE_TYPE) {
 		super(leaf);
 		this.plugin = plugin;
 
@@ -20,18 +25,21 @@ export class TagFolderView extends TagFolderViewBase {
 		this.newNote = this.newNote.bind(this);
 		this.showLevelSelect = this.showLevelSelect.bind(this);
 		this.switchView = this.switchView.bind(this);
+		this.treeViewType = viewType;
+		// this.setState({ viewType: this.viewType, type: this.getViewType() }, {});
 	}
 
 	newNote(evt: MouseEvent) {
 		//@ts-ignore
 		this.app.commands.executeCommandById("file-explorer:new-file");
 	}
+
 	getViewType() {
-		return VIEW_TYPE_TAGFOLDER;
+		return this.treeViewType == "tags" ? VIEW_TYPE_TAGFOLDER : VIEW_TYPE_TAGFOLDER_LINK;
 	}
 
 	getDisplayText() {
-		return "Tag Folder";
+		return this.treeViewType == "tags" ? "Tag Folder" : "Link Folder";
 	}
 
 	async onOpen() {
@@ -49,6 +57,7 @@ export class TagFolderView extends TagFolderViewBase {
 				openScrollView: this.plugin.openScrollView,
 				isViewSwitchable: this.plugin.settings.useMultiPaneList,
 				switchView: this.switchView,
+				viewType: this.treeViewType
 			},
 		});
 	}

@@ -388,3 +388,18 @@ export function parseTagName(thisName: string, _tagInfo: TagInfoDict): [string, 
 
 	return [tagName, tagNameDisp]
 }
+
+export function parseAllReference(metaCache: Record<string, Record<string, number>>, filename: string, passed: string[] = []): string[] {
+	const allForwardLinks = Object.keys(metaCache?.[filename] ?? {}).map(e => `${e}`);
+	const allReverseLinks = Object.entries((metaCache)).filter(([, links]) => filename in links).map(([name,]) => name).map(e => `${e}`);
+
+	return unique([...allForwardLinks, ...allReverseLinks]);
+}
+
+export function isIntersect<T>(a: T[], b: T[]) {
+	if (a.length == 0 && b.length != 0) return false;
+	if (a.length != 0 && b.length == 0) return false;
+	const allKeys = [...unique(a), ...unique(b)];
+	const dedupeKey = unique(allKeys);
+	return allKeys.length != dedupeKey.length;
+}

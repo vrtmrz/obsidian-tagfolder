@@ -1,5 +1,6 @@
 <script lang="ts">
 	import {
+		type TREE_TYPE,
 		type TagFolderSettings,
 		type TagInfoDict,
 		type ViewItem,
@@ -26,8 +27,12 @@
 		ancestorToLongestTag,
 		ancestorToTags,
 		isSpecialTag,
+		unique,
+		isIntersect,
 	} from "./util";
 	import {
+		allViewItems,
+		allViewItemsByLink,
 		currentFile,
 		selectedTags,
 		tagFolderSetting,
@@ -40,8 +45,26 @@
 
 	// -- Props --
 
+	export let viewType: TREE_TYPE = "tags";
+
 	// Name of this tag, including intermediate levels if we are inside.
 	export let thisName = "";
+
+	$: filename =
+		viewType == "tags" ? "" : thisName.substring(thisName.indexOf(":") + 1);
+
+	// $: referenceDirection = "" as "" | "CROSS" | "FORWARD" | "REVERSE";
+	// $: {
+	// 	if (thisName.startsWith("c:")) {
+	// 		referenceDirection = "CROSS";
+	// 	} else if (thisName.startsWith("f:")) {
+	// 		referenceDirection = "FORWARD";
+	// 	} else if (thisName.startsWith("r:")) {
+	// 		referenceDirection = "REVERSE";
+	// 	} else {
+	// 		referenceDirection = "";
+	// 	}
+	// }
 
 	// All contained items.
 	// **Be careful**: Please keep the order of this. This should be already sorted.
@@ -123,12 +146,16 @@
 		trails: string[],
 		filePaths: string[]
 	) {
-		openScrollView(
-			null,
-			"",
-			joinPartialPath(removeIntermediatePath(trails)).join(", "),
-			filePaths
-		);
+		if (viewType == "tags") {
+			openScrollView(
+				null,
+				"",
+				joinPartialPath(removeIntermediatePath(trails)).join(", "),
+				filePaths
+			);
+		} else if (viewType == "links") {
+			openScrollView(null, "", `Linked to ${filename}`, filePaths);
+		}
 		e.preventDefault();
 	}
 	function shouldResponsibleFor(evt: MouseEvent) {
@@ -198,6 +225,23 @@
 		}
 	}
 
+	let thisLinks = [] as string[];
+	$: {
+		thisLinks = [];
+		if (viewType == "links" && $allViewItemsByLink) {
+			const path = thisName.toLocaleLowerCase();
+			let selfInfo = _items.find(
+				(e) => e.path.toLocaleLowerCase() == path
+			);
+			if (!selfInfo) {
+				selfInfo = $allViewItemsByLink.find(
+					(e) => e.path.toLocaleLowerCase() == path
+				);
+			}
+			thisLinks = (selfInfo?.links ?? []).map((e) => `${e}`);
+		}
+	}
+
 	// Updating structure
 	$: {
 		isInDedicatedTag = false;
@@ -219,9 +263,18 @@
 			) {
 				isSuppressibleLevel = false;
 
-				const tagsAll = uniqueCaseIntensive(
+				let tagsAll = uniqueCaseIntensive(
 					_items.flatMap((e) => [...e.tags])
 				);
+				if (viewType == "links") {
+					if (isRoot) {
+						tagsAll = _items.flatMap((e) => [...e.links]);
+						console.log(tagsAll);
+					} else {
+						tagsAll = thisLinks.filter((e) => !trail.contains(e));
+					}
+				} else {
+				}
 
 				const lastTrailTagLC =
 					trimTrailingSlash(previousTrail).toLocaleLowerCase();
@@ -284,7 +337,7 @@
 				}
 
 				let existTagsFiltered1 = [] as string[];
-				if (!_setting.doNotSimplifyTags) {
+				if (viewType == "tags" && !_setting.doNotSimplifyTags) {
 					// If the note has only one item. it can be suppressible.
 					if (_items.length == 1) {
 						existTagsFiltered1 = existTags;
@@ -311,25 +364,32 @@
 						// If reduceNestedParent is enabled, passed trails also should be trimmed.
 						removeItems.push(...trailLower);
 					}
-					const tagsOnNextLevel = uniqueCaseIntensive(
-						existTags.map((e) => {
-							const idx = e.indexOf("/");
-							if (idx < 1) return e;
-							let piece = e.substring(0, idx + 1);
-							let idx2 = idx;
-							while (
-								removeItems.contains(piece.toLocaleLowerCase())
-							) {
-								idx2 = e.indexOf("/", idx2 + 1);
-								if (idx2 === -1) {
-									piece = e;
-									break;
+					let tagsOnNextLevel = [] as string[];
+					if (viewType == "tags") {
+						tagsOnNextLevel = uniqueCaseIntensive(
+							existTags.map((e) => {
+								const idx = e.indexOf("/");
+								if (idx < 1) return e;
+								let piece = e.substring(0, idx + 1);
+								let idx2 = idx;
+								while (
+									removeItems.contains(
+										piece.toLocaleLowerCase()
+									)
+								) {
+									idx2 = e.indexOf("/", idx2 + 1);
+									if (idx2 === -1) {
+										piece = e;
+										break;
+									}
+									piece = e.substring(0, idx2 + 1);
 								}
-								piece = e.substring(0, idx2 + 1);
-							}
-							return piece;
-						})
-					);
+								return piece;
+							})
+						);
+					} else {
+						tagsOnNextLevel = unique(existTags);
+					}
 					const trailShortest = removeIntermediatePath(trail);
 					existTagsFiltered1 = tagsOnNextLevel.filter((tag) =>
 						// Remove tags which in trail again.
@@ -414,20 +474,52 @@
 				.map((tag) => {
 					const tagLC = tag.toLocaleLowerCase();
 					const tagNestedLC = trimPrefix(tagLC, previousTrailLC);
-					return [
-						tag,
-						...parseTagName(tag, _tagInfo),
-						_items.filter((item) =>
-							item.tags.some((itemTag) => {
-								const itemTagLC = itemTag.toLocaleLowerCase();
-								return (
-									pathMatch(itemTagLC, tagLC) || // Exact matched item
-									// `b` should be contained in `a/b` under `a/`, if the level is mixed level.
-									pathMatch(itemTagLC, tagNestedLC)
-								);
-							})
-						),
-					] as V2FolderItem;
+					if (viewType == "tags") {
+						return [
+							tag,
+							...parseTagName(tag, _tagInfo),
+							_items.filter((item) =>
+								item.tags.some((itemTag) => {
+									const itemTagLC =
+										itemTag.toLocaleLowerCase();
+									return (
+										pathMatch(itemTagLC, tagLC) || // Exact matched item
+										// `b` should be contained in `a/b` under `a/`, if the level is mixed level.
+										pathMatch(itemTagLC, tagNestedLC)
+									);
+								})
+							),
+						] as V2FolderItem;
+					} else {
+						const path = tag.toLocaleLowerCase();
+						let selfInfo = _items.find(
+							(e) => e.path.toLocaleLowerCase() == path
+						);
+						if (!selfInfo) {
+							selfInfo = $allViewItemsByLink.find(
+								(e) => e.path.toLocaleLowerCase() == path
+							);
+						}
+						const dispName = selfInfo?.displayName ?? tag;
+						const links = selfInfo?.links ?? [];
+						return [
+							tag,
+							dispName,
+							[dispName],
+							tag == "_unlinked"
+								? _items.filter((e) => e.links.contains(tag))
+								: _items.filter(
+										(
+											item //isIntersect(item.links, links)
+										) =>
+											links.contains(item.path) ||
+											item.links.contains(tag) ||
+											item.path == thisName ||
+											item.path == tag
+								  ),
+							// .filter((item) => !trail.contains(item.path)),
+						] as V2FolderItem;
+					}
 				})
 				.filter((child) => child[V2FI_IDX_CHILDREN].length != 0);
 
@@ -488,7 +580,8 @@
 	// -- Displaying
 
 	$: isActive =
-		_items && _items.some((e) => e.path == _currentActiveFilePath);
+		(_items && _items.some((e) => e.path == _currentActiveFilePath)) ||
+		(viewType == "links" && filename == _currentActiveFilePath);
 	$: {
 		// I wonder actually this is meaningful; tagName and tagNameDisp should be shown
 		if (tagName == "" && tagNameDisp.length == 0) {
@@ -521,11 +614,19 @@
 		}
 	}
 	// To improve performance, make HTML in advance.
+	$: classKey = viewType == "links" ? " tf-link" : " tf-tag";
+	let directionClass = "";
+	// $: {
+	// 	directionClass = "";
+	// 	if (referenceDirection == "CROSS") directionClass = " link-cross";
+	// 	if (referenceDirection == "FORWARD") directionClass = " link-forward";
+	// 	if (referenceDirection == "REVERSE") directionClass = " link-reverse";
+	// }
 	$: tagsDispHtml = isFolderVisible
 		? tagsDisp
 				.map(
 					(e) =>
-						`<span class="tagfolder-tag tag-tag">${e
+						`<span class="tagfolder-tag tag-tag${classKey}${directionClass}">${e
 							.map(
 								(ee) =>
 									`<span class="tf-tag-each">${escapeStringToHTML(
@@ -545,8 +646,10 @@
 			if (isRoot && isMainTree && !isSuppressibleLevel) {
 				// The root, except not is suppressible.
 				if (_setting.expandUntaggedToRoot) {
-					leftOverItems = _items.filter((e) =>
-						e.tags.contains("_untagged")
+					leftOverItems = _items.filter(
+						(e) =>
+							e.tags.contains("_untagged") ||
+							e.tags.contains("_unlinked")
 					);
 				} else {
 					leftOverItems = [];
@@ -593,6 +696,22 @@
 
 				return (aIsInChildren ? -1 : 0) + (bIsInChildren ? 1 : 0);
 			});
+		}
+		if (viewType == "links") {
+			leftOverItems = leftOverItems
+				// .filter(
+				// 	(e) =>
+				// 		thisLinks.some((link) => link == e.path) ||
+				// 		e.links.some((link) => link == filename) ||
+				// 		e.path == thisName ||
+				// 		e.links.contains("_unlinked") ||
+				// 		true
+				// )
+				.filter((item) =>
+					children.every((e) => e[V2FI_IDX_TAG] != item.path)
+				); //.filter(item=>!trail.contains(item.path));
+
+			// .filter((e) => !isIntersect(e.links, trail));
 		}
 	}
 	let isFolderVisible = false;
@@ -725,6 +844,9 @@
 	}
 	function dragStartName(args: DragEvent) {
 		if (!draggable) return;
+		if (viewType == "links") {
+			return dragStartFile(args);
+		}
 		const expandedTagsAll = [
 			...ancestorToLongestTag(
 				ancestorToTags(
@@ -753,6 +875,20 @@
 
 		dm.onDragStart(args, args);
 	}
+	function dragStartFile(args: DragEvent) {
+		if (!draggable) return;
+		const file = app.vault.getAbstractFileByPath(filename);
+		const param = dm.dragFile(args, file);
+		if (param) {
+			return dm.onDragStart(args, param);
+		}
+	}
+	function handleOpenItem(evt: MouseEvent) {
+		if (viewType == "tags") return;
+		evt.preventDefault();
+		evt.stopPropagation();
+		openFile(filename, evt.metaKey || evt.ctrlKey);
+	}
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -764,7 +900,12 @@
 	on:click|stopPropagation={toggleFolder}
 	on:contextmenu|stopPropagation={(evt) => {
 		if (shouldResponsibleFor(evt))
-			showMenu(evt, [...trail, ...suppressLevels], tagName, _items);
+			showMenu(
+				evt,
+				[...trail, ...suppressLevels],
+				viewType == "tags" ? tagName : filename,
+				_items
+			);
 	}}
 >
 	{#if isRoot || !isMainTree}
@@ -794,7 +935,10 @@
 					<svg class="svg-icon" />
 				{/if}
 			</div>
-			<div class="tree-item-inner nav-folder-title-content lsl-f">
+			<div
+				class="tree-item-inner nav-folder-title-content lsl-f"
+				on:click={handleOpenItem}
+			>
 				{#if isFolderVisible}
 					<div
 						class="tagfolder-titletagname"
@@ -831,6 +975,7 @@
 			{#each childrenDisp as items}
 				{#each items as [f, tagName, tagNameDisp, subitems]}
 					<svelte:self
+						{viewType}
 						items={subitems}
 						thisName={f}
 						trail={[...trail, ...suppressLevels, f]}

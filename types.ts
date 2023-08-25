@@ -1,4 +1,7 @@
 export interface ViewItem {
+	/**
+	 * Historical reason, `tags` consists the list of either tag or link.
+	 */
 	tags: string[];
 	extraTags: string[];
 	path: string;
@@ -7,6 +10,7 @@ export interface ViewItem {
 	mtime: number;
 	ctime: number;
 	filename: string;
+	links: string[];
 }
 export interface TagInfoDict {
 	[key: string]: TagInfo;
@@ -128,7 +132,9 @@ export const tagDispDict: { [key: string]: string } = {
 };
 
 export const VIEW_TYPE_TAGFOLDER = "tagfolder-view";
+export const VIEW_TYPE_TAGFOLDER_LINK = "tagfolder-link-view";
 export const VIEW_TYPE_TAGFOLDER_LIST = "tagfolder-view-list";
+export type TREE_TYPE = "tags" | "links";
 
 export const OrderKeyTag: Record<string, string> = {
 	NAME: "Tag name",

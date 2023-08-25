@@ -1,7 +1,7 @@
 <script lang="ts">
 	import OnDemandRender from "OnDemandRender.svelte";
 
-	import type { TagFolderSettings, ViewItem } from "types";
+	import type { TREE_TYPE, TagFolderSettings, ViewItem } from "types";
 	import {
 		renderSpecialTag,
 		trimSlash,
@@ -10,6 +10,8 @@
 		uniqueCaseIntensive,
 	} from "./util";
 	import { currentFile, tagFolderSetting } from "./store";
+
+	export let viewType: TREE_TYPE = "tags";
 
 	// Display props
 	export let item: ViewItem;
