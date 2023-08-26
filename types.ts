@@ -76,6 +76,8 @@ export interface TagFolderSettings {
 	disableDragging: boolean;
 	linkConfig: LinkParseConf;
 	linkShowOnlyFDR: boolean;
+	linkCombineOtherTree: boolean;
+
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -117,7 +119,8 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 			key: ""
 		}
 	},
-	linkShowOnlyFDR: true
+	linkShowOnlyFDR: true,
+	linkCombineOtherTree: true,
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";

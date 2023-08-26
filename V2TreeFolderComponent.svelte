@@ -277,6 +277,9 @@
 						const dLinks = thisInfo.directLinks;
 						tagsAll = tagsAll.filter((e) => dLinks.contains(e));
 					}
+					if (!isRoot) {
+						tagsAll = tagsAll.filter((e) => e != "_unlinked");
+					}
 				}
 
 				const lastTrailTagLC =
@@ -549,16 +552,20 @@
 							);
 						}
 						const dispName = selfInfo?.displayName ?? tag;
-						const links = selfInfo?.links ?? [];
+						const itemCandidates = _setting.linkCombineOtherTree
+							? $allViewItemsByLink.filter(
+									(e) => !trail.contains(e.path)
+							  )
+							: _items;
 						return [
 							tag,
 							dispName,
 							[dispName],
 							tag == "_unlinked"
-								? _items.filter((e) =>
+								? itemCandidates.filter((e) =>
 										e.links.contains("_unlinked")
 								  )
-								: _items.filter((item) =>
+								: itemCandidates.filter((item) =>
 										isDirectLinked(selfInfo, item)
 								  ),
 							// .filter((item) => !trail.contains(item.path)),

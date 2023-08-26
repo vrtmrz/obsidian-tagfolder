@@ -1336,6 +1336,17 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+		new Setting(containerEl)
+			.setName("Connect linked tree")
+			.setDesc("")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.linkCombineOtherTree)
+					.onChange(async (value) => {
+						this.plugin.settings.linkCombineOtherTree = value;
+						await this.plugin.saveSettings();
+					})
+			);
 
 		containerEl.createEl("h3", { text: "Filters" });
 		new Setting(containerEl)
