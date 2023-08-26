@@ -267,8 +267,17 @@ export default class TagFolderPlugin extends Plugin {
 		});
 		this.metadataCacheChanged = this.metadataCacheChanged.bind(this);
 		this.watchWorkspaceOpen = this.watchWorkspaceOpen.bind(this);
+		this.metadataCacheResolve = this.metadataCacheResolve.bind(this);
+		this.metadataCacheResolved = this.metadataCacheResolved.bind(this);
+		this.loadFileInfo = this.loadFileInfo.bind(this);
 		this.registerEvent(
 			this.app.metadataCache.on("changed", this.metadataCacheChanged)
+		);
+		this.registerEvent(
+			this.app.metadataCache.on("resolve", this.metadataCacheResolve)
+		);
+		this.registerEvent(
+			this.app.metadataCache.on("resolved", this.metadataCacheResolved)
 		);
 
 		this.refreshAllTree = this.refreshAllTree.bind(this);
@@ -382,6 +391,16 @@ export default class TagFolderPlugin extends Plugin {
 	metadataCacheChanged(file: TFile) {
 		this.loadFileInfo(file);
 	}
+	metadataCacheResolve(file: TFile) {
+		if (this.getLinkView() != null) {
+			this.loadFileInfo(file);
+		}
+	}
+	metadataCacheResolved() {
+		if (this.getLinkView() != null) {
+			this.loadFileInfo();
+		}
+	}
 
 	refreshAllTree(file: TFile | TFolder) {
 		this.loadFileInfo();
@@ -391,6 +410,7 @@ export default class TagFolderPlugin extends Plugin {
 		file: TFile;
 		metadata: CachedMetadata;
 		links: string[];
+		directLinks: string[];
 	}[] = [];
 
 	oldFileCache = "";
@@ -400,19 +420,23 @@ export default class TagFolderPlugin extends Plugin {
 			const filesAll = [...this.app.vault.getMarkdownFiles(), ...this.app.vault.getAllLoadedFiles().filter(e => "extension" in e && e.extension == "canvas") as TFile[]];
 			const cachedLinks = this.app.metadataCache.resolvedLinks;
 			this.fileCaches = filesAll.map((fileEntry) => {
-				const allLinks = parseAllReference(cachedLinks, fileEntry.path);
+				const [allDirectLinks, allLinks] = parseAllReference(cachedLinks, fileEntry.path, this.settings.linkConfig);
+				const directLinks = [...allDirectLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
 				const links = [...allLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
 				return {
 					file: fileEntry,
 					metadata: this.app.metadataCache.getFileCache(fileEntry),
-					links: links
+					links: links,
+					directLinks: directLinks
 				};
 			});
 		} else {
 			const cachedLinks = this.app.metadataCache.resolvedLinks;
-			const allLinks = parseAllReference(cachedLinks, diff.path);
 
+			const [allDirectLinks, allLinks] = parseAllReference(cachedLinks, diff.path, this.settings.linkConfig);
+			const directLinks = [...allDirectLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
 			const links = [...allLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
+
 			const old = this.fileCaches.find(
 				(fileCache) => fileCache.file.path == diff.path
 			);
@@ -427,7 +451,8 @@ export default class TagFolderPlugin extends Plugin {
 			this.fileCaches.push({
 				file: diff,
 				metadata: this.app.metadataCache.getFileCache(diff),
-				links: links
+				links: links,
+				directLinks: directLinks
 			});
 		}
 
@@ -435,6 +460,7 @@ export default class TagFolderPlugin extends Plugin {
 			this.fileCaches.map((e) => ({
 				path: e.file.path,
 				links: e.links,
+				directLinks: e.directLinks,
 				tags: getAllTags(e.metadata),
 			}))
 		);
@@ -591,6 +617,7 @@ export default class TagFolderPlugin extends Plugin {
 			// }
 
 			const links = fileCache.links;
+			const directLinks = fileCache.directLinks;
 			if (links.length == 0) links.push("_unlinked");
 			if (this.settings.disableNarrowingDown && mode == "tag") {
 				const archiveTagsMatched = allTags.filter(e => archiveTags.contains(e.toLocaleLowerCase()));
@@ -606,6 +633,7 @@ export default class TagFolderPlugin extends Plugin {
 						ctime: fileCache.file.stat.ctime,
 						filename: fileCache.file.basename,
 						links: links,
+						directLinks: directLinks,
 					});
 				}
 			} else {
@@ -619,6 +647,7 @@ export default class TagFolderPlugin extends Plugin {
 					ctime: fileCache.file.stat.ctime,
 					filename: fileCache.file.basename,
 					links: links,
+					directLinks: directLinks,
 				});
 			}
 		}
@@ -1272,6 +1301,41 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
+
+		containerEl.createEl("h3", { text: "Link Folder" });
+		new Setting(containerEl)
+			.setName("Use Incoming")
+			.setDesc("")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.linkConfig.incoming.enabled)
+					.onChange(async (value) => {
+						this.plugin.settings.linkConfig.incoming.enabled = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Use Outgoing")
+			.setDesc("")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.linkConfig.outgoing.enabled)
+					.onChange(async (value) => {
+						this.plugin.settings.linkConfig.outgoing.enabled = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Hide indirectly linked notes")
+			.setDesc("")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.linkShowOnlyFDR)
+					.onChange(async (value) => {
+						this.plugin.settings.linkShowOnlyFDR = value;
+						await this.plugin.saveSettings();
+					})
+			);
 
 		containerEl.createEl("h3", { text: "Filters" });
 		new Setting(containerEl)

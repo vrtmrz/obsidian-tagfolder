@@ -11,7 +11,8 @@ import {
 	type TagFolderSettings,
 	type TagInfo,
 	type TagInfoDict,
-	type ViewItem
+	type ViewItem,
+	type LinkParseConf
 } from "types";
 
 export function unique<T>(items: T[]) {
@@ -389,11 +390,36 @@ export function parseTagName(thisName: string, _tagInfo: TagInfoDict): [string, 
 	return [tagName, tagNameDisp]
 }
 
-export function parseAllReference(metaCache: Record<string, Record<string, number>>, filename: string, passed: string[] = []): string[] {
-	const allForwardLinks = Object.keys(metaCache?.[filename] ?? {}).map(e => `${e}`);
-	const allReverseLinks = Object.entries((metaCache)).filter(([, links]) => filename in links).map(([name,]) => name).map(e => `${e}`);
+function parseAllForwardReference(metaCache: Record<string, Record<string, number>>, filename: string, passed: string[]) {
+	const allForwardLinks = Object.keys(metaCache?.[filename] ?? {}).map(e => `${e}`).filter(e => !passed.contains(e));
+	const nextPassed = [...passed, ...allForwardLinks];
+	let allNextLinks = [] as string[];
+	for (const link of allForwardLinks) {
+		const [, next] = parseAllForwardReference(metaCache, link, nextPassed);
+		allNextLinks = [...allNextLinks, ...next];
+	}
+	return [unique(allForwardLinks), unique([...allForwardLinks, ...allNextLinks])];
+}
+function parseAllReverseReference(metaCache: Record<string, Record<string, number>>, filename: string, passed: string[]) {
+	const allReverseLinks = Object.entries((metaCache)).filter(([, links]) => filename in links).map(([name,]) => name).map(e => `${e}`).filter(e => !passed.contains(e));
+	const nextPassed = [...passed, ...allReverseLinks];
+	let allNextLinks = [] as string[];
+	for (const link of allReverseLinks) {
+		const [, next] = parseAllReverseReference(metaCache, link, nextPassed);
+		allNextLinks = [...allNextLinks, ...next];
+	}
+	return [unique(allReverseLinks), unique([...allReverseLinks, ...allNextLinks])];
 
-	return unique([...allForwardLinks, ...allReverseLinks]);
+}
+export function parseAllReference(metaCache: Record<string, Record<string, number>>, filename: string, conf: LinkParseConf): string[][] {
+	const [allDirectForwardLinks, allForwardLinks] = (!conf?.outgoing?.enabled) ? [[], []] : parseAllForwardReference(metaCache, filename, []);
+	const [allDirectReverseLinks, allReverseLinks] = (!conf?.incoming?.enabled) ? [[], []] : parseAllReverseReference(metaCache, filename, []);
+	let direct = [...allDirectForwardLinks, ...allDirectReverseLinks];
+	let linked = [...allForwardLinks, ...allReverseLinks];
+	if (direct.length != 0) direct = unique([filename, ...direct]);
+	if (linked.length != 0) linked = unique([filename, ...linked]);
+
+	return [direct, linked];
 }
 
 export function isIntersect<T>(a: T[], b: T[]) {

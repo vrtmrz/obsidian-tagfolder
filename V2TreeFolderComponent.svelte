@@ -132,7 +132,10 @@
 	tagInfo.subscribe((info: TagInfoDict) => {
 		_tagInfo = info;
 	});
-	$: sortFunc = selectCompareMethodTags(_setting, _tagInfo);
+	$: sortFunc = selectCompareMethodTags(
+		_setting,
+		viewType == "links" ? {} : _tagInfo
+	);
 
 	// To Highlight active things.
 	let _currentActiveFilePath = "";
@@ -226,8 +229,10 @@
 	}
 
 	let thisLinks = [] as string[];
+	let thisInfo: ViewItem;
 	$: {
 		thisLinks = [];
+		thisInfo = undefined;
 		if (viewType == "links" && $allViewItemsByLink) {
 			const path = thisName.toLocaleLowerCase();
 			let selfInfo = _items.find(
@@ -238,6 +243,7 @@
 					(e) => e.path.toLocaleLowerCase() == path
 				);
 			}
+			if (selfInfo) thisInfo = selfInfo;
 			thisLinks = (selfInfo?.links ?? []).map((e) => `${e}`);
 		}
 	}
@@ -267,13 +273,10 @@
 					_items.flatMap((e) => [...e.tags])
 				);
 				if (viewType == "links") {
-					if (isRoot) {
-						tagsAll = _items.flatMap((e) => [...e.links]);
-						console.log(tagsAll);
-					} else {
-						tagsAll = thisLinks.filter((e) => !trail.contains(e));
+					if (!isRoot && _setting.linkShowOnlyFDR && thisInfo) {
+						const dLinks = thisInfo.directLinks;
+						tagsAll = tagsAll.filter((e) => dLinks.contains(e));
 					}
-				} else {
 				}
 
 				const lastTrailTagLC =
@@ -444,6 +447,51 @@
 		}
 	}
 
+	function isDirectLinked(from: ViewItem, to: ViewItem) {
+		const ret = _isDirectLinked(from, to);
+		// console.log(`D:${from.path} -> ${to.path} : ${ret}`);
+		return ret;
+	}
+	function _isDirectLinked(from: ViewItem, to: ViewItem) {
+		if (!from) return false;
+		if (!to) return false;
+		if (from.path == to.path) return false;
+
+		if (_setting.linkConfig.incoming.enabled) {
+			if (to.directLinks.some((e) => e == from.path)) {
+				return true;
+			}
+		}
+		if (_setting.linkConfig.outgoing.enabled) {
+			if (from.directLinks.some((e) => e == to.path)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function isLinked(from: ViewItem, to: ViewItem) {
+		const ret = _isLinked(from, to);
+		// console.log(`L:${from.path} -> ${to.path} : ${ret}`);
+		return ret;
+	}
+
+	function _isLinked(from: ViewItem, to: ViewItem) {
+		if (from.path == to.path) return false;
+
+		if (_setting.linkConfig.incoming.enabled) {
+			if (to.links.some((e) => e == from.path)) {
+				return true;
+			}
+		}
+		if (_setting.linkConfig.outgoing.enabled) {
+			if (from.links.some((e) => e == to.path)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	// Collect sub-folders.
 	$: {
 		suppressLevels = []; // This will be shown as chip.
@@ -507,15 +555,11 @@
 							dispName,
 							[dispName],
 							tag == "_unlinked"
-								? _items.filter((e) => e.links.contains(tag))
-								: _items.filter(
-										(
-											item //isIntersect(item.links, links)
-										) =>
-											links.contains(item.path) ||
-											item.links.contains(tag) ||
-											item.path == thisName ||
-											item.path == tag
+								? _items.filter((e) =>
+										e.links.contains("_unlinked")
+								  )
+								: _items.filter((item) =>
+										isDirectLinked(selfInfo, item)
 								  ),
 							// .filter((item) => !trail.contains(item.path)),
 						] as V2FolderItem;
@@ -523,54 +567,58 @@
 				})
 				.filter((child) => child[V2FI_IDX_CHILDREN].length != 0);
 
-			// -- Check redundant combination if configured.
-			if (_setting.mergeRedundantCombination) {
-				let out = [] as typeof wChildren;
-				const isShown = new Set<string>();
-				for (const [tag, tagName, tagsDisp, items] of wChildren) {
-					const list = [] as ViewItem[];
-					for (const v of items) {
-						if (!isShown.has(v.path)) {
-							list.push(v);
-							isShown.add(v.path);
+			if (viewType == "tags") {
+				// -- Check redundant combination if configured.
+				if (_setting.mergeRedundantCombination) {
+					let out = [] as typeof wChildren;
+					const isShown = new Set<string>();
+					for (const [tag, tagName, tagsDisp, items] of wChildren) {
+						const list = [] as ViewItem[];
+						for (const v of items) {
+							if (!isShown.has(v.path)) {
+								list.push(v);
+								isShown.add(v.path);
+							}
 						}
+						if (list.length != 0)
+							out.push([tag, tagName, tagsDisp, list]);
 					}
-					if (list.length != 0)
-						out.push([tag, tagName, tagsDisp, list]);
+					wChildren = out;
 				}
-				wChildren = out;
-			}
 
-			// -- MainTree and Root specific structure modification.
-			if (isMainTree && isRoot) {
-				// Remove all items which have been already archived except is on the root.
-				const archiveTags = _setting.archiveTags
-					.toLocaleLowerCase()
-					.replace(/[\n ]/g, "")
-					.split(",");
-				wChildren = wChildren
-					.map((e) =>
-						archiveTags.some((aTag) =>
-							`${aTag}//`.startsWith(
-								e[V2FI_IDX_TAG].toLocaleLowerCase() + "/"
+				// -- MainTree and Root specific structure modification.
+				if (isMainTree && isRoot) {
+					// Remove all items which have been already archived except is on the root.
+					const archiveTags = _setting.archiveTags
+						.toLocaleLowerCase()
+						.replace(/[\n ]/g, "")
+						.split(",");
+					wChildren = wChildren
+						.map((e) =>
+							archiveTags.some((aTag) =>
+								`${aTag}//`.startsWith(
+									e[V2FI_IDX_TAG].toLocaleLowerCase() + "/"
+								)
 							)
-						)
-							? e
-							: ([
-									e[V2FI_IDX_TAG],
-									e[V2FI_IDX_TAGNAME],
-									e[V2FI_IDX_TAGDISP],
-									e[V2FI_IDX_CHILDREN].filter(
-										(items) =>
-											!items.tags.some((e) =>
-												archiveTags.contains(
-													e.toLocaleLowerCase()
+								? e
+								: ([
+										e[V2FI_IDX_TAG],
+										e[V2FI_IDX_TAGNAME],
+										e[V2FI_IDX_TAGDISP],
+										e[V2FI_IDX_CHILDREN].filter(
+											(items) =>
+												!items.tags.some((e) =>
+													archiveTags.contains(
+														e.toLocaleLowerCase()
+													)
 												)
-											)
-									),
-							  ] as V2FolderItem)
-					)
-					.filter((child) => child[V2FI_IDX_CHILDREN].length != 0);
+										),
+								  ] as V2FolderItem)
+						)
+						.filter(
+							(child) => child[V2FI_IDX_CHILDREN].length != 0
+						);
+				}
 			}
 			wChildren = wChildren.sort(sortFunc);
 			children = wChildren;
@@ -709,7 +757,7 @@
 				// )
 				.filter((item) =>
 					children.every((e) => e[V2FI_IDX_TAG] != item.path)
-				); //.filter(item=>!trail.contains(item.path));
+				);
 
 			// .filter((e) => !isIntersect(e.links, trail));
 		}

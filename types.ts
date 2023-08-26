@@ -11,6 +11,7 @@ export interface ViewItem {
 	ctime: number;
 	filename: string;
 	links: string[];
+	directLinks: string[];
 }
 export interface TagInfoDict {
 	[key: string]: TagInfo;
@@ -23,6 +24,16 @@ export interface TagInfo {
 }
 
 import { type DISPLAY_METHOD, type HIDE_ITEMS_TYPE } from "./main";
+export type LinkParseConf = {
+	outgoing: {
+		enabled: boolean,
+		key: string,
+	},
+	incoming: {
+		enabled: boolean,
+		key: string
+	}
+}
 
 export interface TagFolderSettings {
 	displayMethod: DISPLAY_METHOD;
@@ -63,6 +74,8 @@ export interface TagFolderSettings {
 	disableNarrowingDown: boolean;
 	expandUntaggedToRoot: boolean;
 	disableDragging: boolean;
+	linkConfig: LinkParseConf;
+	linkShowOnlyFDR: boolean;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -94,6 +107,17 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	disableNarrowingDown: false,
 	expandUntaggedToRoot: false,
 	disableDragging: false,
+	linkConfig: {
+		incoming: {
+			enabled: true,
+			key: "",
+		},
+		outgoing: {
+			enabled: true,
+			key: ""
+		}
+	},
+	linkShowOnlyFDR: true
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";

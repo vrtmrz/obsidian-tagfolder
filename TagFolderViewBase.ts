@@ -30,7 +30,10 @@ export abstract class TagFolderViewBase extends ItemView {
     component: TagFolderViewComponent;
     plugin: TagFolderPlugin;
     navigation: false;
-
+    async saveSettings() {
+        await this.plugin.saveSettings();
+		this.plugin.updateFileCaches();
+    }
     showOrder(evt: MouseEvent) {
         const menu = new Menu();
 

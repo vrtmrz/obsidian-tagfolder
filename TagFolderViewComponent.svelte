@@ -22,6 +22,7 @@
 	export let vaultName: string = "";
 	export let title: string = "";
 	export let tags: string[] = [];
+	export let saveSettings: () => Promise<void>;
 
 	export let showMenu: (
 		evt: MouseEvent,
@@ -72,8 +73,14 @@
 	});
 
 	let _setting = $tagFolderSetting as TagFolderSettings;
+	let outgoingEnabled = false;
+	let incomingEnabled = false;
+	let onlyFDREnabled = false;
 	tagFolderSetting.subscribe((setting) => {
 		_setting = setting;
+		outgoingEnabled = _setting?.linkConfig?.outgoing?.enabled ?? false;
+		incomingEnabled = _setting?.linkConfig?.incoming?.enabled ?? false;
+		onlyFDREnabled = _setting.linkShowOnlyFDR;
 	});
 	let showSearch = false;
 	function toggleSearch() {
@@ -98,6 +105,27 @@
 	let stackedLevels = "";
 	let searchIcon = "";
 	let switchIcon = "";
+	let outgoingIcon = "";
+	let incomingIcon = "";
+	let linkIcon = "";
+
+	async function switchIncoming() {
+		_setting.linkConfig.incoming.enabled =
+			!_setting.linkConfig.incoming.enabled;
+		if (saveSettings) await saveSettings();
+		tagFolderSetting.set({ ..._setting });
+	}
+	async function switchOutgoing() {
+		_setting.linkConfig.outgoing.enabled =
+			!_setting.linkConfig.outgoing.enabled;
+		if (saveSettings) await saveSettings();
+		tagFolderSetting.set({ ..._setting });
+	}
+	async function switchOnlyFDR() {
+		_setting.linkShowOnlyFDR = !_setting.linkShowOnlyFDR;
+		// if (saveSettings) await saveSettings();
+		tagFolderSetting.set({ ..._setting });
+	}
 
 	onMount(() => {
 		setIcon(iconDivEl, "right-triangle");
@@ -111,6 +139,14 @@
 			stackedLevels = iconDivEl.innerHTML;
 			setIcon(iconDivEl, "search");
 			searchIcon = iconDivEl.innerHTML;
+		}
+		if (viewType == "links") {
+			setIcon(iconDivEl, "links-coming-in");
+			incomingIcon = iconDivEl.innerHTML;
+			setIcon(iconDivEl, "links-going-out");
+			outgoingIcon = iconDivEl.innerHTML;
+			setIcon(iconDivEl, "link");
+			linkIcon = iconDivEl.innerHTML;
 		}
 		setIcon(iconDivEl, "lucide-arrow-left-right");
 		switchIcon = iconDivEl.innerHTML;
@@ -221,6 +257,35 @@
 				on:click={doSwitch}
 			>
 				{@html switchIcon}
+			</div>
+		{/if}
+		{#if viewType == "links"}
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<div
+				class="clickable-icon nav-action-button"
+				class:is-active={incomingEnabled}
+				aria-label="Toggle Incoming"
+				on:click={switchIncoming}
+			>
+				{@html incomingIcon}
+			</div>
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<div
+				class="clickable-icon nav-action-button"
+				class:is-active={outgoingEnabled}
+				aria-label="Toggle Outgoing"
+				on:click={switchOutgoing}
+			>
+				{@html outgoingIcon}
+			</div>
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<div
+				class="clickable-icon nav-action-button"
+				class:is-active={onlyFDREnabled}
+				aria-label="Toggle Hide indirect notes"
+				on:click={switchOnlyFDR}
+			>
+				{@html linkIcon}
 			</div>
 		{/if}
 	</div>

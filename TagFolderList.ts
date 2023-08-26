@@ -92,6 +92,7 @@ export class TagFolderList extends TagFolderViewBase {
 				openScrollView: this.plugin.openScrollView,
 				isViewSwitchable: this.plugin.settings.useMultiPaneList,
 				switchView: this.switchView,
+				saveSettings: this.saveSettings.bind(this),
 			},
 		});
 	}
