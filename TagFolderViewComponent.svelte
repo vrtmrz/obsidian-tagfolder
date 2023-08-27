@@ -22,7 +22,7 @@
 	export let vaultName: string = "";
 	export let title: string = "";
 	export let tags: string[] = [];
-	export let saveSettings: () => Promise<void>;
+	export let saveSettings: (setting: TagFolderSettings) => Promise<void>;
 
 	export let showMenu: (
 		evt: MouseEvent,
@@ -78,8 +78,8 @@
 	let onlyFDREnabled = false;
 	tagFolderSetting.subscribe((setting) => {
 		_setting = setting;
-		outgoingEnabled = _setting?.linkConfig?.outgoing?.enabled ?? false;
-		incomingEnabled = _setting?.linkConfig?.incoming?.enabled ?? false;
+		outgoingEnabled = _setting.linkConfig?.outgoing?.enabled ?? false;
+		incomingEnabled = _setting.linkConfig?.incoming?.enabled ?? false;
 		onlyFDREnabled = _setting.linkShowOnlyFDR;
 	});
 	let showSearch = false;
@@ -110,21 +110,21 @@
 	let linkIcon = "";
 
 	async function switchIncoming() {
-		_setting.linkConfig.incoming.enabled =
+		let newSet = { ..._setting };
+		newSet.linkConfig.incoming.enabled =
 			!_setting.linkConfig.incoming.enabled;
-		if (saveSettings) await saveSettings();
-		tagFolderSetting.set({ ..._setting });
+		if (saveSettings) await saveSettings(newSet);
 	}
 	async function switchOutgoing() {
-		_setting.linkConfig.outgoing.enabled =
+		let newSet = { ..._setting };
+		newSet.linkConfig.outgoing.enabled =
 			!_setting.linkConfig.outgoing.enabled;
-		if (saveSettings) await saveSettings();
-		tagFolderSetting.set({ ..._setting });
+		if (saveSettings) await saveSettings(newSet);
 	}
 	async function switchOnlyFDR() {
-		_setting.linkShowOnlyFDR = !_setting.linkShowOnlyFDR;
-		// if (saveSettings) await saveSettings();
-		tagFolderSetting.set({ ..._setting });
+		let newSet = { ..._setting };
+		newSet.linkShowOnlyFDR = !_setting.linkShowOnlyFDR;
+		if (saveSettings) await saveSettings(newSet);
 	}
 
 	onMount(() => {

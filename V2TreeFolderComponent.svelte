@@ -277,6 +277,19 @@
 						const dLinks = thisInfo.directLinks;
 						tagsAll = tagsAll.filter((e) => dLinks.contains(e));
 					}
+					if (!isRoot && _setting.linkCombineOtherTree && thisInfo) {
+						if (_setting.linkConfig.incoming.enabled) {
+							tagsAll = [
+								...tagsAll,
+								...$allViewItemsByLink
+									.filter((e) =>
+										e.directLinks.contains(thisName)
+									)
+									.filter((e) => !trail.contains(e.path))
+									.map((e) => e.path),
+							];
+						}
+					}
 					if (!isRoot) {
 						tagsAll = tagsAll.filter((e) => e != "_unlinked");
 					}
@@ -552,11 +565,30 @@
 							);
 						}
 						const dispName = selfInfo?.displayName ?? tag;
-						const itemCandidates = _setting.linkCombineOtherTree
-							? $allViewItemsByLink.filter(
-									(e) => !trail.contains(e.path)
-							  )
-							: _items;
+						let itemIncomingCandidates = [] as ViewItem[];
+						let itemOutgoingCandidates = [] as ViewItem[];
+						let itemCandidates = [] as ViewItem[];
+						const onlyFDR = _setting.linkShowOnlyFDR;
+						if (_setting.linkCombineOtherTree) {
+							if (_setting.linkConfig.outgoing.enabled) {
+								itemOutgoingCandidates =
+									$allViewItemsByLink.filter(
+										(e) => !trail.contains(e.path)
+									);
+							}
+							if (_setting.linkConfig.incoming.enabled) {
+								itemIncomingCandidates = $allViewItemsByLink
+									.filter((e) => e.links.contains(tag))
+									.filter((e) => !trail.contains(e.path));
+							}
+
+							itemCandidates = [
+								...itemOutgoingCandidates,
+								...itemIncomingCandidates,
+							];
+						} else {
+							itemCandidates = _items;
+						}
 						return [
 							tag,
 							dispName,
@@ -566,7 +598,10 @@
 										e.links.contains("_unlinked")
 								  )
 								: itemCandidates.filter((item) =>
-										isDirectLinked(selfInfo, item)
+										(onlyFDR ? isDirectLinked : isLinked)(
+											selfInfo,
+											item
+										)
 								  ),
 							// .filter((item) => !trail.contains(item.path)),
 						] as V2FolderItem;

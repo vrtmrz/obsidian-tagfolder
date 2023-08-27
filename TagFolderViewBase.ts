@@ -8,6 +8,7 @@ import {
     VIEW_TYPE_TAGFOLDER,
     VIEW_TYPE_TAGFOLDER_LINK,
     VIEW_TYPE_TAGFOLDER_LIST,
+    type TagFolderSettings,
     type ViewItem
 } from "./types";
 import { maxDepth, selectedTags } from "./store";
@@ -30,9 +31,10 @@ export abstract class TagFolderViewBase extends ItemView {
     component: TagFolderViewComponent;
     plugin: TagFolderPlugin;
     navigation: false;
-    async saveSettings() {
+    async saveSettings(settings: TagFolderSettings) {
+        this.plugin.settings = { ...this.plugin.settings, ...settings };
         await this.plugin.saveSettings();
-		this.plugin.updateFileCaches();
+        this.plugin.updateFileCaches();
     }
     showOrder(evt: MouseEvent) {
         const menu = new Menu();
@@ -280,6 +282,7 @@ export abstract class TagFolderViewBase extends ItemView {
             menu.addItem((item) =>
                 item
                     .setTitle(`Open in new tab`)
+                    .setSection("open")
                     .setIcon("lucide-file-plus")
                     .onClick(async () => {
                         app.workspace.openLinkText(path, path, "tab");
@@ -288,6 +291,7 @@ export abstract class TagFolderViewBase extends ItemView {
             menu.addItem((item) =>
                 item
                     .setTitle(`Open to the right`)
+                    .setSection("open")
                     .setIcon("lucide-separator-vertical")
                     .onClick(async () => {
                         app.workspace.openLinkText(path, path, "split");
@@ -307,7 +311,7 @@ export abstract class TagFolderViewBase extends ItemView {
             menu.addItem((item) =>
                 item
                     .setTitle(`Open in new tab`)
-				    .setSection("open")
+                    .setSection("open")
                     .setIcon("lucide-file-plus")
                     .onClick(async () => {
                         app.workspace.openLinkText(path, path, "tab");
@@ -316,7 +320,7 @@ export abstract class TagFolderViewBase extends ItemView {
             menu.addItem((item) =>
                 item
                     .setTitle(`Open to the right`)
-				    .setSection("open")
+                    .setSection("open")
                     .setIcon("lucide-separator-vertical")
                     .onClick(async () => {
                         app.workspace.openLinkText(path, path, "split");

@@ -415,47 +415,28 @@ export default class TagFolderPlugin extends Plugin {
 
 	oldFileCache = "";
 
-	updateFileCaches(diff?: TFile): boolean {
-		if (this.fileCaches.length == 0 || !diff) {
-			const filesAll = [...this.app.vault.getMarkdownFiles(), ...this.app.vault.getAllLoadedFiles().filter(e => "extension" in e && e.extension == "canvas") as TFile[]];
-			const cachedLinks = this.app.metadataCache.resolvedLinks;
-			this.fileCaches = filesAll.map((fileEntry) => {
-				const [allDirectLinks, allLinks] = parseAllReference(cachedLinks, fileEntry.path, this.settings.linkConfig);
-				const directLinks = [...allDirectLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
-				const links = [...allLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
-				return {
-					file: fileEntry,
-					metadata: this.app.metadataCache.getFileCache(fileEntry),
-					links: links,
-					directLinks: directLinks
-				};
-			});
-		} else {
-			const cachedLinks = this.app.metadataCache.resolvedLinks;
 
-			const [allDirectLinks, allLinks] = parseAllReference(cachedLinks, diff.path, this.settings.linkConfig);
+	parsedFileCache = new Map<string, number>();
+
+	updateFileCachesAll(): boolean {
+		const filesAll = [...this.app.vault.getMarkdownFiles(), ...this.app.vault.getAllLoadedFiles().filter(e => "extension" in e && e.extension == "canvas") as TFile[]];
+		const processFiles = filesAll.filter(file => this.parsedFileCache.get(file.path) ?? 0 != file.stat.mtime);
+		const cachedLinks = this.app.metadataCache.resolvedLinks;
+		this.fileCaches = processFiles.map((fileEntry) => {
+			const [allDirectLinks, allLinks] = this.getLinkView() == null ? [[], []] : parseAllReference(cachedLinks, fileEntry.path, this.settings.linkConfig);
 			const directLinks = [...allDirectLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
 			const links = [...allLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
-
-			const old = this.fileCaches.find(
-				(fileCache) => fileCache.file.path == diff.path
-			);
-
-			if (old && JSON.stringify(old?.links) != JSON.stringify(links) && this.getLinkView() != null) {
-				// Update links 
-				return this.updateFileCaches();
-			}
-			this.fileCaches = this.fileCaches.filter(
-				(fileCache) => fileCache.file.path != diff.path
-			);
-			this.fileCaches.push({
-				file: diff,
-				metadata: this.app.metadataCache.getFileCache(diff),
+			this.parsedFileCache.set(fileEntry.path, fileEntry.stat.mtime);
+			return {
+				file: fileEntry,
+				metadata: this.app.metadataCache.getFileCache(fileEntry),
 				links: links,
 				directLinks: directLinks
-			});
-		}
-
+			};
+		});
+		return this.isFileCacheChanged();
+	}
+	isFileCacheChanged() {
 		const fileCacheDump = JSON.stringify(
 			this.fileCaches.map((e) => ({
 				path: e.file.path,
@@ -470,6 +451,42 @@ export default class TagFolderPlugin extends Plugin {
 			this.oldFileCache = fileCacheDump;
 			return true;
 		}
+	}
+
+	updateFileCaches(diff?: TFile): boolean {
+		let anyUpdated = false;
+
+		if (this.fileCaches.length == 0 || !diff) {
+			return this.updateFileCachesAll();
+		} else {
+			const cachedLinks = this.app.metadataCache.resolvedLinks;
+			if (this.parsedFileCache.get(diff.path) == diff.stat.mtime) return false;
+			const [allDirectLinks, allLinks] = this.getLinkView() == null ? [[], []] : parseAllReference(cachedLinks, diff.path, this.settings.linkConfig);
+			const directLinks = [...allDirectLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
+			const links = [...allLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
+
+			const old = this.fileCaches.find(
+				(fileCache) => fileCache.file.path == diff.path
+			);
+
+			if (old && JSON.stringify(old?.links) != JSON.stringify(links) && this.getLinkView() != null) {
+				const files = unique([...old.links, ...links]);
+				for (const file of files) {
+					const f = app.vault.getAbstractFileByPath(file);
+					if (f instanceof TFile) anyUpdated = this.updateFileCaches(f) || anyUpdated;
+				}
+			}
+			this.fileCaches = this.fileCaches.filter(
+				(fileCache) => fileCache.file.path != diff.path
+			);
+			this.fileCaches.push({
+				file: diff,
+				metadata: this.app.metadataCache.getFileCache(diff),
+				links: links,
+				directLinks: directLinks
+			});
+		}
+		return this.isFileCacheChanged() || anyUpdated;
 	}
 
 	async getItemsList(mode: "tag" | "link"): Promise<ViewItem[]> {
@@ -937,6 +954,18 @@ export default class TagFolderPlugin extends Plugin {
 		});
 	}
 
+	async refreshAllViewItems() {
+		this.parsedFileCache.clear();
+		const items = await this.getItemsList("tag");
+		const itemsSorted = items.sort(this.compareItems);
+		this.allViewItems = itemsSorted;
+		allViewItems.set(this.allViewItems);
+
+		const itemsLink = await this.getItemsList("link");
+		const itemsLinkSorted = itemsLink.sort(this.compareItems);
+		this.allViewItemsByLink = itemsLinkSorted;
+		allViewItemsByLink.set(this.allViewItemsByLink);
+	}
 	async loadSettings() {
 		this.settings = Object.assign(
 			{},
@@ -954,10 +983,7 @@ export default class TagFolderPlugin extends Plugin {
 		await this.saveTagInfo();
 		tagFolderSetting.set(this.settings);
 		this.compareItems = getCompareMethodItems(this.settings);
-		if (this.allViewItems) {
-			this.allViewItems = this.allViewItems.sort(this.compareItems);
-			allViewItems.set(this.allViewItems);
-		}
+		this.refreshAllViewItems();
 		// this.compareTags = getCompareMethodTags(this.settings);
 	}
 

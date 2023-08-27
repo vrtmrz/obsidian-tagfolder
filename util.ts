@@ -390,27 +390,76 @@ export function parseTagName(thisName: string, _tagInfo: TagInfoDict): [string, 
 	return [tagName, tagNameDisp]
 }
 
+const frCache = new Map<string, string[][]>();
+const rrCache = new Map<string, string[][]>();
+
+
 function parseAllForwardReference(metaCache: Record<string, Record<string, number>>, filename: string, passed: string[]) {
+	const key = `${filename}-${passed.join("-")}`;
+
 	const allForwardLinks = Object.keys(metaCache?.[filename] ?? {}).map(e => `${e}`).filter(e => !passed.contains(e));
+	if (frCache.has(key)) {
+		const cached = frCache.get(key);
+		if (cached[1].join("-") != allForwardLinks.join("-")) {
+			invalidateRefCache(unique([...cached[1], ...allForwardLinks]))
+		} else {
+			return cached;
+		}
+	}
 	const nextPassed = [...passed, ...allForwardLinks];
 	let allNextLinks = [] as string[];
 	for (const link of allForwardLinks) {
 		const [, next] = parseAllForwardReference(metaCache, link, nextPassed);
 		allNextLinks = [...allNextLinks, ...next];
 	}
-	return [unique(allForwardLinks), unique([...allForwardLinks, ...allNextLinks])];
+	const ret = [unique(allForwardLinks), unique([...allForwardLinks, ...allNextLinks])];
+	frCache.set(key, ret);
+	return ret;
 }
 function parseAllReverseReference(metaCache: Record<string, Record<string, number>>, filename: string, passed: string[]) {
+	const key = `${filename}-${passed.join("-")}`;
 	const allReverseLinks = Object.entries((metaCache)).filter(([, links]) => filename in links).map(([name,]) => name).map(e => `${e}`).filter(e => !passed.contains(e));
+
+	if (rrCache.has(key)) {
+		const cached = rrCache.get(key);
+		if (cached[1].join("-") != allReverseLinks.join("-")) {
+			invalidateRefCache(unique([...cached[1], ...allReverseLinks]))
+		} else {
+			return cached;
+		}
+	}
+
 	const nextPassed = [...passed, ...allReverseLinks];
 	let allNextLinks = [] as string[];
 	for (const link of allReverseLinks) {
 		const [, next] = parseAllReverseReference(metaCache, link, nextPassed);
 		allNextLinks = [...allNextLinks, ...next];
 	}
-	return [unique(allReverseLinks), unique([...allReverseLinks, ...allNextLinks])];
-
+	const ret = [unique(allReverseLinks), unique([...allReverseLinks, ...allNextLinks])];
+	rrCache.set(key, ret);
+	return ret;
 }
+
+export function invalidateRefCache(filenames: string[]) {
+	const delRCache = [] as string[];
+	for (const [key, value] of rrCache) {
+		if (isIntersect(value[1], filenames)) {
+			delRCache.push(key);
+		}
+	}
+	const delFCache = [] as string[];
+	for (const [key, value] of frCache) {
+		if (isIntersect(value[1], filenames)) {
+			delFCache.push(key);
+		}
+	}
+	for (const key of delRCache) {
+		rrCache.delete(key);
+	} for (const key of delFCache) {
+		frCache.delete(key);
+	}
+}
+
 export function parseAllReference(metaCache: Record<string, Record<string, number>>, filename: string, conf: LinkParseConf): string[][] {
 	const [allDirectForwardLinks, allForwardLinks] = (!conf?.outgoing?.enabled) ? [[], []] : parseAllForwardReference(metaCache, filename, []);
 	const [allDirectReverseLinks, allReverseLinks] = (!conf?.incoming?.enabled) ? [[], []] : parseAllReverseReference(metaCache, filename, []);
