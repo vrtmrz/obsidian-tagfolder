@@ -660,7 +660,7 @@ export default class TagFolderPlugin extends Plugin {
 			// 	allTags = mergeSameParents(allTags);
 			// }
 
-			const links = fileCache.links;
+			const links = [...fileCache.links];
 			if (links.length == 0) links.push("_unlinked");
 			if (this.settings.disableNarrowingDown && mode == "tag") {
 				const archiveTagsMatched = allTags.filter(e => archiveTags.contains(e.toLocaleLowerCase()));
