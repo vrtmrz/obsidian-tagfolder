@@ -1,3 +1,6 @@
+import type { TFile } from "obsidian";
+import { type DISPLAY_METHOD, type HIDE_ITEMS_TYPE } from "./main";
+
 export interface ViewItem {
 	/**
 	 * Historical reason, `tags` consists the list of either tag or link.
@@ -11,7 +14,6 @@ export interface ViewItem {
 	ctime: number;
 	filename: string;
 	links: string[];
-	directLinks: string[];
 }
 export interface TagInfoDict {
 	[key: string]: TagInfo;
@@ -23,7 +25,7 @@ export interface TagInfo {
 	redirect?: string;
 }
 
-import { type DISPLAY_METHOD, type HIDE_ITEMS_TYPE } from "./main";
+
 export type LinkParseConf = {
 	outgoing: {
 		enabled: boolean,
@@ -183,4 +185,11 @@ export const OrderKeyItem: Record<string, string> = {
 export type TagFolderListState = {
 	tags: string[];
 	title: string;
+}
+
+
+export type FileCache = {
+	file: TFile;
+	links: string[];
+	tags: string[];
 }

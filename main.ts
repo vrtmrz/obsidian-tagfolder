@@ -2,7 +2,6 @@
 
 import {
 	App,
-	type CachedMetadata,
 	debounce,
 	Editor,
 	getAllTags,
@@ -15,8 +14,9 @@ import {
 	PluginSettingTab,
 	Setting,
 	TFile,
-	TFolder,
 	WorkspaceLeaf,
+	TAbstractFile,
+	type MarkdownFileInfo,
 } from "obsidian";
 
 import {
@@ -33,16 +33,19 @@ import {
 	VIEW_TYPE_TAGFOLDER,
 	VIEW_TYPE_TAGFOLDER_LIST,
 	type ViewItem,
-	VIEW_TYPE_TAGFOLDER_LINK
+	VIEW_TYPE_TAGFOLDER_LINK,
+	type FileCache
 } from "types";
-import { allViewItems, allViewItemsByLink, currentFile, maxDepth, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
+import { allViewItems, allViewItemsByLink, appliedFiles, currentFile, maxDepth, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
 import {
 	compare,
 	doEvents,
+	fileCacheToCompare,
 	parseAllReference,
 	renderSpecialTag,
 	secondsToFreshness,
 	unique,
+	updateItemsLinkMap,
 } from "./util";
 import { ScrollView } from "./ScrollView";
 import { TagFolderView } from "./TagFolderView";
@@ -61,7 +64,7 @@ const HideItemsType: Record<string, string> = {
 };
 
 
-function dotted<T extends Record<string, object>>(object: T, notation: string) {
+function dotted<T extends Record<string, any>>(object: T, notation: string) {
 	return notation.split('.').reduce((a, b) => (a && (b in a)) ? a[b] : null, object);
 }
 
@@ -102,7 +105,7 @@ function onElement<T extends HTMLElement | Document>(el: T, event: string, selec
 }
 
 export default class TagFolderPlugin extends Plugin {
-	settings: TagFolderSettings;
+	settings: TagFolderSettings = { ...DEFAULT_SETTINGS };
 
 	// Folder opening status.
 	expandedFolders: string[] = ["root"];
@@ -115,9 +118,9 @@ export default class TagFolderPlugin extends Plugin {
 	allViewItems = [] as ViewItem[];
 	allViewItemsByLink = [] as ViewItem[];
 
-	compareItems: (a: ViewItem, b: ViewItem) => number;
+	compareItems: (a: ViewItem, b: ViewItem) => number = (_, __) => 0;
 
-	getView(): TagFolderView {
+	getView(): TagFolderView | null {
 		for (const leaf of this.app.workspace.getLeavesOfType(
 			VIEW_TYPE_TAGFOLDER
 		)) {
@@ -128,7 +131,7 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		return null;
 	}
-	getLinkView(): TagFolderView {
+	getLinkView(): TagFolderView | null {
 		for (const leaf of this.app.workspace.getLeavesOfType(
 			VIEW_TYPE_TAGFOLDER_LINK
 		)) {
@@ -148,11 +151,11 @@ export default class TagFolderPlugin extends Plugin {
 
 		if (targetFile) {
 			if (specialKey) {
-				app.workspace.openLinkText(targetFile.path, targetFile.path, "tab");
+				this.app.workspace.openLinkText(targetFile.path, targetFile.path, "tab");
 			} else {
 				// const leaf = this.app.workspace.getLeaf(false);
 				// leaf.openFile(targetFile);
-				app.workspace.openLinkText(targetFile.path, targetFile.path);
+				this.app.workspace.openLinkText(targetFile.path, targetFile.path);
 			}
 		}
 	};
@@ -174,11 +177,11 @@ export default class TagFolderPlugin extends Plugin {
 	getFileTitle(file: TFile): string {
 		if (!this.settings.useTitle) return file.basename;
 		const metadata = this.app.metadataCache.getCache(file.path);
-		if (metadata.frontmatter && (this.settings.frontmatterKey)) {
+		if (metadata?.frontmatter && (this.settings.frontmatterKey)) {
 			const d = dotted(metadata.frontmatter, this.settings.frontmatterKey);
 			if (d) return `${d}`;
 		}
-		if (metadata.headings) {
+		if (metadata?.headings) {
 			const h1 = metadata.headings.find((e) => e.level == 1);
 			if (h1) {
 				return h1.heading;
@@ -258,8 +261,12 @@ export default class TagFolderPlugin extends Plugin {
 		this.addCommand({
 			id: "tagfolder-create-similar",
 			name: "Create a new note with the same tags",
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
-				const tags = getAllTags(this.app.metadataCache.getFileCache(view.file));
+			editorCallback: async (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				const file = view?.file;
+				if (!file) return;
+				const cache = this.app.metadataCache.getFileCache(file);
+				if (!cache) return;
+				const tags = getAllTags(cache) ?? [];
 				//@ts-ignore
 				const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
 				await this.app.vault.append(ww, tags.join(" "));
@@ -281,8 +288,9 @@ export default class TagFolderPlugin extends Plugin {
 		);
 
 		this.refreshAllTree = this.refreshAllTree.bind(this);
-		this.registerEvent(this.app.vault.on("rename", this.refreshAllTree));
-		this.registerEvent(this.app.vault.on("delete", this.refreshAllTree));
+		this.refreshTree = this.refreshTree.bind(this);
+		this.registerEvent(this.app.vault.on("rename", this.refreshTree));
+		this.registerEvent(this.app.vault.on("delete", this.refreshTree));
 		this.registerEvent(this.app.vault.on("modify", this.modifyFile));
 
 		this.registerEvent(
@@ -299,7 +307,7 @@ export default class TagFolderPlugin extends Plugin {
 		}
 		searchString.subscribe((search => {
 			this.searchString = search;
-			this.refreshAllTree(null);
+			this.refreshAllTree();
 		}))
 
 
@@ -345,7 +353,7 @@ export default class TagFolderPlugin extends Plugin {
 		this.register(
 			onElement(document, "click", selectorHashTagSpan, (event: MouseEvent, targetEl: HTMLElement) => {
 				if (!this.settings.overrideTagClicking) return;
-				let enumTags: Element = targetEl;
+				let enumTags: Element | null = targetEl;
 				let tagString = "";
 				// A tag is consisted of possibly several spans having each class.
 				// Usually, they have been merged into two spans. but can be more.
@@ -379,7 +387,7 @@ export default class TagFolderPlugin extends Plugin {
 		})
 	}
 
-	watchWorkspaceOpen(file: TFile) {
+	watchWorkspaceOpen(file: TFile | null) {
 		if (file) {
 			this.currentOpeningFile = file.path;
 		} else {
@@ -389,51 +397,59 @@ export default class TagFolderPlugin extends Plugin {
 	}
 
 	metadataCacheChanged(file: TFile) {
-		this.loadFileInfo(file);
+		this.loadFileInfoAsync(file);
 	}
 	metadataCacheResolve(file: TFile) {
 		if (this.getLinkView() != null) {
-			this.loadFileInfo(file);
+			this.loadFileInfoAsync(file);
 		}
 	}
 	metadataCacheResolved() {
 		if (this.getLinkView() != null) {
-			this.loadFileInfo();
+			// console.warn("MetaCache Resolved")
+			// this.loadFileInfo();
 		}
 	}
 
-	refreshAllTree(file: TFile | TFolder) {
+	refreshTree(file: TAbstractFile, oldName?: string) {
+		if (file instanceof TFile) {
+			this.loadFileInfo(file);
+		}
+	}
+
+	refreshAllTree() {
 		this.loadFileInfo();
 	}
 
-	fileCaches: {
-		file: TFile;
-		metadata: CachedMetadata;
-		links: string[];
-		directLinks: string[];
-	}[] = [];
+	fileCaches: FileCache[] = [];
 
 	oldFileCache = "";
 
 
 	parsedFileCache = new Map<string, number>();
 
+	getFileCacheLinks(file: TFile) {
+		const cachedLinks = this.app.metadataCache.resolvedLinks;
+		const allLinks = this.getLinkView() == null ? [] : parseAllReference(cachedLinks, file.path, this.settings.linkConfig);
+
+		const links = [...allLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
+		return links;
+	}
+	getFileCacheData(file: TFile): FileCache | false {
+		const metadata = this.app.metadataCache.getFileCache(file);
+		if (!metadata) return false;
+		const links = this.getFileCacheLinks(file);
+		return {
+			file: file,
+			links: links,
+			tags: getAllTags(metadata) || [],
+		};
+	}
 	updateFileCachesAll(): boolean {
 		const filesAll = [...this.app.vault.getMarkdownFiles(), ...this.app.vault.getAllLoadedFiles().filter(e => "extension" in e && e.extension == "canvas") as TFile[]];
 		const processFiles = filesAll.filter(file => this.parsedFileCache.get(file.path) ?? 0 != file.stat.mtime);
-		const cachedLinks = this.app.metadataCache.resolvedLinks;
-		this.fileCaches = processFiles.map((fileEntry) => {
-			const [allDirectLinks, allLinks] = this.getLinkView() == null ? [[], []] : parseAllReference(cachedLinks, fileEntry.path, this.settings.linkConfig);
-			const directLinks = [...allDirectLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
-			const links = [...allLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
-			this.parsedFileCache.set(fileEntry.path, fileEntry.stat.mtime);
-			return {
-				file: fileEntry,
-				metadata: this.app.metadataCache.getFileCache(fileEntry),
-				links: links,
-				directLinks: directLinks
-			};
-		});
+		const caches = processFiles.map(entry => this.getFileCacheData(entry)).filter(e => e !== false) as FileCache[];
+		this.fileCaches = [...caches];
 		return this.isFileCacheChanged();
 	}
 	isFileCacheChanged() {
@@ -441,8 +457,7 @@ export default class TagFolderPlugin extends Plugin {
 			this.fileCaches.map((e) => ({
 				path: e.file.path,
 				links: e.links,
-				directLinks: e.directLinks,
-				tags: getAllTags(e.metadata),
+				tags: e.tags,
 			}))
 		);
 		if (this.oldFileCache == fileCacheDump) {
@@ -453,40 +468,52 @@ export default class TagFolderPlugin extends Plugin {
 		}
 	}
 
-	updateFileCaches(diff?: TFile): boolean {
+
+	updateFileCaches(diffs: (TFile | undefined)[] = []): boolean {
 		let anyUpdated = false;
 
-		if (this.fileCaches.length == 0 || !diff) {
+		if (this.fileCaches.length == 0 || diffs.length == 0) {
 			return this.updateFileCachesAll();
 		} else {
-			const cachedLinks = this.app.metadataCache.resolvedLinks;
-			if (this.parsedFileCache.get(diff.path) == diff.stat.mtime) return false;
-			const [allDirectLinks, allLinks] = this.getLinkView() == null ? [[], []] : parseAllReference(cachedLinks, diff.path, this.settings.linkConfig);
-			const directLinks = [...allDirectLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
-			const links = [...allLinks.filter(e => e.endsWith(".md")).map(e => `${e}`)];
+			const processDiffs = [...diffs];
+			let newCaches = [...this.fileCaches];
+			let diff = processDiffs.shift();
+			do {
+				const procDiff = diff;
+				if (!procDiff) break;
+				// Find old one and remove if exist once.
+				const old = newCaches.find(
+					(fileCache) => fileCache.file.path == procDiff.path
+				);
 
-			const old = this.fileCaches.find(
-				(fileCache) => fileCache.file.path == diff.path
-			);
-
-			if (old && JSON.stringify(old?.links) != JSON.stringify(links) && this.getLinkView() != null) {
-				const files = unique([...old.links, ...links]);
-				for (const file of files) {
-					const f = app.vault.getAbstractFileByPath(file);
-					if (f instanceof TFile) anyUpdated = this.updateFileCaches(f) || anyUpdated;
+				if (old) {
+					newCaches = newCaches.filter(
+						(fileCache) => fileCache !== old
+					);
 				}
-			}
-			this.fileCaches = this.fileCaches.filter(
-				(fileCache) => fileCache.file.path != diff.path
-			);
-			this.fileCaches.push({
-				file: diff,
-				metadata: this.app.metadataCache.getFileCache(diff),
-				links: links,
-				directLinks: directLinks
-			});
+				const newCache = this.getFileCacheData(procDiff);
+				if (newCache) {
+					// Update about references
+					if (this.getLinkView() != null) {
+						const oldLinks = old?.links || [];
+						const newLinks = newCache.links;
+						const all = unique([...oldLinks, ...newLinks]);
+						// Updated or Deleted reference
+						const diffs = all.filter(link => !oldLinks.contains(link) || !newLinks.contains(link))
+						for (const filename of diffs) {
+							const file = this.app.vault.getAbstractFileByPath(filename);
+							if (file instanceof TFile) processDiffs.push(file);
+						}
+					}
+					newCaches.push(newCache);
+				}
+				anyUpdated = anyUpdated || (JSON.stringify(fileCacheToCompare(old)) != JSON.stringify(fileCacheToCompare(newCache)));
+				diff = processDiffs.shift();
+			} while (diff !== undefined);
+			this.fileCaches = newCaches;
+
 		}
-		return this.isFileCacheChanged() || anyUpdated;
+		return anyUpdated;
 	}
 
 	async getItemsList(mode: "tag" | "link"): Promise<ViewItem[]> {
@@ -551,7 +578,7 @@ export default class TagFolderPlugin extends Plugin {
 			const tagRedirectList = {} as { [key: string]: string };
 			if (this.settings.useTagInfo && this.tagInfo) {
 				for (const [key, taginfo] of Object.entries(this.tagInfo)) {
-					if ("redirect" in taginfo) {
+					if (taginfo?.redirect) {
 						tagRedirectList[key] = taginfo.redirect;
 					}
 				}
@@ -559,7 +586,7 @@ export default class TagFolderPlugin extends Plugin {
 
 			let allTags = [] as string[];
 			if (mode == "tag") {
-				const allTagsDocs = unique(getAllTags(fileCache.metadata) ?? []);
+				const allTagsDocs = unique(fileCache.tags);
 				allTags = unique(allTagsDocs.map((e) => e.substring(1)).map(e => e in tagRedirectList ? tagRedirectList[e] : e));
 			} else {
 				allTags = unique(fileCache.links)
@@ -634,7 +661,6 @@ export default class TagFolderPlugin extends Plugin {
 			// }
 
 			const links = fileCache.links;
-			const directLinks = fileCache.directLinks;
 			if (links.length == 0) links.push("_unlinked");
 			if (this.settings.disableNarrowingDown && mode == "tag") {
 				const archiveTagsMatched = allTags.filter(e => archiveTags.contains(e.toLocaleLowerCase()));
@@ -650,7 +676,6 @@ export default class TagFolderPlugin extends Plugin {
 						ctime: fileCache.file.stat.ctime,
 						filename: fileCache.file.basename,
 						links: links,
-						directLinks: directLinks,
 					});
 				}
 			} else {
@@ -664,7 +689,6 @@ export default class TagFolderPlugin extends Plugin {
 					ctime: fileCache.file.stat.ctime,
 					filename: fileCache.file.basename,
 					links: links,
-					directLinks: directLinks,
 				});
 			}
 		}
@@ -680,9 +704,8 @@ export default class TagFolderPlugin extends Plugin {
 		});
 	}
 
-	// Sweep updated file or all files to retrieve tags.
-	async loadFileInfoAsync(diff?: TFile) {
-		if (this.getView() == null && this.getLinkView() == null) return;
+	processingFileInfo = false;
+	isSettingChanged() {
 		const strSetting = JSON.stringify(this.settings);
 		const isSettingChanged = strSetting != this.lastSettings;
 		const isSearchStringModified =
@@ -693,26 +716,71 @@ export default class TagFolderPlugin extends Plugin {
 		if (isSearchStringModified) {
 			this.lastSearchString = this.searchString;
 		}
-		if (
-			!this.updateFileCaches(diff) &&
-			!isSearchStringModified &&
-			!isSettingChanged
-		) {
-			// If any conditions are not changed, skip processing.
-			await this.applyUpdateIntoScroll(diff);
+		return isSearchStringModified || isSettingChanged;
+	}
+	loadFileQueue = [] as TFile[];
+	loadFileTimer?: ReturnType<typeof setTimeout> = undefined;
+	async loadFileInfos(diffs: TFile[]) {
+		if (this.processingFileInfo) {
+			diffs.forEach(e => this.loadFileInfoAsync(e));
 			return;
 		}
+		try {
+			this.processingFileInfo = true;
+			const cacheUpdated = this.updateFileCaches(diffs);
+			if (this.isSettingChanged() || cacheUpdated) {
+				appliedFiles.set(diffs.map(e => e.path));
+				await this.applyFileInfoToView();
+			}
+			// Apply content of diffs to each view.
+			await this.applyUpdateIntoScroll(diffs);
+		} finally {
+			this.processingFileInfo = false;
+		}
+	}
+	async applyFileInfoToView() {
 		const items = await this.getItemsList("tag");
 		const itemsSorted = items.sort(this.compareItems);
 		this.allViewItems = itemsSorted;
 		allViewItems.set(this.allViewItems);
+		if (this.getLinkView() != null) {
+			const itemsLink = await this.getItemsList("link");
+			updateItemsLinkMap(itemsLink);
+			const itemsLinkSorted = itemsLink.sort(this.compareItems);
+			this.allViewItemsByLink = itemsLinkSorted;
+			allViewItemsByLink.set(this.allViewItemsByLink);
+		}
+	}
 
-		const itemsLink = await this.getItemsList("link");
-		const itemsLinkSorted = itemsLink.sort(this.compareItems);
-		this.allViewItemsByLink = itemsLinkSorted;
-		allViewItemsByLink.set(this.allViewItemsByLink);
-		await this.applyUpdateIntoScroll(diff);
-
+	// Sweep updated file or all files to retrieve tags.
+	async loadFileInfoAsync(diff?: TFile) {
+		if (!diff) {
+			this.loadFileQueue = [];
+			if (this.loadFileTimer) {
+				clearTimeout(this.loadFileTimer);
+				this.loadFileTimer = undefined;
+			}
+			await this.loadFileInfos([]);
+			return;
+		}
+		if (diff && this.loadFileQueue.some(e => e.path == diff?.path)) {
+			//console.log(`LoadFileInfo already in queue:${diff?.path}`)
+		} else {
+			this.loadFileQueue.push(diff);
+			//console.log(`LoadFileInfo queued:${diff.path}`);
+		}
+		if (this.loadFileTimer) {
+			clearTimeout(this.loadFileTimer);
+		}
+		this.loadFileTimer = setTimeout(() => {
+			if (this.loadFileQueue.length === 0) {
+				// console.log(`No need to LoadFile`);
+			} else {
+				const diffs = [...this.loadFileQueue];
+				this.loadFileQueue = [];
+				this.loadFileInfos(diffs);
+			}
+		}, 200);
 	}
 
 	onunload() { }
@@ -733,7 +801,7 @@ export default class TagFolderPlugin extends Plugin {
 		);
 	}
 
-	async applyUpdateIntoScroll(file?: TFile) {
+	async applyUpdateIntoScroll(files: TFile[]) {
 		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_SCROLL);
 		for (const leaf of leaves) {
 			const view = leaf.view as ScrollView;
@@ -742,19 +810,21 @@ export default class TagFolderPlugin extends Plugin {
 			const scrollViewState = view?.getScrollViewState();
 			if (!viewState || !scrollViewState) continue;
 			const viewStat = { ...viewState, state: { ...scrollViewState } }
-			if (file && view.isFileOpened(file.path)) {
+			for (const file of files) {
+				if (file && view.isFileOpened(file.path)) {
 
-				const newStat = {
-					...viewStat,
-					state: {
-						...viewStat.state,
-						files: viewStat.state.files.map(e => e.path == file.path ? ({
-							path: file.path
-						} as ScrollViewFile) : e)
+					const newStat = {
+						...viewStat,
+						state: {
+							...viewStat.state,
+							files: viewStat.state.files.map(e => e.path == file.path ? ({
+								path: file.path
+							} as ScrollViewFile) : e)
 
+						}
 					}
+					await leaf.setViewState(newStat);
 				}
-				await leaf.setViewState(newStat);
 			}
 			const tagPath = viewStat.state.tagPath;
 			const tags = tagPath.split(", ");
@@ -862,12 +932,12 @@ export default class TagFolderPlugin extends Plugin {
 
 	}
 
-	tagInfo: TagInfoDict = null;
+	tagInfo: TagInfoDict = {};
 	tagInfoFrontMatterBuffer: Record<string, object> = {};
-	skipOnce: boolean;
+	skipOnce = false;
 	tagInfoBody = "";
 
-	async modifyFile(file: TFile | TFolder) {
+	async modifyFile(file: TAbstractFile) {
 		if (!this.settings.useTagInfo) return;
 		if (this.skipOnce) {
 			this.skipOnce = false;
@@ -991,7 +1061,7 @@ export default class TagFolderPlugin extends Plugin {
 		if (!tagSrc) return;
 		const tags = tagSrc.first() == "root" ? tagSrc.slice(1) : tagSrc;
 
-		let theLeaf: WorkspaceLeaf;
+		let theLeaf: WorkspaceLeaf | undefined = undefined;
 		for (const leaf of this.app.workspace.getLeavesOfType(
 			VIEW_TYPE_TAGFOLDER_LIST
 		)) {
@@ -1125,13 +1195,13 @@ class TagFolderSettingTab extends PluginSettingTab {
 						"NAME : PATH": "NAME : PATH",
 					})
 					.setValue(this.plugin.settings.displayMethod)
-					.onChange(async (value: DISPLAY_METHOD) => {
-						this.plugin.settings.displayMethod = value;
-						this.plugin.loadFileInfo(null);
+					.onChange(async (value) => {
+						this.plugin.settings.displayMethod = value as DISPLAY_METHOD;
+						this.plugin.loadFileInfo();
 						await this.plugin.saveSettings();
 					})
 			);
-		const setOrderMethod = async (key: string, order: string) => {
+		const setOrderMethod = async (key?: string, order?: string) => {
 			const oldSetting = this.plugin.settings.sortType.split("_");
 			if (!key) key = oldSetting[0];
 			if (!order) order = oldSetting[1];
@@ -1146,12 +1216,12 @@ class TagFolderSettingTab extends PluginSettingTab {
 			.addDropdown((dd) => {
 				dd.addOptions(OrderKeyItem)
 					.setValue(this.plugin.settings.sortType.split("_")[0])
-					.onChange((key) => setOrderMethod(key, null));
+					.onChange((key) => setOrderMethod(key, undefined));
 			})
 			.addDropdown((dd) => {
 				dd.addOptions(OrderDirection)
 					.setValue(this.plugin.settings.sortType.split("_")[1])
-					.onChange((order) => setOrderMethod(null, order));
+					.onChange((order) => setOrderMethod(undefined, order));
 			});
 		new Setting(containerEl)
 			.setName("Prioritize items which are not contained in sub-folder")
@@ -1192,7 +1262,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 
 		containerEl.createEl("h3", { text: "Tags" });
 
-		const setOrderMethodTag = async (key: string, order: string) => {
+		const setOrderMethodTag = async (key?: string, order?: string) => {
 			const oldSetting = this.plugin.settings.sortTypeTag.split("_");
 			if (!key) key = oldSetting[0];
 			if (!order) order = oldSetting[1];
@@ -1207,12 +1277,12 @@ class TagFolderSettingTab extends PluginSettingTab {
 			.addDropdown((dd) => {
 				dd.addOptions(OrderKeyTag)
 					.setValue(this.plugin.settings.sortTypeTag.split("_")[0])
-					.onChange((key) => setOrderMethodTag(key, null));
+					.onChange((key) => setOrderMethodTag(key, undefined));
 			})
 			.addDropdown((dd) => {
 				dd.addOptions(OrderDirection)
 					.setValue(this.plugin.settings.sortTypeTag.split("_")[1])
-					.onChange((order) => setOrderMethodTag(null, order));
+					.onChange((order) => setOrderMethodTag(undefined, order));
 			});
 
 

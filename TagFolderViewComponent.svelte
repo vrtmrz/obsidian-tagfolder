@@ -2,6 +2,7 @@
 	import {
 		allViewItems,
 		allViewItemsByLink,
+		appliedFiles,
 		performHide,
 		searchString,
 		tagFolderSetting,
@@ -12,7 +13,7 @@
 		type TREE_TYPE,
 	} from "./types";
 	import V2TreeFolderComponent from "./V2TreeFolderComponent.svelte";
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
 	import { setIcon } from "obsidian";
 	import { trimTrailingSlash } from "./util";
 	import { setContext } from "svelte";
@@ -49,12 +50,31 @@
 	let isMainTree: boolean;
 
 	let viewItemsSrc = [] as ViewItem[];
+	let updatedFiles = [] as string[];
+	appliedFiles.subscribe(async (filenames) => {
+		updatedFiles = filenames ?? [];
+	});
+
 	if (viewType == "tags") {
 		allViewItems.subscribe((items) => {
 			viewItemsSrc = items;
 		});
 	} else if (viewType == "links") {
-		allViewItemsByLink.subscribe((items) => {
+		allViewItemsByLink.subscribe(async (items) => {
+			// Remove items for update
+			if (viewItemsSrc) {
+				const filtered = [
+					...viewItemsSrc.filter(
+						(e) =>
+							!updatedFiles.some((filename) =>
+								e.links.contains(filename)
+							)
+					),
+				];
+				updatedFiles = [];
+				viewItemsSrc = filtered;
+				await tick();
+			}
 			viewItemsSrc = items;
 		});
 	}

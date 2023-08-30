@@ -28,11 +28,10 @@
 		ancestorToTags,
 		isSpecialTag,
 		unique,
-		isIntersect,
+		getViewItemFromPath,
+		getAllLinksRecursive,
 	} from "./util";
 	import {
-		allViewItems,
-		allViewItemsByLink,
 		currentFile,
 		selectedTags,
 		tagFolderSetting,
@@ -52,19 +51,6 @@
 
 	$: filename =
 		viewType == "tags" ? "" : thisName.substring(thisName.indexOf(":") + 1);
-
-	// $: referenceDirection = "" as "" | "CROSS" | "FORWARD" | "REVERSE";
-	// $: {
-	// 	if (thisName.startsWith("c:")) {
-	// 		referenceDirection = "CROSS";
-	// 	} else if (thisName.startsWith("f:")) {
-	// 		referenceDirection = "FORWARD";
-	// 	} else if (thisName.startsWith("r:")) {
-	// 		referenceDirection = "REVERSE";
-	// 	} else {
-	// 		referenceDirection = "";
-	// 	}
-	// }
 
 	// All contained items.
 	// **Be careful**: Please keep the order of this. This should be already sorted.
@@ -125,8 +111,17 @@
 
 	// Watch them to realise the configurations to display immediately
 	let _setting = $tagFolderSetting as TagFolderSettings;
+	let expandLimit = 0;
 	tagFolderSetting.subscribe((setting) => {
 		_setting = setting;
+		expandLimit = 0;
+		if (_setting.expandLimit) {
+			if (viewType == "links") {
+				expandLimit = _setting.expandLimit + 1;
+			} else {
+				expandLimit = _setting.expandLimit;
+			}
+		}
 	});
 	let _tagInfo: TagInfoDict = {};
 	tagInfo.subscribe((info: TagInfoDict) => {
@@ -229,27 +224,21 @@
 	}
 
 	let thisLinks = [] as string[];
-	let thisInfo: ViewItem;
+	let thisInfo: ViewItem | undefined;
 	$: {
 		thisLinks = [];
 		thisInfo = undefined;
-		if (viewType == "links" && $allViewItemsByLink) {
-			const path = thisName.toLocaleLowerCase();
-			let selfInfo = _items.find(
-				(e) => e.path.toLocaleLowerCase() == path
-			);
-			if (!selfInfo) {
-				selfInfo = $allViewItemsByLink.find(
-					(e) => e.path.toLocaleLowerCase() == path
-				);
-			}
-			if (selfInfo) thisInfo = selfInfo;
-			thisLinks = (selfInfo?.links ?? []).map((e) => `${e}`);
+		if (viewType == "links") {
+			thisInfo = getViewItemFromPath(thisName);
+			thisLinks = (thisInfo?.links ?? []).map((e) => `${e}`);
 		}
 	}
 
+	// Items which should be used in LinkFolder.
+	let linkedItems = new Map<string, ViewItem[]>();
 	// Updating structure
 	$: {
+		linkedItems.clear();
 		isInDedicatedTag = false;
 		let isMixedDedicatedTag = false;
 		if (_items) {
@@ -264,254 +253,255 @@
 
 			if (
 				isMainTree &&
-				(!_setting?.expandLimit ||
-					(_setting?.expandLimit && depth < _setting.expandLimit))
+				(!expandLimit || (expandLimit && depth < expandLimit))
 			) {
 				isSuppressibleLevel = false;
-
+				isMixedDedicatedTag = false;
 				let tagsAll = uniqueCaseIntensive(
 					_items.flatMap((e) => [...e.tags])
 				);
 				if (viewType == "links") {
-					if (!isRoot && _setting.linkShowOnlyFDR && thisInfo) {
-						const dLinks = thisInfo.directLinks;
-						tagsAll = tagsAll.filter((e) => dLinks.contains(e));
-					}
-					if (!isRoot && _setting.linkCombineOtherTree && thisInfo) {
-						if (_setting.linkConfig.incoming.enabled) {
-							tagsAll = [
-								...tagsAll,
-								...$allViewItemsByLink
-									.filter((e) =>
-										e.directLinks.contains(thisName)
-									)
-									.filter((e) => !trail.contains(e.path))
-									.map((e) => e.path),
-							];
+					tagsAll = unique(_items.flatMap((e) => [...e.links]));
+					if (!isRoot) {
+						tagsAll = thisLinks;
+						if (!_setting.linkShowOnlyFDR) {
+							tagsAll = thisInfo
+								? getAllLinksRecursive(thisInfo, [...trail])
+								: thisLinks;
 						}
 					}
-					if (!isRoot) {
+					if (!isRoot || _setting.expandUntaggedToRoot) {
 						tagsAll = tagsAll.filter((e) => e != "_unlinked");
 					}
-				}
 
-				const lastTrailTagLC =
-					trimTrailingSlash(previousTrail).toLocaleLowerCase();
-
-				// If there are intermediate or normal tag, cancel inDedicatedTag.
-				if (
-					isInDedicatedTag &&
-					tagsAll.some((e) => e.toLocaleLowerCase() == lastTrailTagLC)
-				) {
-					isInDedicatedTag = false;
-				}
-
-				let existTags = [...tagsAll];
-
-				// trimming tags
-
-				// Remove tags which already visited
-				existTags = existTags.filter((tag) =>
-					trail.every(
-						(trail) =>
-							trimTrailingSlash(tag.toLocaleLowerCase()) !==
-							trimTrailingSlash(trail.toLocaleLowerCase())
-					)
-				);
-
-				// Remove itself
-				existTags = existTags.filter(
-					(tag) =>
-						tag.toLocaleLowerCase() !=
-							thisName.toLocaleLowerCase() &&
-						tag.toLocaleLowerCase() != tagName.toLocaleLowerCase()
-				);
-				existTags = existTags.filter(
-					(tag) =>
-						!tag
-							.toLocaleLowerCase()
-							.endsWith(
-								"/" + trimSlash(thisName).toLocaleLowerCase()
-							)
-				);
-
-				let escapedPreviousTrail = previousTrail;
-
-				if (isInDedicatedTag) {
-					// Dedicated tag does not accept other items on the intermediate places.
-
-					existTags = existTags.filter((e) =>
-						(e + "/").startsWith(previousTrail)
-					);
-				}
-				if (isMixedDedicatedTag) {
-					// Escape slash to grouping tags.
-					escapedPreviousTrail = previousTrail.split("/").join("*");
-					existTags = existTags.map((e) =>
-						(e + "/").startsWith(previousTrail)
-							? escapedPreviousTrail +
-							  e.substring(previousTrail.length)
-							: e
-					);
-				}
-
-				let existTagsFiltered1 = [] as string[];
-				if (viewType == "tags" && !_setting.doNotSimplifyTags) {
-					// If the note has only one item. it can be suppressible.
-					if (_items.length == 1) {
-						existTagsFiltered1 = existTags;
-						isSuppressibleLevel = true;
-					} else {
-						// All tags under this note are the same. it can be suppressible
-						const allChildTags = uniqueCaseIntensive(
-							_items.map((e) => e.tags.sort().join("**"))
-						);
-						if (allChildTags.length == 1) {
-							isSuppressibleLevel = true;
-							existTagsFiltered1 = existTags;
+					tagsAll = tagsAll.filter((e) => !trail.contains(e));
+					for (const tag of tagsAll) {
+						if (tag == "_unlinked") {
+							linkedItems.set(
+								tag,
+								_items.filter((e) => e.links.contains(tag))
+							);
+						} else {
+							const wItems = _items.filter((e) => e.path == tag);
+							linkedItems.set(tag, wItems);
 						}
 					}
-				}
-
-				if (!isSuppressibleLevel) {
-					// Collect tags and pieces of nested tags, for preparing a list of
-					// tags (or subsequent part of nested-tag) on the next level.
-
-					// At least, this tag name should be trimmed.
-					const removeItems = [thisName.toLocaleLowerCase()];
-					if (_setting.reduceNestedParent) {
-						// If reduceNestedParent is enabled, passed trails also should be trimmed.
-						removeItems.push(...trailLower);
-					}
-					let tagsOnNextLevel = [] as string[];
-					if (viewType == "tags") {
-						tagsOnNextLevel = uniqueCaseIntensive(
-							existTags.map((e) => {
-								const idx = e.indexOf("/");
-								if (idx < 1) return e;
-								let piece = e.substring(0, idx + 1);
-								let idx2 = idx;
-								while (
-									removeItems.contains(
-										piece.toLocaleLowerCase()
-									)
-								) {
-									idx2 = e.indexOf("/", idx2 + 1);
-									if (idx2 === -1) {
-										piece = e;
-										break;
-									}
-									piece = e.substring(0, idx2 + 1);
-								}
-								return piece;
-							})
-						);
+					tags = [];
+					leftOverItems = [];
+					if (thisName == "_unlinked") {
+						leftOverItems = _items;
 					} else {
-						tagsOnNextLevel = unique(existTags);
+						tagsAll.forEach((tag) => {
+							if (tag == "_unlinked") {
+								tags.push(tag);
+								return;
+							}
+							const x = getViewItemFromPath(tag);
+							if (x == undefined) return false;
+							const existLinks = x.links.filter(
+								(e) => !trail.contains(e) && e != thisName
+							);
+
+							// Show as a tag,
+							// if there are two or more items under the tag,
+							// and it has not reached the expanding limit.
+							const nextDepth =
+								!expandLimit ||
+								(expandLimit && depth + 1 < expandLimit);
+							if (existLinks.length >= 2 && nextDepth) {
+								tags.push(tag);
+							} else {
+								// Otherwise, show as files.
+								leftOverItems.push(x);
+							}
+						});
 					}
-					const trailShortest = removeIntermediatePath(trail);
-					existTagsFiltered1 = tagsOnNextLevel.filter((tag) =>
-						// Remove tags which in trail again.
-						trailShortest.every(
+				} else {
+					const lastTrailTagLC =
+						trimTrailingSlash(previousTrail).toLocaleLowerCase();
+
+					// If there are intermediate or normal tag, cancel inDedicatedTag.
+					if (
+						isInDedicatedTag &&
+						tagsAll.some(
+							(e) => e.toLocaleLowerCase() == lastTrailTagLC
+						)
+					) {
+						isInDedicatedTag = false;
+					}
+
+					let existTags = [...tagsAll];
+
+					// trimming tags
+
+					// Remove tags which already visited
+					existTags = existTags.filter((tag) =>
+						trail.every(
 							(trail) =>
 								trimTrailingSlash(tag.toLocaleLowerCase()) !==
 								trimTrailingSlash(trail.toLocaleLowerCase())
 						)
 					);
-				}
 
-				// To use as a filter, the previous level should be included in the tags list if in the dedicated level.
-				if (isMixedDedicatedTag) {
-					existTagsFiltered1 = existTagsFiltered1.map((e) =>
-						e.replace(escapedPreviousTrail, previousTrail)
+					// Remove itself
+					existTags = existTags.filter(
+						(tag) =>
+							tag.toLocaleLowerCase() !=
+								thisName.toLocaleLowerCase() &&
+							tag.toLocaleLowerCase() !=
+								tagName.toLocaleLowerCase()
 					);
-				}
-
-				// Merge the tags of dedicated tag and normal tag
-				const existTagsFiltered1LC = existTagsFiltered1.map((e) =>
-					e.toLocaleLowerCase()
-				);
-				const existTagsFiltered2 = existTagsFiltered1.map((e) =>
-					existTagsFiltered1LC.contains(e.toLocaleLowerCase() + "/")
-						? e + "/"
-						: e
-				);
-				const existTagsFiltered3 =
-					uniqueCaseIntensive(existTagsFiltered2);
-				if (previousTrail.endsWith("/")) {
-					const existTagsFiltered4 = [] as string[];
-					for (const tag of existTagsFiltered3) {
-						if (
-							!existTagsFiltered3
-								.map((e) => e.toLocaleLowerCase())
-								.contains(
-									(previousTrail + tag).toLocaleLowerCase()
+					existTags = existTags.filter(
+						(tag) =>
+							!tag
+								.toLocaleLowerCase()
+								.endsWith(
+									"/" +
+										trimSlash(thisName).toLocaleLowerCase()
 								)
-						) {
-							existTagsFiltered4.push(tag);
+					);
+
+					let escapedPreviousTrail = previousTrail;
+
+					if (isInDedicatedTag) {
+						// Dedicated tag does not accept other items on the intermediate places.
+
+						existTags = existTags.filter((e) =>
+							(e + "/").startsWith(previousTrail)
+						);
+					}
+					if (isMixedDedicatedTag) {
+						// Escape slash to grouping tags.
+						escapedPreviousTrail = previousTrail
+							.split("/")
+							.join("*");
+						existTags = existTags.map((e) =>
+							(e + "/").startsWith(previousTrail)
+								? escapedPreviousTrail +
+								  e.substring(previousTrail.length)
+								: e
+						);
+					}
+
+					let existTagsFiltered1 = [] as string[];
+					if (!_setting.doNotSimplifyTags) {
+						// If the note has only one item. it can be suppressible.
+						if (_items.length == 1) {
+							existTagsFiltered1 = existTags;
+							isSuppressibleLevel = true;
+						} else {
+							// All tags under this note are the same. it can be suppressible
+							const allChildTags = uniqueCaseIntensive(
+								_items.map((e) => e.tags.sort().join("**"))
+							);
+							if (allChildTags.length == 1) {
+								isSuppressibleLevel = true;
+								existTagsFiltered1 = existTags;
+							}
 						}
 					}
-					tags = uniqueCaseIntensive(
-						removeIntermediatePath(existTagsFiltered4)
+
+					if (!isSuppressibleLevel) {
+						// Collect tags and pieces of nested tags, for preparing a list of
+						// tags (or subsequent part of nested-tag) on the next level.
+
+						// At least, this tag name should be trimmed.
+						const removeItems = [thisName.toLocaleLowerCase()];
+						if (_setting.reduceNestedParent) {
+							// If reduceNestedParent is enabled, passed trails also should be trimmed.
+							removeItems.push(...trailLower);
+						}
+						let tagsOnNextLevel = [] as string[];
+						if (viewType == "tags") {
+							tagsOnNextLevel = uniqueCaseIntensive(
+								existTags.map((e) => {
+									const idx = e.indexOf("/");
+									if (idx < 1) return e;
+									let piece = e.substring(0, idx + 1);
+									let idx2 = idx;
+									while (
+										removeItems.contains(
+											piece.toLocaleLowerCase()
+										)
+									) {
+										idx2 = e.indexOf("/", idx2 + 1);
+										if (idx2 === -1) {
+											piece = e;
+											break;
+										}
+										piece = e.substring(0, idx2 + 1);
+									}
+									return piece;
+								})
+							);
+						} else {
+							tagsOnNextLevel = unique(existTags);
+						}
+						const trailShortest = removeIntermediatePath(trail);
+						existTagsFiltered1 = tagsOnNextLevel.filter((tag) =>
+							// Remove tags which in trail again.
+							trailShortest.every(
+								(trail) =>
+									trimTrailingSlash(
+										tag.toLocaleLowerCase()
+									) !==
+									trimTrailingSlash(trail.toLocaleLowerCase())
+							)
+						);
+					}
+
+					// To use as a filter, the previous level should be included in the tags list if in the dedicated level.
+					if (isMixedDedicatedTag) {
+						existTagsFiltered1 = existTagsFiltered1.map((e) =>
+							e.replace(escapedPreviousTrail, previousTrail)
+						);
+					}
+
+					// Merge the tags of dedicated tag and normal tag
+					const existTagsFiltered1LC = existTagsFiltered1.map((e) =>
+						e.toLocaleLowerCase()
 					);
-				} else {
-					tags = uniqueCaseIntensive(
-						removeIntermediatePath(existTagsFiltered3)
+					const existTagsFiltered2 = existTagsFiltered1.map((e) =>
+						existTagsFiltered1LC.contains(
+							e.toLocaleLowerCase() + "/"
+						)
+							? e + "/"
+							: e
 					);
+					const existTagsFiltered3 =
+						uniqueCaseIntensive(existTagsFiltered2);
+					if (previousTrail.endsWith("/")) {
+						const existTagsFiltered4 = [] as string[];
+						for (const tag of existTagsFiltered3) {
+							if (
+								!existTagsFiltered3
+									.map((e) => e.toLocaleLowerCase())
+									.contains(
+										(
+											previousTrail + tag
+										).toLocaleLowerCase()
+									)
+							) {
+								existTagsFiltered4.push(tag);
+							}
+						}
+						tags = uniqueCaseIntensive(
+							removeIntermediatePath(existTagsFiltered4)
+						);
+					} else {
+						tags = uniqueCaseIntensive(
+							removeIntermediatePath(existTagsFiltered3)
+						);
+					}
 				}
 			}
 		}
-	}
-
-	function isDirectLinked(from: ViewItem, to: ViewItem) {
-		const ret = _isDirectLinked(from, to);
-		// console.log(`D:${from.path} -> ${to.path} : ${ret}`);
-		return ret;
-	}
-	function _isDirectLinked(from: ViewItem, to: ViewItem) {
-		if (!from) return false;
-		if (!to) return false;
-		if (from.path == to.path) return false;
-
-		if (_setting.linkConfig.incoming.enabled) {
-			if (to.directLinks.some((e) => e == from.path)) {
-				return true;
-			}
-		}
-		if (_setting.linkConfig.outgoing.enabled) {
-			if (from.directLinks.some((e) => e == to.path)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	function isLinked(from: ViewItem, to: ViewItem) {
-		const ret = _isLinked(from, to);
-		// console.log(`L:${from.path} -> ${to.path} : ${ret}`);
-		return ret;
-	}
-
-	function _isLinked(from: ViewItem, to: ViewItem) {
-		if (from.path == to.path) return false;
-
-		if (_setting.linkConfig.incoming.enabled) {
-			if (to.links.some((e) => e == from.path)) {
-				return true;
-			}
-		}
-		if (_setting.linkConfig.outgoing.enabled) {
-			if (from.links.some((e) => e == to.path)) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	// Collect sub-folders.
 	$: {
 		suppressLevels = []; // This will be shown as chip.
-		if (_setting?.expandLimit && depth >= _setting.expandLimit) {
+		if (expandLimit && depth >= expandLimit) {
 			// If expand limit had been configured and we have reached it,
 			// suppress sub-folders and show that information as extraTags.
 			children = [];
@@ -533,12 +523,13 @@
 				_setting.reduceNestedParent
 			);
 		} else {
-			const previousTrailLC = previousTrail.toLocaleLowerCase();
-			let wChildren = tags
-				.map((tag) => {
-					const tagLC = tag.toLocaleLowerCase();
-					const tagNestedLC = trimPrefix(tagLC, previousTrailLC);
-					if (viewType == "tags") {
+			let wChildren = [] as V2FolderItem[];
+			if (viewType == "tags") {
+				const previousTrailLC = previousTrail.toLocaleLowerCase();
+				wChildren = tags
+					.map((tag) => {
+						const tagLC = tag.toLocaleLowerCase();
+						const tagNestedLC = trimPrefix(tagLC, previousTrailLC);
 						return [
 							tag,
 							...parseTagName(tag, _tagInfo),
@@ -554,61 +545,22 @@
 								})
 							),
 						] as V2FolderItem;
-					} else {
-						const path = tag.toLocaleLowerCase();
-						let selfInfo = _items.find(
-							(e) => e.path.toLocaleLowerCase() == path
-						);
-						if (!selfInfo) {
-							selfInfo = $allViewItemsByLink.find(
-								(e) => e.path.toLocaleLowerCase() == path
-							);
-						}
-						const dispName = selfInfo?.displayName ?? tag;
-						let itemIncomingCandidates = [] as ViewItem[];
-						let itemOutgoingCandidates = [] as ViewItem[];
-						let itemCandidates = [] as ViewItem[];
-						const onlyFDR = _setting.linkShowOnlyFDR;
-						if (_setting.linkCombineOtherTree) {
-							if (_setting.linkConfig.outgoing.enabled) {
-								itemOutgoingCandidates =
-									$allViewItemsByLink.filter(
-										(e) => !trail.contains(e.path)
-									);
-							}
-							if (_setting.linkConfig.incoming.enabled) {
-								itemIncomingCandidates = $allViewItemsByLink
-									.filter((e) => e.links.contains(tag))
-									.filter((e) => !trail.contains(e.path));
-							}
-
-							itemCandidates = [
-								...itemOutgoingCandidates,
-								...itemIncomingCandidates,
-							];
-						} else {
-							itemCandidates = _items;
-						}
-						return [
-							tag,
-							dispName,
-							[dispName],
-							tag == "_unlinked"
-								? itemCandidates.filter((e) =>
-										e.links.contains("_unlinked")
-								  )
-								: itemCandidates.filter((item) =>
-										(onlyFDR ? isDirectLinked : isLinked)(
-											selfInfo,
-											item
-										)
-								  ),
-							// .filter((item) => !trail.contains(item.path)),
-						] as V2FolderItem;
-					}
-				})
-				.filter((child) => child[V2FI_IDX_CHILDREN].length != 0);
-
+					})
+					.filter((child) => child[V2FI_IDX_CHILDREN].length != 0);
+			} else if (viewType == "links") {
+				// We made the list in the previous step.
+				wChildren = tags.map((tag) => {
+					const selfInfo = getViewItemFromPath(tag);
+					const dispName = !selfInfo ? tag : selfInfo.displayName;
+					const children = linkedItems.get(tag) ?? [];
+					return [
+						tag,
+						dispName,
+						[dispName],
+						children,
+					] as V2FolderItem;
+				});
+			}
 			if (viewType == "tags") {
 				// -- Check redundant combination if configured.
 				if (_setting.mergeRedundantCombination) {
@@ -671,7 +623,10 @@
 
 	$: isActive =
 		(_items && _items.some((e) => e.path == _currentActiveFilePath)) ||
-		(viewType == "links" && filename == _currentActiveFilePath);
+		(viewType == "links" &&
+			(thisName == _currentActiveFilePath ||
+				tags.contains(_currentActiveFilePath) ||
+				leftOverItems.some((e) => e.path == _currentActiveFilePath)));
 	$: {
 		// I wonder actually this is meaningful; tagName and tagNameDisp should be shown
 		if (tagName == "" && tagNameDisp.length == 0) {
@@ -705,18 +660,11 @@
 	}
 	// To improve performance, make HTML in advance.
 	$: classKey = viewType == "links" ? " tf-link" : " tf-tag";
-	let directionClass = "";
-	// $: {
-	// 	directionClass = "";
-	// 	if (referenceDirection == "CROSS") directionClass = " link-cross";
-	// 	if (referenceDirection == "FORWARD") directionClass = " link-forward";
-	// 	if (referenceDirection == "REVERSE") directionClass = " link-reverse";
-	// }
 	$: tagsDispHtml = isFolderVisible
 		? tagsDisp
 				.map(
 					(e) =>
-						`<span class="tagfolder-tag tag-tag${classKey}${directionClass}">${e
+						`<span class="tagfolder-tag tag-tag${classKey}">${e
 							.map(
 								(ee) =>
 									`<span class="tf-tag-each">${escapeStringToHTML(
@@ -747,7 +695,7 @@
 			} else if (isRoot && !isMainTree) {
 				// Separated List;
 				leftOverItems = _items;
-			} else {
+			} else if (viewType == "tags") {
 				if (_setting.hideItems == "NONE") {
 					leftOverItems = _items;
 				} else if (
@@ -787,24 +735,13 @@
 				return (aIsInChildren ? -1 : 0) + (bIsInChildren ? 1 : 0);
 			});
 		}
-		if (viewType == "links") {
-			leftOverItems = leftOverItems
-				// .filter(
-				// 	(e) =>
-				// 		thisLinks.some((link) => link == e.path) ||
-				// 		e.links.some((link) => link == filename) ||
-				// 		e.path == thisName ||
-				// 		e.links.contains("_unlinked") ||
-				// 		true
-				// )
-				.filter((item) =>
-					children.every((e) => e[V2FI_IDX_TAG] != item.path)
-				);
-
-			// .filter((e) => !isIntersect(e.links, trail));
-		}
 	}
 	let isFolderVisible = false;
+
+	$: itemCount =
+		viewType == "tags"
+			? _items?.length ?? 0
+			: tags.length + leftOverItems.length;
 
 	// -- Phased UI update --
 
@@ -945,7 +882,6 @@
 					)
 				)
 			),
-			,
 		].map((e) => trimTrailingSlash(e));
 		const expandedTags = expandedTagsAll
 			.map((e) =>
@@ -958,8 +894,8 @@
 			.map((e) => "#" + e)
 			.join(" ")
 			.trim();
-		args.dataTransfer.setData("text/plain", expandedTags);
-		args.dataTransfer.setData("Text", expandedTags);
+		(args as any).dataTransfer.setData("text/plain", expandedTags);
+		(args as any).dataTransfer.setData("Text", expandedTags);
 		(args as any).title = expandedTags;
 		(args as any).draggable = true;
 
@@ -1052,8 +988,7 @@
 					<span
 						class="itemscount"
 						{draggable}
-						on:dragstart={dragStartFiles}
-						>{_items?.length ?? 0}</span
+						on:dragstart={dragStartFiles}>{itemCount}</span
 					>
 				</div>
 			</div>

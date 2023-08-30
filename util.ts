@@ -1,4 +1,4 @@
-import { tagInfo } from "store";
+import { allViewItemsByLink, tagInfo } from "store";
 import {
 	EPOCH_DAY,
 	EPOCH_HOUR,
@@ -12,7 +12,8 @@ import {
 	type TagInfo,
 	type TagInfoDict,
 	type ViewItem,
-	type LinkParseConf
+	type LinkParseConf,
+	type FileCache
 } from "types";
 
 export function unique<T>(items: T[]) {
@@ -64,7 +65,7 @@ tagInfo.subscribe(tagInfo => {
 	}
 	const items = Object.entries(tagInfo);
 	for (const [key, info] of items) {
-		if ("alt" in info) {
+		if (info?.alt) {
 			tagDispAlternativeDict[key] = info.alt;
 		}
 	}
@@ -145,8 +146,8 @@ export const compare = (Intl && Intl.Collator) ? (new Intl.Collator().compare) :
 	(x: string, y: string) => (`${x ?? ""}`).localeCompare(`${y ?? ""}`);
 
 
-export function getTagName(tagName: string, subtreePrefix: string, tagInfo: TagInfoDict, invert: number) {
-	if (tagInfo == null) return tagName;
+export function getTagName(tagName: string, subtreePrefix: string, tagInfo: TagInfoDict | undefined, invert: number) {
+	if (tagInfo == undefined) return tagName;
 	const prefix = invert == -1 ? `\uffff` : `\u0001`;
 	const unpinned = invert == 1 ? `\uffff` : `\u0001`;
 
@@ -197,7 +198,7 @@ export function removeIntermediatePathOld(paths: string[]) {
 	return out.filter(e => removeList.indexOf(e) == -1)
 }
 
-export function getTagMark(tagInfo: TagInfo) {
+export function getTagMark(tagInfo: TagInfo | undefined) {
 	if (!tagInfo) return "";
 	if ("key" in tagInfo) {
 		if ("mark" in tagInfo && tagInfo.mark != "") {
@@ -257,7 +258,7 @@ export function selectCompareMethodTags(settings: TagFolderSettings, tagInfo: Ta
 		const bName = b[V2FI_IDX_TAGNAME];
 		const aPrefix = isASubTree ? subTreeChar[invert] : "";
 		const bPrefix = isBSubTree ? subTreeChar[invert] : "";
-		return compare(getTagName(aName, aPrefix, settings.useTagInfo ? _tagInfo : null, invert), getTagName(bName, bPrefix, settings.useTagInfo ? _tagInfo : null, invert)) * invert;
+		return compare(getTagName(aName, aPrefix, settings.useTagInfo ? _tagInfo : undefined, invert), getTagName(bName, bPrefix, settings.useTagInfo ? _tagInfo : undefined, invert)) * invert;
 	}
 	switch (settings.sortTypeTag) {
 		case "ITEMS_ASC":
@@ -390,85 +391,25 @@ export function parseTagName(thisName: string, _tagInfo: TagInfoDict): [string, 
 	return [tagName, tagNameDisp]
 }
 
-const frCache = new Map<string, string[][]>();
-const rrCache = new Map<string, string[][]>();
-
-
 function parseAllForwardReference(metaCache: Record<string, Record<string, number>>, filename: string, passed: string[]) {
-	const key = `${filename}-${passed.join("-")}`;
 
-	const allForwardLinks = Object.keys(metaCache?.[filename] ?? {}).map(e => `${e}`).filter(e => !passed.contains(e));
-	if (frCache.has(key)) {
-		const cached = frCache.get(key);
-		if (cached[1].join("-") != allForwardLinks.join("-")) {
-			invalidateRefCache(unique([...cached[1], ...allForwardLinks]))
-		} else {
-			return cached;
-		}
-	}
-	const nextPassed = [...passed, ...allForwardLinks];
-	let allNextLinks = [] as string[];
-	for (const link of allForwardLinks) {
-		const [, next] = parseAllForwardReference(metaCache, link, nextPassed);
-		allNextLinks = [...allNextLinks, ...next];
-	}
-	const ret = [unique(allForwardLinks), unique([...allForwardLinks, ...allNextLinks])];
-	frCache.set(key, ret);
+	const allForwardLinks = Object.keys(metaCache?.[filename] ?? {}).filter(e => !passed.contains(e));
+	const ret = unique(allForwardLinks);
 	return ret;
 }
 function parseAllReverseReference(metaCache: Record<string, Record<string, number>>, filename: string, passed: string[]) {
-	const key = `${filename}-${passed.join("-")}`;
-	const allReverseLinks = Object.entries((metaCache)).filter(([, links]) => filename in links).map(([name,]) => name).map(e => `${e}`).filter(e => !passed.contains(e));
-
-	if (rrCache.has(key)) {
-		const cached = rrCache.get(key);
-		if (cached[1].join("-") != allReverseLinks.join("-")) {
-			invalidateRefCache(unique([...cached[1], ...allReverseLinks]))
-		} else {
-			return cached;
-		}
-	}
-
-	const nextPassed = [...passed, ...allReverseLinks];
-	let allNextLinks = [] as string[];
-	for (const link of allReverseLinks) {
-		const [, next] = parseAllReverseReference(metaCache, link, nextPassed);
-		allNextLinks = [...allNextLinks, ...next];
-	}
-	const ret = [unique(allReverseLinks), unique([...allReverseLinks, ...allNextLinks])];
-	rrCache.set(key, ret);
+	const allReverseLinks = Object.entries((metaCache)).filter(([, links]) => filename in links).map(([name,]) => name).filter(e => !passed.contains(e));
+	const ret = unique(allReverseLinks);
 	return ret;
 }
 
-export function invalidateRefCache(filenames: string[]) {
-	const delRCache = [] as string[];
-	for (const [key, value] of rrCache) {
-		if (isIntersect(value[1], filenames)) {
-			delRCache.push(key);
-		}
-	}
-	const delFCache = [] as string[];
-	for (const [key, value] of frCache) {
-		if (isIntersect(value[1], filenames)) {
-			delFCache.push(key);
-		}
-	}
-	for (const key of delRCache) {
-		rrCache.delete(key);
-	} for (const key of delFCache) {
-		frCache.delete(key);
-	}
-}
-
-export function parseAllReference(metaCache: Record<string, Record<string, number>>, filename: string, conf: LinkParseConf): string[][] {
-	const [allDirectForwardLinks, allForwardLinks] = (!conf?.outgoing?.enabled) ? [[], []] : parseAllForwardReference(metaCache, filename, []);
-	const [allDirectReverseLinks, allReverseLinks] = (!conf?.incoming?.enabled) ? [[], []] : parseAllReverseReference(metaCache, filename, []);
-	let direct = [...allDirectForwardLinks, ...allDirectReverseLinks];
+export function parseAllReference(metaCache: Record<string, Record<string, number>>, filename: string, conf: LinkParseConf): string[] {
+	const allForwardLinks = (!conf?.outgoing?.enabled) ? [] : parseAllForwardReference(metaCache, filename, []);
+	const allReverseLinks = (!conf?.incoming?.enabled) ? [] : parseAllReverseReference(metaCache, filename, []);
 	let linked = [...allForwardLinks, ...allReverseLinks];
-	if (direct.length != 0) direct = unique([filename, ...direct]);
 	if (linked.length != 0) linked = unique([filename, ...linked]);
 
-	return [direct, linked];
+	return linked;
 }
 
 export function isIntersect<T>(a: T[], b: T[]) {
@@ -477,4 +418,37 @@ export function isIntersect<T>(a: T[], b: T[]) {
 	const allKeys = [...unique(a), ...unique(b)];
 	const dedupeKey = unique(allKeys);
 	return allKeys.length != dedupeKey.length;
+}
+
+export function isValid<T>(obj: T | false): obj is T {
+	return obj !== false;
+}
+
+export function fileCacheToCompare(cache: FileCache | undefined | false) {
+	if (!cache) return "";
+	return ({ l: cache.links, t: cache.tags })
+}
+
+const allViewItemsMap = new Map<string, ViewItem>();
+allViewItemsByLink.subscribe(e => {
+	updateItemsLinkMap(e);
+});
+export function updateItemsLinkMap(e: ViewItem[]) {
+	allViewItemsMap.clear();
+	if (e) e.forEach(item => allViewItemsMap.set(item.path, item));
+}
+
+export function getViewItemFromPath(path: string) {
+	return allViewItemsMap.get(path);
+}
+
+export function getAllLinksRecursive(item: ViewItem, trail: string[]): string[] {
+	const allLinks = item.links;
+	const leftLinks = allLinks.filter(e => !trail.contains(e));
+	const allChildLinks = leftLinks.flatMap(itemName => {
+		const item = getViewItemFromPath(itemName);
+		if (!item) return [];
+		return getAllLinksRecursive(item, [...trail, itemName]);
+	})
+	return unique([...leftLinks, ...allChildLinks]);
 }
