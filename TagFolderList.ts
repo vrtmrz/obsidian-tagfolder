@@ -55,18 +55,7 @@ export class TagFolderList extends TagFolderViewBase {
 	}
 
 	async newNote(evt: MouseEvent) {
-
-		const expandedTags = this.state.tags.map(e => trimTrailingSlash(e))
-			.map(e => e.split("/")
-				.filter(ee => !isSpecialTag(ee))
-				.join("/")).filter(e => e != "")
-			.map((e) => "#" + e)
-			.join(" ")
-			.trim();
-
-		//@ts-ignore
-		const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
-		await this.app.vault.append(ww, expandedTags);
+		await this.plugin.createNewNote(this.state.tags);
 	}
 
 	getViewType() {

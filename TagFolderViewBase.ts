@@ -179,9 +179,7 @@ export abstract class TagFolderViewBase extends ItemView {
                     .setTitle(`New note ${targetTag ? "in here" : "as like this"}`)
                     .setIcon("create-new")
                     .onClick(async () => {
-                        //@ts-ignore
-                        const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
-                        await this.app.vault.append(ww, expandedTags);
+                        await this.plugin.createNewNote(trail);
                     })
             );
             if (targetTag) {
