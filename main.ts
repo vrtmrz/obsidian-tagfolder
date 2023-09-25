@@ -64,6 +64,7 @@ const HideItemsType: Record<string, string> = {
 };
 
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dotted<T extends Record<string, any>>(object: T, notation: string) {
 	return notation.split('.').reduce((a, b) => (a && (b in a)) ? a[b] : null, object);
 }
@@ -519,22 +520,22 @@ export default class TagFolderPlugin extends Plugin {
 	async getItemsList(mode: "tag" | "link"): Promise<ViewItem[]> {
 		const items: ViewItem[] = [];
 		const ignoreDocTags = this.settings.ignoreDocTags
-			.toLocaleLowerCase()
+			.toLowerCase()
 			.replace(/[\n ]/g, "")
 			.split(",");
 		const ignoreTags = this.settings.ignoreTags
-			.toLocaleLowerCase()
+			.toLowerCase()
 			.replace(/[\n ]/g, "")
 			.split(",");
 
 		const ignoreFolders = this.settings.ignoreFolders
-			.toLocaleLowerCase()
+			.toLowerCase()
 			.replace(/\n/g, "")
 			.split(",")
 			.map((e) => e.trim())
 			.filter((e) => !!e);
 		const targetFolders = this.settings.targetFolders
-			.toLocaleLowerCase()
+			.toLowerCase()
 			.replace(/\n/g, "")
 			.split(",")
 			.map((e) => e.trim())
@@ -542,14 +543,14 @@ export default class TagFolderPlugin extends Plugin {
 
 
 		const searchItems = this.searchString
-			.toLocaleLowerCase()
+			.toLowerCase()
 			.split("|")
 			.map((ee) => ee.split(" ").map((e) => e.trim()));
 
 
 		const today = Date.now();
 		const archiveTags = this.settings.archiveTags
-			.toLocaleLowerCase()
+			.toLowerCase()
 			.replace(/[\n ]/g, "")
 			.split(",");
 
@@ -559,7 +560,7 @@ export default class TagFolderPlugin extends Plugin {
 				!targetFolders.some(
 					(e) => {
 						return e != "" &&
-							fileCache.file.path.toLocaleLowerCase().startsWith(e)
+							fileCache.file.path.toLowerCase().startsWith(e)
 					}
 				)
 			) {
@@ -569,7 +570,7 @@ export default class TagFolderPlugin extends Plugin {
 				ignoreFolders.some(
 					(e) =>
 						e != "" &&
-						fileCache.file.path.toLocaleLowerCase().startsWith(e)
+						fileCache.file.path.toLowerCase().startsWith(e)
 				)
 			) {
 				continue;
@@ -612,7 +613,7 @@ export default class TagFolderPlugin extends Plugin {
 			}
 			if (
 				allTags.some((tag) =>
-					ignoreDocTags.contains(tag.toLocaleLowerCase())
+					ignoreDocTags.contains(tag.toLowerCase())
 				)
 			) {
 				continue;
@@ -634,7 +635,7 @@ export default class TagFolderPlugin extends Plugin {
 							bx ||
 							allTags.some((tag) =>
 								tag
-									.toLocaleLowerCase()[func](search.substring(1))
+									.toLowerCase()[func](search.substring(1))
 							);
 						// if (bx) continue;
 					} else {
@@ -642,7 +643,7 @@ export default class TagFolderPlugin extends Plugin {
 							bx ||
 							allTags.every(
 								(tag) =>
-									!tag.toLocaleLowerCase()[func](search)
+									!tag.toLowerCase()[func](search)
 							);
 						// if (bx) continue;
 					}
@@ -653,7 +654,7 @@ export default class TagFolderPlugin extends Plugin {
 			if (w.every((e) => e)) continue;
 
 			allTags = allTags.filter(
-				(tag) => !ignoreTags.contains(tag.toLocaleLowerCase())
+				(tag) => !ignoreTags.contains(tag.toLowerCase())
 			);
 
 			// if (this.settings.reduceNestedParent) {
@@ -663,7 +664,7 @@ export default class TagFolderPlugin extends Plugin {
 			const links = [...fileCache.links];
 			if (links.length == 0) links.push("_unlinked");
 			if (this.settings.disableNarrowingDown && mode == "tag") {
-				const archiveTagsMatched = allTags.filter(e => archiveTags.contains(e.toLocaleLowerCase()));
+				const archiveTagsMatched = allTags.filter(e => archiveTags.contains(e.toLowerCase()));
 				const targetTags = archiveTagsMatched.length == 0 ? allTags : archiveTagsMatched;
 				for (const tags of targetTags) {
 					items.push({
@@ -833,13 +834,13 @@ export default class TagFolderPlugin extends Plugin {
 			for (const tag of tags) {
 				matchedFiles = matchedFiles.filter((item) =>
 					item.tags
-						.map((tag) => tag.toLocaleLowerCase())
+						.map((tag) => tag.toLowerCase())
 						.some(
 							(itemTag) =>
 								itemTag ==
-								tag.toLocaleLowerCase() ||
+								tag.toLowerCase() ||
 								(itemTag + "/").startsWith(
-									tag.toLocaleLowerCase() +
+									tag.toLowerCase() +
 									(tag.endsWith("/")
 										? ""
 										: "/")

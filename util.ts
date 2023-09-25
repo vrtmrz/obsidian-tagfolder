@@ -89,7 +89,7 @@ export function secondsToFreshness(totalAsMSec: number) {
 
 const queues = [] as (() => void)[];
 
-function waitForRequestAnimationFrame() {
+export function waitForRequestAnimationFrame() {
 	return new Promise<void>(res => requestAnimationFrame(() => res()));
 }
 function delay() {
@@ -159,8 +159,8 @@ export function getTagName(tagName: string, subtreePrefix: string, tagInfo: TagI
 	return `${prefix}_${subtreePrefix}_${unpinned}_${tagName}`
 }
 
-function llc(str: string) {
-	return str.toLocaleLowerCase();
+function lc(str: string) {
+	return str.toLowerCase();
 }
 
 /**
@@ -174,7 +174,7 @@ export function removeIntermediatePath(paths: string[]) {
 	for (const v of paths) {
 		const last = passed.pop();
 		if (last !== undefined) {
-			if (!(trimTrailingSlash(v.toLocaleLowerCase()) + "/").startsWith(trimTrailingSlash(last.toLocaleLowerCase()) + "/")) {
+			if (!(trimTrailingSlash(v.toLowerCase()) + "/").startsWith(trimTrailingSlash(last.toLowerCase()) + "/")) {
 				// back to the stack
 				passed.push(last);
 			}
@@ -189,9 +189,9 @@ export function removeIntermediatePathOld(paths: string[]) {
 	const pathEntries = paths.sort((a, b) => a.length - b.length);
 	const removeList = [] as string[];
 	for (const el of pathEntries) {
-		const elLower = llc(el);
+		const elLower = lc(el);
 		const elCapped = elLower.endsWith("/") ? elLower : (elLower + "/");
-		if (out.some(e => llc(e).startsWith(elCapped) && llc(e) !== elCapped)) {
+		if (out.some(e => lc(e).startsWith(elCapped) && lc(e) !== elCapped)) {
 			removeList.push(el);
 		}
 	}
@@ -297,9 +297,9 @@ export function uniqueCaseIntensive(pieces: string[]): string[] {
 	const delMap = new Set<string>();
 	const ret = [];
 	for (const piece of pieces) {
-		if (!delMap.has(piece.toLocaleLowerCase())) {
+		if (!delMap.has(piece.toLowerCase())) {
 			ret.push(piece);
-			delMap.add(piece.toLocaleLowerCase());
+			delMap.add(piece.toLowerCase());
 		}
 	}
 	return ret;
@@ -331,7 +331,7 @@ export function getExtraTags(tags: string[], trail: string[], reduceNestedParent
 		// In that case, if `test/a`, `test/b` exist and expanded as test -> a -> b, trails should be `test/` `test/a` `test/b`
 		if (reduceNestedParent) {
 			tagsLeft = tagsLeft.map((e) =>
-				(e + "/").toLocaleLowerCase().startsWith(t.toLocaleLowerCase())
+				(e + "/").toLowerCase().startsWith(t.toLowerCase())
 					? e.substring(trimLength)
 					: e
 			);
@@ -340,8 +340,8 @@ export function getExtraTags(tags: string[], trail: string[], reduceNestedParent
 			// test -> a test -> b, trails should be `test/` `test/a` `test/` `test/b`
 			const f = tagsLeft.findIndex((e) =>
 				(e + "/")
-					.toLocaleLowerCase()
-					.startsWith(t.toLocaleLowerCase())
+					.toLowerCase()
+					.startsWith(t.toLowerCase())
 			);
 			if (f !== -1) {
 				tagsLeft[f] = tagsLeft[f].substring(trimLength);
@@ -361,11 +361,11 @@ export function joinPartialPath(path: string[]) {
 }
 
 export function pathMatch(haystackLC: string, needleLC: string) {
-	if (needleLC.endsWith("/")) {
+	if (haystackLC == needleLC) return true;
+	if (needleLC[needleLC.length - 1] == "/") {
 		if ((haystackLC + "/").indexOf(needleLC) === 0) return true;
 	}
-	//return (haystackLC).indexOf(needleLC)===0;
-	return haystackLC == needleLC;
+	return false;
 }
 
 export function parseTagName(thisName: string, _tagInfo: TagInfoDict): [string, string[]] {

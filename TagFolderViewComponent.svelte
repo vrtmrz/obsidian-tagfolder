@@ -133,12 +133,25 @@
 		let newSet = { ..._setting };
 		newSet.linkConfig.incoming.enabled =
 			!_setting.linkConfig.incoming.enabled;
+		if (
+			!newSet.linkConfig.incoming.enabled &&
+			!newSet.linkConfig.outgoing.enabled
+		) {
+			newSet.linkConfig.incoming.enabled = true;
+		}
 		if (saveSettings) await saveSettings(newSet);
 	}
 	async function switchOutgoing() {
 		let newSet = { ..._setting };
 		newSet.linkConfig.outgoing.enabled =
 			!_setting.linkConfig.outgoing.enabled;
+		if (
+			!newSet.linkConfig.incoming.enabled &&
+			!newSet.linkConfig.outgoing.enabled
+		) {
+			newSet.linkConfig.outgoing.enabled = true;
+		}
+
 		if (saveSettings) await saveSettings(newSet);
 	}
 	async function switchOnlyFDR() {
@@ -188,22 +201,22 @@
 				viewItems = viewItemsSrc;
 			} else {
 				let items = viewItemsSrc;
-				const lowerTags = tags.map((e) => e.toLocaleLowerCase());
+				const lowerTags = tags.map((e) => e.toLowerCase());
 				for (const tag of lowerTags) {
 					items = items.filter((e) =>
 						e.tags.some((e) =>
-							(e.toLocaleLowerCase() + "/").startsWith(tag)
+							(e.toLowerCase() + "/").startsWith(tag)
 						)
 					);
 				}
 
 				const firstLevel = trimTrailingSlash(
 					tags.first() ?? ""
-				).toLocaleLowerCase();
+				).toLowerCase();
 
 				// Processing archive tags
 				const archiveTags = _setting.archiveTags
-					.toLocaleLowerCase()
+					.toLowerCase()
 					.replace(/[\n ]/g, "")
 					.split(",");
 
@@ -211,7 +224,7 @@
 					items = items.filter(
 						(item) =>
 							!item.tags.some((e) =>
-								archiveTags.contains(e.toLocaleLowerCase())
+								archiveTags.contains(e.toLowerCase())
 							)
 					);
 				}

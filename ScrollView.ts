@@ -1,15 +1,15 @@
 import {
 	TFile,
 	ItemView,
-	WorkspaceLeaf, ViewStateResult
+	WorkspaceLeaf, type ViewStateResult
 } from "obsidian";
 import ScrollViewComponent from "./ScrollViewComponent.svelte";
 import {
-	ScrollViewState,
-	ScrollViewFile,
+	type ScrollViewState,
+	type ScrollViewFile,
 	VIEW_TYPE_SCROLL
 } from "types";
-import { writable, Writable } from "svelte/store";
+import { writable, type Writable } from "svelte/store";
 import TagFolderPlugin from "./main";
 import { doEvents } from "./util";
 

@@ -15,6 +15,7 @@ import { maxDepth, selectedTags } from "./store";
 import { ancestorToLongestTag, ancestorToTags, isSpecialTag, renderSpecialTag, joinPartialPath, removeIntermediatePath, trimTrailingSlash } from "./util";
 import { askString } from "dialog";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toggleObjectProp(obj: { [key: string]: any }, propName: string, value: string | false) {
     if (value === false) {
         const newTagInfoEntries = Object.entries(obj || {}).filter(([key]) => key != propName);

@@ -9,19 +9,13 @@
 		renderSpecialTag,
 		escapeStringToHTML,
 		selectCompareMethodTags,
-		getExtraTags,
 		joinPartialPath,
 		parseTagName,
-		pathMatch,
 		removeIntermediatePath,
 		trimTrailingSlash,
 		uniqueCaseIntensive,
 		type V2FolderItem,
-		V2FI_IDX_TAG,
 		V2FI_IDX_CHILDREN,
-		V2FI_IDX_TAGDISP,
-		V2FI_IDX_TAGNAME,
-		trimPrefix,
 		trimSlash,
 		doEvents,
 		ancestorToLongestTag,
@@ -38,6 +32,7 @@
 		tagInfo,
 		v2expandedTags,
 	} from "./store";
+	import { collectTreeChildren, performSortExactFirst } from "./v2codebehind";
 	import TreeItemItemComponent from "V2TreeItemComponent.svelte";
 	import OnDemandRender from "OnDemandRender.svelte";
 	import { tick } from "svelte";
@@ -214,7 +209,7 @@
 	let tagsDisp = [] as string[][];
 
 	// Just for convenience.
-	$: trailLower = trail.map((e) => e.toLocaleLowerCase());
+	$: trailLower = trail.map((e) => e.toLowerCase());
 
 	// Change detection
 	$: {
@@ -318,14 +313,12 @@
 					}
 				} else {
 					const lastTrailTagLC =
-						trimTrailingSlash(previousTrail).toLocaleLowerCase();
+						trimTrailingSlash(previousTrail).toLowerCase();
 
 					// If there are intermediate or normal tag, cancel inDedicatedTag.
 					if (
 						isInDedicatedTag &&
-						tagsAll.some(
-							(e) => e.toLocaleLowerCase() == lastTrailTagLC
-						)
+						tagsAll.some((e) => e.toLowerCase() == lastTrailTagLC)
 					) {
 						isInDedicatedTag = false;
 					}
@@ -338,26 +331,23 @@
 					existTags = existTags.filter((tag) =>
 						trail.every(
 							(trail) =>
-								trimTrailingSlash(tag.toLocaleLowerCase()) !==
-								trimTrailingSlash(trail.toLocaleLowerCase())
+								trimTrailingSlash(tag.toLowerCase()) !==
+								trimTrailingSlash(trail.toLowerCase())
 						)
 					);
 
 					// Remove itself
 					existTags = existTags.filter(
 						(tag) =>
-							tag.toLocaleLowerCase() !=
-								thisName.toLocaleLowerCase() &&
-							tag.toLocaleLowerCase() !=
-								tagName.toLocaleLowerCase()
+							tag.toLowerCase() != thisName.toLowerCase() &&
+							tag.toLowerCase() != tagName.toLowerCase()
 					);
 					existTags = existTags.filter(
 						(tag) =>
 							!tag
-								.toLocaleLowerCase()
+								.toLowerCase()
 								.endsWith(
-									"/" +
-										trimSlash(thisName).toLocaleLowerCase()
+									"/" + trimSlash(thisName).toLowerCase()
 								)
 					);
 
@@ -406,7 +396,7 @@
 						// tags (or subsequent part of nested-tag) on the next level.
 
 						// At least, this tag name should be trimmed.
-						const removeItems = [thisName.toLocaleLowerCase()];
+						const removeItems = [thisName.toLowerCase()];
 						if (_setting.reduceNestedParent) {
 							// If reduceNestedParent is enabled, passed trails also should be trimmed.
 							removeItems.push(...trailLower);
@@ -421,7 +411,7 @@
 									let idx2 = idx;
 									while (
 										removeItems.contains(
-											piece.toLocaleLowerCase()
+											piece.toLowerCase()
 										)
 									) {
 										idx2 = e.indexOf("/", idx2 + 1);
@@ -442,10 +432,8 @@
 							// Remove tags which in trail again.
 							trailShortest.every(
 								(trail) =>
-									trimTrailingSlash(
-										tag.toLocaleLowerCase()
-									) !==
-									trimTrailingSlash(trail.toLocaleLowerCase())
+									trimTrailingSlash(tag.toLowerCase()) !==
+									trimTrailingSlash(trail.toLowerCase())
 							)
 						);
 					}
@@ -459,12 +447,10 @@
 
 					// Merge the tags of dedicated tag and normal tag
 					const existTagsFiltered1LC = existTagsFiltered1.map((e) =>
-						e.toLocaleLowerCase()
+						e.toLowerCase()
 					);
 					const existTagsFiltered2 = existTagsFiltered1.map((e) =>
-						existTagsFiltered1LC.contains(
-							e.toLocaleLowerCase() + "/"
-						)
+						existTagsFiltered1LC.contains(e.toLowerCase() + "/")
 							? e + "/"
 							: e
 					);
@@ -475,11 +461,9 @@
 						for (const tag of existTagsFiltered3) {
 							if (
 								!existTagsFiltered3
-									.map((e) => e.toLocaleLowerCase())
+									.map((e) => e.toLowerCase())
 									.contains(
-										(
-											previousTrail + tag
-										).toLocaleLowerCase()
+										(previousTrail + tag).toLowerCase()
 									)
 							) {
 								existTagsFiltered4.push(tag);
@@ -498,126 +482,69 @@
 		}
 	}
 
+	// --> Dirty area
 	// Collect sub-folders.
-	$: {
-		suppressLevels = []; // This will be shown as chip.
-		if (expandLimit && depth >= expandLimit) {
-			// If expand limit had been configured and we have reached it,
-			// suppress sub-folders and show that information as extraTags.
-			children = [];
-			suppressLevels = getExtraTags(
-				tags,
-				trailLower,
-				_setting.reduceNestedParent
-			);
-		} else if (!isMainTree) {
-			// If not in main tree, suppress sub-folders.
-			children = [];
-		} else if (isSuppressibleLevel) {
-			// If we determined it was a suppressible,
-			// suppress sub-folders and show that information as extraTags.
-			children = [];
-			suppressLevels = getExtraTags(
-				tags,
-				trailLower,
-				_setting.reduceNestedParent
-			);
-		} else {
-			let wChildren = [] as V2FolderItem[];
-			if (viewType == "tags") {
-				const previousTrailLC = previousTrail.toLocaleLowerCase();
-				wChildren = tags
-					.map((tag) => {
-						const tagLC = tag.toLocaleLowerCase();
-						const tagNestedLC = trimPrefix(tagLC, previousTrailLC);
-						return [
-							tag,
-							...parseTagName(tag, _tagInfo),
-							_items.filter((item) =>
-								item.tags.some((itemTag) => {
-									const itemTagLC =
-										itemTag.toLocaleLowerCase();
-									return (
-										pathMatch(itemTagLC, tagLC) || // Exact matched item
-										// `b` should be contained in `a/b` under `a/`, if the level is mixed level.
-										pathMatch(itemTagLC, tagNestedLC)
-									);
-								})
-							),
-						] as V2FolderItem;
-					})
-					.filter((child) => child[V2FI_IDX_CHILDREN].length != 0);
-			} else if (viewType == "links") {
-				// We made the list in the previous step.
-				wChildren = tags.map((tag) => {
-					const selfInfo = getViewItemFromPath(tag);
-					const dispName = !selfInfo ? tag : selfInfo.displayName;
-					const children = linkedItems.get(tag) ?? [];
-					return [
-						tag,
-						dispName,
-						[dispName],
-						children,
-					] as V2FolderItem;
-				});
+	let nextQueue: ReturnType<typeof setTimeout> = undefined;
+	const key = trail.join("/");
+	let running = false;
+	function updateChildren(_: unknown) {
+		if (running) {
+			if (nextQueue !== undefined) {
+				clearTimeout(nextQueue);
 			}
-			if (viewType == "tags") {
-				// -- Check redundant combination if configured.
-				if (_setting.mergeRedundantCombination) {
-					let out = [] as typeof wChildren;
-					const isShown = new Set<string>();
-					for (const [tag, tagName, tagsDisp, items] of wChildren) {
-						const list = [] as ViewItem[];
-						for (const v of items) {
-							if (!isShown.has(v.path)) {
-								list.push(v);
-								isShown.add(v.path);
-							}
-						}
-						if (list.length != 0)
-							out.push([tag, tagName, tagsDisp, list]);
-					}
-					wChildren = out;
-				}
-
-				// -- MainTree and Root specific structure modification.
-				if (isMainTree && isRoot) {
-					// Remove all items which have been already archived except is on the root.
-					const archiveTags = _setting.archiveTags
-						.toLocaleLowerCase()
-						.replace(/[\n ]/g, "")
-						.split(",");
-					wChildren = wChildren
-						.map((e) =>
-							archiveTags.some((aTag) =>
-								`${aTag}//`.startsWith(
-									e[V2FI_IDX_TAG].toLocaleLowerCase() + "/"
-								)
-							)
-								? e
-								: ([
-										e[V2FI_IDX_TAG],
-										e[V2FI_IDX_TAGNAME],
-										e[V2FI_IDX_TAGDISP],
-										e[V2FI_IDX_CHILDREN].filter(
-											(items) =>
-												!items.tags.some((e) =>
-													archiveTags.contains(
-														e.toLocaleLowerCase()
-													)
-												)
-										),
-								  ] as V2FolderItem)
-						)
-						.filter(
-							(child) => child[V2FI_IDX_CHILDREN].length != 0
-						);
-				}
-			}
-			wChildren = wChildren.sort(sortFunc);
-			children = wChildren;
+			nextQueue = setTimeout(() => {
+				nextQueue = undefined;
+				updateChildren(undefined);
+			}, 300);
+			return;
 		}
+		running = true;
+		collectTreeChildren({
+			key,
+			expandLimit,
+			depth,
+			tags,
+			trailLower,
+			_setting,
+			isMainTree,
+			isSuppressibleLevel,
+			viewType,
+			previousTrail,
+			_tagInfo,
+			_items,
+			linkedItems,
+			isRoot,
+			sortFunc,
+		})
+			.then((ret) => {
+				children = ret.children;
+				suppressLevels = ret.suppressLevels;
+			})
+			.finally(() => {
+				running = false;
+			});
 	}
+	$: {
+		// Do not use any params on the function, but we want to watch.
+		updateChildren({
+			expandLimit,
+			depth,
+			tags,
+			trailLower,
+			_setting,
+			isMainTree,
+			isSuppressibleLevel,
+			viewType,
+			previousTrail,
+			_tagInfo,
+			_items,
+			linkedItems,
+			isRoot,
+			sortFunc,
+		});
+	}
+
+	// <-- Dirty area
 
 	// -- Displaying
 
@@ -716,24 +643,11 @@
 			}
 		}
 		if (_setting.sortExactFirst) {
-			// Now in PoC. Perhaps heavy but looks working.
-			const exactHereItems = _items.filter(
-				(e) =>
-					!children
-						.map((e) => e[V2FI_IDX_CHILDREN])
-						.flat()
-						.find((ee) => e.path == ee.path)
+			leftOverItems = performSortExactFirst(
+				_items,
+				children,
+				leftOverItems
 			);
-			leftOverItems = [...leftOverItems].sort((a, b) => {
-				const aIsInChildren = exactHereItems.some(
-					(e) => e.path == a.path
-				);
-				const bIsInChildren = exactHereItems.some(
-					(e) => e.path == b.path
-				);
-
-				return (aIsInChildren ? -1 : 0) + (bIsInChildren ? 1 : 0);
-			});
 		}
 	}
 	let isFolderVisible = false;
