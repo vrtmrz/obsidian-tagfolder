@@ -13,7 +13,7 @@
 		type TREE_TYPE,
 	} from "./types";
 	import V2TreeFolderComponent from "./V2TreeFolderComponent.svelte";
-	import { onMount, tick } from "svelte";
+	import { onDestroy, onMount, tick } from "svelte";
 	import { setIcon } from "obsidian";
 	import { trimTrailingSlash } from "./util";
 	import { setContext } from "svelte";
@@ -160,7 +160,44 @@
 		if (saveSettings) await saveSettings(newSet);
 	}
 
+	let observer: IntersectionObserver;
+	type handler = {
+		callback: (visibility: boolean) => void;
+		lastState: boolean | undefined;
+	};
+	let observingElements = new Map<Element, handler>();
+	function observe(el: Element, callback: (visibility: boolean) => void) {
+		if (observingElements.has(el)) {
+			unobserve(el);
+		}
+		observingElements.set(el, { callback, lastState: undefined });
+		observer.observe(el);
+	}
+	function unobserve(el: Element) {
+		observer.unobserve(el);
+	}
+	setContext("observer", {
+		observe,
+		unobserve,
+	});
 	onMount(() => {
+		const observingOption = {
+			root: scrollParent,
+			rootMargin: "40px 0px",
+			threshold: 0,
+		};
+		observer = new IntersectionObserver((ex) => {
+			for (const v of ex) {
+				if (observingElements.has(v.target)) {
+					const tg = observingElements.get(v.target);
+					if (tg.lastState !== v.isIntersecting) {
+						tg.lastState = v.isIntersecting;
+						setTimeout(() => tg.callback(v.isIntersecting), 10);
+					}
+				}
+			}
+		}, observingOption);
+
 		setIcon(iconDivEl, "right-triangle");
 		folderIcon = `${iconDivEl.innerHTML}`;
 		setIcon(iconDivEl, "lucide-edit");
@@ -189,6 +226,9 @@
 		return () => {
 			clearInterval(int);
 		};
+	});
+	onDestroy(() => {
+		observer.disconnect();
 	});
 	$: headerTitle =
 		title == ""
@@ -234,9 +274,6 @@
 	}
 	$: isMainTree = tags.length == 0;
 	let scrollParent: HTMLDivElement;
-	setContext("tf-list", {
-		getScrollParent: () => scrollParent,
-	});
 </script>
 
 <div hidden bind:this={iconDivEl} />

@@ -92,12 +92,15 @@ const queues = [] as (() => void)[];
 export function waitForRequestAnimationFrame() {
 	return new Promise<void>(res => requestAnimationFrame(() => res()));
 }
-function delay() {
-	return new Promise<void>(res => setTimeout(() => res(), 5));
+function delay(num?: number) {
+	return new Promise<void>(res => setTimeout(() => res(), num || 5));
+}
+function nextTick() {
+	return new Promise<void>(res => setTimeout(() => res(), 0));
 }
 
 // This is based on nothing.
-const waits = [waitForRequestAnimationFrame, waitForRequestAnimationFrame, delay];
+const waits = [nextTick, delay, nextTick, delay, delay, nextTick];//[waitForRequestAnimationFrame, nextTick, nextTick, nextTick, waitForRequestAnimationFrame, delay, delay, nextTick];
 let waitIdx = 0;
 let pumping = false;
 let startContinuousProcessing = Date.now();
@@ -451,4 +454,152 @@ export function getAllLinksRecursive(item: ViewItem, trail: string[]): string[] 
 		return getAllLinksRecursive(item, [...trail, itemName]);
 	})
 	return unique([...leftLinks, ...allChildLinks]);
+}
+/*
+let showResultTimer: ReturnType<typeof setTimeout>;
+const measured = {} as Record<string, {
+	count: number,
+	spent: number,
+}>;
+const pf = window.performance;
+export function measure(key: string) {
+	const start = pf.now();
+	return function end() {
+		const end = pf.now();
+		const spent = end - start;
+		measured[key] = { count: (measured[key]?.count ?? 0) + 1, spent: (measured[key]?.spent ?? 0) + spent }
+		if (showResultTimer) clearTimeout(showResultTimer);
+		showResultTimer = setTimeout(() => {
+			console.table(Object.fromEntries(Object.entries(measured).map(e => [e[0], { ...e[1], each: e[1].spent / e[1].count }])));
+		}, 500)
+	}
+}
+*/
+
+export function isSameViewItems(a: ViewItem[][], b: ViewItem[][]) {
+	if (a === b) return true;
+	if (a.length != b.length) return false;
+	for (const i in a) {
+		if (a[i].length != b[i].length) {
+			return false;
+		}
+		if (!_isSameViewItem(a[i], b[i])) return false;
+
+	}
+	return true;
+}
+export function _isSameViewItem(a: ViewItem[], b: ViewItem[]) {
+	if (!a || !b) return false;
+	if (a === b) return true;
+	if (a.length != b.length) return false;
+	for (const j in a) {
+		if (a[j] === b[j]) return true;
+		for (const k in a[j]) {
+			if (!isSameObj(a[j][k as keyof ViewItem], b[j][k as keyof ViewItem])) return false;
+		}
+	}
+	return true;
+}
+export function isSameV2FolderItem(a: V2FolderItem[][], b: V2FolderItem[][]) {
+	if (a === b) return true;
+	if (a.length != b.length) return false;
+	for (const i in a) {
+		if (a[i].length != b[i].length) {
+			return false;
+		}
+		if (a[i] === b[i]) return true;
+		for (const j in a[i]) {
+			if (a[i][j][V2FI_IDX_TAG] !== b[i][j][V2FI_IDX_TAG]) return false;
+			if (a[i][j][V2FI_IDX_TAGNAME] !== b[i][j][V2FI_IDX_TAGNAME]) return false;
+			if (!isSameObj(a[i][j][V2FI_IDX_TAGDISP], b[i][j][V2FI_IDX_TAGDISP])) return false;
+			if (!_isSameViewItem(a[i][j][V2FI_IDX_CHILDREN], b[i][j][V2FI_IDX_CHILDREN])) return false;
+		}
+	}
+	return true;
+}
+
+export function isSameObj<T extends string | number | string[]>(a: T, b: typeof a) {
+	if (a === b) return true;
+	if (typeof a == "string" || typeof a == "number") {
+		return a == b;
+	}
+	if (a.length != (b as string[]).length) return false;
+	const len = a.length;
+	for (let i = 0; i < len; i++) {
+		if (!isSameObj(a[i], (b as string[])[i])) return false;
+	}
+	return true;
+}
+
+const waitingProcess = new Map<string, () => Promise<unknown>>();
+const runningProcess = new Set<string>();
+
+
+
+export async function scheduleOnceIfDuplicated<T>(key: string, proc: () => Promise<T>): Promise<void> {
+	if (runningProcess.has(key)) {
+		waitingProcess.set(key, proc);
+		return;
+	}
+	try {
+		runningProcess.add(key);
+		await delay(3);
+		if (waitingProcess.has(key)) {
+			const nextProc = waitingProcess.get(key);
+			waitingProcess.delete(key);
+			runningProcess.delete(key);
+			return scheduleOnceIfDuplicated(key, nextProc);
+		} else {
+			//console.log(`run!! ${key}`);
+			await proc();
+		}
+	}
+	finally {
+		runningProcess.delete(key);
+	}
+
+}
+
+export function isSameAny(a: unknown, b: unknown) {
+	if (typeof a != typeof b) return false;
+	switch (typeof a) {
+		case "string":
+		case "number":
+		case "bigint":
+		case "boolean":
+		case "symbol":
+		case "function":
+		case "undefined":
+			return a == b;
+		case "object":
+			if (a === b) return true;
+
+			if (a instanceof Map || a instanceof Set) {
+				if (a.size != (b as typeof a).size) return false;
+				const v = [...a]
+				const w = [...(b as typeof a)];
+				for (let i = 0; i < v.length; i++) {
+					if (v[i] != w[i]) return false;
+				}
+				return true;
+			}
+			if (Array.isArray(a)) {
+				for (let i = 0; i < a.length; i++) {
+					if (!isSameAny(a[i], (b as typeof a)[i])) return false;
+				}
+				return true;
+			}
+			{
+				const x = Object.values(a);
+				const y = Object.values(b);
+				if (x.length != y.length) return false;
+				for (let i = 0; i < x.length; i++) {
+					if (!isSameAny(x[i], y[i])) return false;
+				}
+				return true;
+			}
+		default:
+			return false;
+	}
+
 }

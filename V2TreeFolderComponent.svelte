@@ -24,6 +24,11 @@
 		unique,
 		getViewItemFromPath,
 		getAllLinksRecursive,
+		isSameViewItems,
+		isSameV2FolderItem,
+		_isSameViewItem,
+		scheduleOnceIfDuplicated,
+		isSameAny,
 	} from "./util";
 	import {
 		currentFile,
@@ -213,7 +218,10 @@
 
 	// Change detection
 	$: {
-		if (JSON.stringify(items) !== JSON.stringify(_items)) {
+		if (
+			!_isSameViewItem(items, _items)
+			//JSON.stringify(items) !== JSON.stringify(_items)
+		) {
 			_items = items;
 		}
 	}
@@ -253,10 +261,10 @@
 				isSuppressibleLevel = false;
 				isMixedDedicatedTag = false;
 				let tagsAll = uniqueCaseIntensive(
-					_items.flatMap((e) => [...e.tags])
+					_items.flatMap((e) => e.tags)
 				);
 				if (viewType == "links") {
-					tagsAll = unique(_items.flatMap((e) => [...e.links]));
+					tagsAll = unique(_items.flatMap((e) => e.links));
 					if (!isRoot) {
 						tagsAll = thisLinks;
 						if (!_setting.linkShowOnlyFDR) {
@@ -484,22 +492,33 @@
 
 	// --> Dirty area
 	// Collect sub-folders.
-	let nextQueue: ReturnType<typeof setTimeout> = undefined;
-	const key = trail.join("/");
-	let running = false;
-	function updateChildren(_: unknown) {
-		if (running) {
-			if (nextQueue !== undefined) {
-				clearTimeout(nextQueue);
-			}
-			nextQueue = setTimeout(() => {
-				nextQueue = undefined;
-				updateChildren(undefined);
-			}, 300);
+	let _lastParam = {} as any;
+	let isUpdating = false;
+	function updateX(
+		param: Parameters<typeof collectTreeChildren>[0] & {
+			isFolderVisible: boolean;
+		}
+	) {
+		if (isSameAny(param, _lastParam)) {
 			return;
 		}
-		running = true;
-		collectTreeChildren({
+		_lastParam = { ...param };
+		if (!param.isFolderVisible && !isRoot) {
+			// console.log("invisible!");
+			return;
+		}
+
+		scheduleOnceIfDuplicated("update-children-" + param.key, async () => {
+			isUpdating = true;
+			const ret = await collectTreeChildren(param);
+			children = ret.children;
+			suppressLevels = ret.suppressLevels;
+			isUpdating = false;
+		});
+	}
+	$: {
+		const key = trailKey + (isRoot ? "-r" : "-x");
+		const param = {
 			key,
 			expandLimit,
 			depth,
@@ -514,34 +533,10 @@
 			_items,
 			linkedItems,
 			isRoot,
+			isFolderVisible,
 			sortFunc,
-		})
-			.then((ret) => {
-				children = ret.children;
-				suppressLevels = ret.suppressLevels;
-			})
-			.finally(() => {
-				running = false;
-			});
-	}
-	$: {
-		// Do not use any params on the function, but we want to watch.
-		updateChildren({
-			expandLimit,
-			depth,
-			tags,
-			trailLower,
-			_setting,
-			isMainTree,
-			isSuppressibleLevel,
-			viewType,
-			previousTrail,
-			_tagInfo,
-			_items,
-			linkedItems,
-			isRoot,
-			sortFunc,
-		});
+		};
+		updateX(param);
 	}
 
 	// <-- Dirty area
@@ -660,8 +655,9 @@
 	// -- Phased UI update --
 
 	// For preventing UI freezing, split items into batches and apply them at intervals.
-	const batchSize = 20;
+	const batchSize = 80;
 	function splitArrayToBatch<T>(items: T[]): T[][] {
+		// let batchSize = Math.min(20, ~~(items.length / 40));
 		const ret = [] as T[][];
 		if (items && items.length > 0) {
 			const applyItems = [...items];
@@ -697,7 +693,8 @@
 		try {
 			const allOfBatch = splitArrayToBatch(items);
 			if (
-				JSON.stringify(leftOverItemsDisp) == JSON.stringify(allOfBatch)
+				// JSON.stringify(leftOverItemsDisp) == JSON.stringify(allOfBatch)
+				isSameViewItems(leftOverItemsDisp, allOfBatch)
 			) {
 				return;
 			}
@@ -739,7 +736,10 @@
 		}
 		try {
 			const allOfBatch = splitArrayToBatch(items);
-			if (JSON.stringify(childrenDisp) == JSON.stringify(allOfBatch)) {
+			if (
+				isSameV2FolderItem(childrenDisp, allOfBatch)
+				//JSON.stringify(childrenDisp) == JSON.stringify(allOfBatch)
+			) {
 				return;
 			}
 			batchedChildren = allOfBatch;
@@ -836,7 +836,7 @@
 <div
 	class={`tree-item nav-folder${collapsed ? " is-collapsed" : ""}${
 		isRoot ? " mod-root" : ""
-	}`}
+	}${isUpdating ? " updating" : ""}`}
 	on:click|stopPropagation={toggleFolder}
 	on:contextmenu|stopPropagation={(evt) => {
 		if (shouldResponsibleFor(evt))

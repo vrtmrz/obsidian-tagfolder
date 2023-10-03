@@ -128,3 +128,10 @@
 .tag-folder-title {
 	max-width: 100%;
 }
+
+.tree-item.nav-folder.updating {
+	background: linear-gradient(135deg, var(--interactive-accent-hover) 0%, var(--interactive-accent-hover) 50%, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0) 100%);
+	background-repeat: no-repeat;
+	background-position: 0 0;
+	background-size: 10px 10px;
+}

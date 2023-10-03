@@ -1,6 +1,6 @@
 
 import type { TREE_TYPE, TagFolderSettings, TagInfoDict, ViewItem } from "./types";
-import { V2FI_IDX_CHILDREN, type V2FolderItem, trimPrefix, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame } from "./util";
+import { V2FI_IDX_CHILDREN, type V2FolderItem, trimPrefix, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, doEvents, waitForRequestAnimationFrame } from "./util";
 
 export function performSortExactFirst(_items: ViewItem[], children: V2FolderItem[], leftOverItems: ViewItem[]) {
 
@@ -26,7 +26,14 @@ export function performSortExactFirst(_items: ViewItem[], children: V2FolderItem
 
     return [...wk2];
 }
-
+function delay() {
+    return new Promise<void>(res => setTimeout(() => res(), 5));
+}
+function nextTick() {
+    return new Promise<void>(res => setTimeout(() => res(), 0));
+}
+const delays = [nextTick, delay, nextTick, waitForRequestAnimationFrame];
+let delayIdx = 0;
 export async function collectChildren(previousTrail: string, tags: string[], _tagInfo: TagInfoDict, _items: ViewItem[]) {
     const previousTrailLC = previousTrail.toLowerCase();
 
@@ -60,7 +67,8 @@ export async function collectChildren(previousTrail: string, tags: string[], _ta
             ]
         )
         // Prevent UI freezing.
-        await waitForRequestAnimationFrame();
+        delayIdx++; delayIdx %= 4;
+        await (delays[delayIdx])();
     }
     return children;
 }
