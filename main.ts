@@ -153,7 +153,9 @@ export default class TagFolderPlugin extends Plugin {
 
 	// Called when item clicked in the tag folder pane.
 	readonly focusFile = (path: string, specialKey: boolean): void => {
-		const targetFile = this.app.vault
+		if (this.currentOpeningFile == path) return;
+		const _targetFile = this.app.vault.getAbstractFileByPath(path);
+		const targetFile = (_targetFile instanceof TFile) ? _targetFile : this.app.vault
 			.getFiles()
 			.find((f) => f.path === path);
 
@@ -264,6 +266,13 @@ export default class TagFolderPlugin extends Plugin {
 			name: "Show Link Folder",
 			callback: () => {
 				this.activateViewLink();
+			},
+		});
+		this.addCommand({
+			id: "tagfolder-rebuild-tree",
+			name: "Force Rebuild",
+			callback: () => {
+				this.refreshAllTree();
 			},
 		});
 		this.addCommand({
@@ -419,8 +428,12 @@ export default class TagFolderPlugin extends Plugin {
 	}
 
 	refreshTree(file: TAbstractFile, oldName?: string) {
-		if (file instanceof TFile) {
-			this.loadFileInfo(file);
+		if (oldName) {
+			this.refreshAllTree();
+		} else {
+			if (file instanceof TFile) {
+				this.loadFileInfo(file);
+			}
 		}
 	}
 
@@ -741,6 +754,12 @@ export default class TagFolderPlugin extends Plugin {
 			}
 			// Apply content of diffs to each view.
 			await this.applyUpdateIntoScroll(diffs);
+			const af = this.app.workspace.getActiveFile();
+			if (af && this.currentOpeningFile != af.path) {
+				this.currentOpeningFile = af.path;
+				currentFile.set(this.currentOpeningFile);
+			}
+
 		} finally {
 			this.processingFileInfo = false;
 		}

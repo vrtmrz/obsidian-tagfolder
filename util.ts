@@ -49,7 +49,7 @@ export function ancestorToTags(ancestors: string[]): string[] {
 }
 
 export function ancestorToLongestTag(ancestors: string[]): string[] {
-	return ancestors.reduceRight((a: string[], e) => !a ? [e] : (a[0]?.startsWith(e) ? a : [e, ...a]), [])
+	return ancestors.reduceRight((a: string[], e) => !a ? [e] : (a[0]?.startsWith(e) ? a : [e, ...a]), []);
 }
 
 export function isSpecialTag(tagSrc: string) {
@@ -360,7 +360,7 @@ export function trimTrailingSlash(src: string) {
 }
 
 export function joinPartialPath(path: string[]) {
-	return path.reduceRight((p, c) => (c.endsWith("/") && p.length > 0) ? [c + p[0], ...p.slice(1)] : [c, ...p], [] as string[]);
+	return path.reduce((p, c) => (c.endsWith("/") && p.length > 0) ? [c + p[0], ...p.slice(1)] : [c, ...p], [] as string[]);
 }
 
 export function pathMatch(haystackLC: string, needleLC: string) {
