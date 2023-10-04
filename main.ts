@@ -46,6 +46,13 @@ import {
 	secondsToFreshness,
 	unique,
 	updateItemsLinkMap,
+	ancestorToLongestTag,
+	ancestorToTags,
+	joinPartialPath,
+	removeIntermediatePath,
+	trimTrailingSlash,
+	isSpecialTag,
+	trimPrefix
 } from "./util";
 import { ScrollView } from "./ScrollView";
 import { TagFolderView } from "./TagFolderView";
@@ -268,9 +275,8 @@ export default class TagFolderPlugin extends Plugin {
 				const cache = this.app.metadataCache.getFileCache(file);
 				if (!cache) return;
 				const tags = getAllTags(cache) ?? [];
-				//@ts-ignore
-				const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
-				await this.app.vault.append(ww, tags.join(" "));
+				const tagsWithoutPrefix = tags.map((e) => trimPrefix(e, "#"));
+				await this.createNewNote(tagsWithoutPrefix);
 			},
 		});
 		this.metadataCacheChanged = this.metadataCacheChanged.bind(this);
@@ -1107,6 +1113,36 @@ export default class TagFolderPlugin extends Plugin {
 			theLeaf
 		);
 	}
+
+	async createNewNote(tags?: string[]) {
+		const expandedTagsAll = ancestorToLongestTag(ancestorToTags(joinPartialPath(removeIntermediatePath(tags ?? []))))
+			.map((e) => trimTrailingSlash(e));
+
+		const expandedTags = expandedTagsAll
+			.map((e) => e
+				.split("/")
+				.filter((ee) => !isSpecialTag(ee))
+				.join("/"))
+			.filter((e) => e != "")
+			.map((e) => "#" + e)
+			.join(" ")
+			.trim();
+
+		//@ts-ignore
+		const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
+		if (this.settings.useFrontmatterTagsForNewNotes) {
+			await this.app.fileManager.processFrontMatter(ww, (matter) => {
+				matter.tags = matter.tags ?? [];
+				matter.tags = expandedTagsAll
+					.filter(e => !isSpecialTag(e))
+					.filter(e => matter.tags.indexOf(e) < 0)
+					.concat(matter.tags);
+			});
+		}
+		else {
+			await this.app.vault.append(ww, expandedTags);
+		}
+	}
 }
 
 class TagFolderSettingTab extends PluginSettingTab {
@@ -1294,6 +1330,18 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.useVirtualTag)
 					.onChange(async (value) => {
 						this.plugin.settings.useVirtualTag = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("Store tags in frontmatter for new notes")
+			.setDesc("Otherwise, tags are stored with #hashtags at the top of the note")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.useFrontmatterTagsForNewNotes)
+					.onChange(async (value) => {
+						this.plugin.settings.useFrontmatterTagsForNewNotes = value;
 						await this.plugin.saveSettings();
 					});
 			});
