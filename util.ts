@@ -145,8 +145,9 @@ export const doEvents = () => {
 }
 
 
-export const compare = (Intl && Intl.Collator) ? (new Intl.Collator().compare) :
-	(x: string, y: string) => (`${x ?? ""}`).localeCompare(`${y ?? ""}`);
+export function compare(x: string, y: string) {
+	return `${x || ""}`.localeCompare(y, undefined, { numeric: true })
+}
 
 
 export function getTagName(tagName: string, subtreePrefix: string, tagInfo: TagInfoDict | undefined, invert: number) {

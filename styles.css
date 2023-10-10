@@ -59,15 +59,15 @@
 .tf-taglist {
 	white-space: nowrap;
 	text-overflow: ellipsis;
-	padding-left: 1em;
 	overflow: hidden;
 	display: inline-block;
-	flex-shrink: 2;
-	flex-grow: 1;
-	width: auto;
-	min-width: 5em;
+	flex-shrink: 100;
+	margin-left: auto;
 	text-align: right;
-	max-width: 30%;
+}
+
+.tf-taglist:not(:empty) {
+	min-width: 3em;
 }
 
 .tf-taglist .tf-tag {
@@ -95,9 +95,11 @@
 	display: flex;
 	flex-grow: 1;
 	overflow: hidden;
-	max-width: calc(100%);
-	width: 50%;
-	flex-grow: 1;
+	flex-shrink: 1;
+}
+
+.lsl-f:not(:last-child) {
+	min-width: 3em;
 }
 
 .lsl-f:empty::before {
