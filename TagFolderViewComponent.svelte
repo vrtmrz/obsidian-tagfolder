@@ -274,6 +274,9 @@
 	}
 	$: isMainTree = tags.length == 0;
 	let scrollParent: HTMLDivElement;
+
+	const componentHash = `${Math.random()}`;
+	setContext("viewID", componentHash);
 </script>
 
 <div hidden bind:this={iconDivEl} />

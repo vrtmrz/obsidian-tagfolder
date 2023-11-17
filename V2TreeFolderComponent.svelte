@@ -40,7 +40,7 @@
 	import { collectTreeChildren, performSortExactFirst } from "./v2codebehind";
 	import TreeItemItemComponent from "V2TreeItemComponent.svelte";
 	import OnDemandRender from "OnDemandRender.svelte";
-	import { tick } from "svelte";
+	import { getContext, tick } from "svelte";
 
 	// -- Props --
 
@@ -516,8 +516,9 @@
 			isUpdating = false;
 		});
 	}
+	const viewContextID = `${getContext("viewID") ?? ""}`;
 	$: {
-		const key = trailKey + (isRoot ? "-r" : "-x");
+		const key = trailKey + (isRoot ? "-r" : "-x") + viewContextID;
 		const param = {
 			key,
 			expandLimit,

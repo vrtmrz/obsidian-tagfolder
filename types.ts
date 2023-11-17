@@ -36,6 +36,11 @@ export type LinkParseConf = {
 		key: string
 	}
 }
+export const enumShowListIn = {
+	"": "Sidebar",
+	"CURRENT_PANE": "Current pane",
+	"SPLIT_PANE": "New pane",
+}
 
 export interface TagFolderSettings {
 	displayMethod: DISPLAY_METHOD;
@@ -80,7 +85,7 @@ export interface TagFolderSettings {
 	linkConfig: LinkParseConf;
 	linkShowOnlyFDR: boolean;
 	linkCombineOtherTree: boolean;
-
+	showListIn: keyof typeof enumShowListIn;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -125,6 +130,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	},
 	linkShowOnlyFDR: true,
 	linkCombineOtherTree: true,
+	showListIn: ""
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";

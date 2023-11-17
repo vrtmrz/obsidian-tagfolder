@@ -34,7 +34,8 @@ import {
 	VIEW_TYPE_TAGFOLDER_LIST,
 	type ViewItem,
 	VIEW_TYPE_TAGFOLDER_LINK,
-	type FileCache
+	type FileCache,
+	enumShowListIn
 } from "types";
 import { allViewItems, allViewItemsByLink, appliedFiles, currentFile, maxDepth, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
 import {
@@ -1109,10 +1110,21 @@ export default class TagFolderPlugin extends Plugin {
 				// Cancel if the tagfolder has been disappeared.
 				return;
 			}
-			if (!Platform.isMobile) {
-				theLeaf = this.app.workspace.createLeafBySplit(parent, "horizontal", false);
-			} else {
-				theLeaf = this.app.workspace.getLeftLeaf(false);
+			switch (this.settings.showListIn) {
+				case "CURRENT_PANE":
+					theLeaf = this.app.workspace.getLeaf();
+					break;
+				case "SPLIT_PANE":
+					theLeaf = this.app.workspace.getLeaf("split", "horizontal");
+					break;
+				case "":
+				default:
+					if (!Platform.isMobile) {
+						theLeaf = this.app.workspace.createLeafBySplit(parent, "horizontal", false);
+					} else {
+						theLeaf = this.app.workspace.getLeftLeaf(false);
+					}
+					break;
 			}
 		}
 		const title = tags.map((e) =>
@@ -1126,7 +1138,6 @@ export default class TagFolderPlugin extends Plugin {
 			active: true,
 			state: { tags: tags, title: title } as TagFolderListState
 		});
-		// (theLeaf.view as TagFolderList).setTreeRoot(this.root);
 
 		this.app.workspace.revealLeaf(
 			theLeaf
@@ -1383,6 +1394,18 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.useMultiPaneList)
 					.onChange(async (value) => {
 						this.plugin.settings.useMultiPaneList = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Show list in")
+			.setDesc("This option applies to the newly opened list")
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOptions(enumShowListIn)
+					.setValue(this.plugin.settings.showListIn)
+					.onChange(async (value) => {
+						this.plugin.settings.showListIn = value as keyof typeof enumShowListIn;
 						await this.plugin.saveSettings();
 					});
 			});
