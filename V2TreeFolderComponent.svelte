@@ -331,6 +331,9 @@
 						isInDedicatedTag = false;
 					}
 
+					if (!isRoot || _setting.expandUntaggedToRoot) {
+						tagsAll = tagsAll.filter((e) => e != "_untagged");
+					}
 					let existTags = [...tagsAll];
 
 					// trimming tags
