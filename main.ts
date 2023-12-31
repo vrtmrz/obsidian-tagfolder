@@ -348,7 +348,10 @@ export default class TagFolderPlugin extends Plugin {
 					}
 				} else {
 					this.setSearchString(tagString);
-
+				}
+				const leaf = this.getView()?.leaf;
+				if (leaf) {
+					this.app.workspace.revealLeaf(leaf);
 				}
 				event.preventDefault();
 				event.stopPropagation();
