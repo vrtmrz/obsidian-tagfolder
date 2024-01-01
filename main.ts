@@ -349,10 +349,6 @@ export default class TagFolderPlugin extends Plugin {
 				} else {
 					this.setSearchString(tagString);
 				}
-				const leaf = this.getView()?.leaf;
-				if (leaf) {
-					this.app.workspace.revealLeaf(leaf);
-				}
 				event.preventDefault();
 				event.stopPropagation();
 
@@ -367,6 +363,10 @@ export default class TagFolderPlugin extends Plugin {
 				const tagString = targetEl.innerText.substring(1);
 				if (tagString) {
 					setTagSearchString(event, tagString);
+					const leaf = this.getView()?.leaf;
+					if (leaf) {
+						this.app.workspace.revealLeaf(leaf);
+					}
 				}
 			}, { capture: true })
 		);
@@ -400,6 +400,10 @@ export default class TagFolderPlugin extends Plugin {
 				} while (enumTags);
 				tagString = tagString.substring(1) //Snip hash.
 				setTagSearchString(event, tagString);
+				const leaf = this.getView()?.leaf;
+				if (leaf) {
+					this.app.workspace.revealLeaf(leaf);
+				}
 			}, { capture: true })
 		);
 		selectedTags.subscribe(newTags => {
