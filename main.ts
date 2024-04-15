@@ -254,6 +254,9 @@ export default class TagFolderPlugin extends Plugin {
 				await this.initView();
 				await this.activateView();
 			}
+			if (this.settings.useTagInfo) {
+				await this.loadTagInfo();
+			}
 		});
 		this.addCommand({
 			id: "tagfolder-open",
@@ -317,11 +320,7 @@ export default class TagFolderPlugin extends Plugin {
 
 		this.addSettingTab(new TagFolderSettingTab(this.app, this));
 		maxDepth.set(this.settings.expandLimit);
-		if (this.settings.useTagInfo) {
-			this.app.workspace.onLayoutReady(async () => {
-				await this.loadTagInfo();
-			});
-		}
+
 		searchString.subscribe((search => {
 			this.searchString = search;
 			this.refreshAllTree();
@@ -819,7 +818,7 @@ export default class TagFolderPlugin extends Plugin {
 
 	onunload() { }
 
-	async openScrollView(leaf: WorkspaceLeaf, title: string, tagPath: string, files: string[]) {
+	async openScrollView(leaf: WorkspaceLeaf | undefined, title: string, tagPath: string, files: string[]) {
 		if (!leaf) {
 			leaf = this.app.workspace.getLeaf("split");
 		}
@@ -910,7 +909,7 @@ export default class TagFolderPlugin extends Plugin {
 	async _initTagView() {
 		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TAGFOLDER);
 		if (leaves.length == 0) {
-			await this.app.workspace.getLeftLeaf(false).setViewState({
+			await this.app.workspace.getLeftLeaf(false)?.setViewState({
 				type: VIEW_TYPE_TAGFOLDER,
 				state: { treeViewType: "tags" }
 			});
@@ -925,7 +924,7 @@ export default class TagFolderPlugin extends Plugin {
 	async _initLinkView() {
 		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TAGFOLDER_LINK);
 		if (leaves.length == 0) {
-			await this.app.workspace.getLeftLeaf(false).setViewState({
+			await this.app.workspace.getLeftLeaf(false)?.setViewState({
 				type: VIEW_TYPE_TAGFOLDER_LINK,
 				state: { treeViewType: "links" }
 			});
@@ -1129,7 +1128,7 @@ export default class TagFolderPlugin extends Plugin {
 					if (!Platform.isMobile) {
 						theLeaf = this.app.workspace.createLeafBySplit(parent, "horizontal", false);
 					} else {
-						theLeaf = this.app.workspace.getLeftLeaf(false);
+						theLeaf = this.app.workspace.getLeftLeaf(false) as WorkspaceLeaf;
 					}
 					break;
 			}

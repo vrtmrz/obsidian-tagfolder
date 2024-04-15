@@ -29,7 +29,7 @@
 		evt: MouseEvent,
 		trail: string[],
 		targetTag?: string,
-		targetItems?: ViewItem[]
+		targetItems?: ViewItem[],
 	) => void;
 	export let showLevelSelect: (evt: MouseEvent) => void;
 
@@ -38,10 +38,10 @@
 	export let newNote: (evt: MouseEvent) => void;
 
 	export let openScrollView: (
-		leaf: null,
+		leaf: undefined,
 		title: string,
 		tagPath: string,
-		files: string[]
+		files: string[],
 	) => Promise<void>;
 
 	export let isViewSwitchable: boolean;
@@ -67,8 +67,8 @@
 					...viewItemsSrc.filter(
 						(e) =>
 							!updatedFiles.some((filename) =>
-								e.links.contains(filename)
-							)
+								e.links.contains(filename),
+							),
 					),
 				];
 				updatedFiles = [];
@@ -190,7 +190,7 @@
 			for (const v of ex) {
 				if (observingElements.has(v.target)) {
 					const tg = observingElements.get(v.target);
-					if (tg.lastState !== v.isIntersecting) {
+					if (tg && tg.lastState !== v.isIntersecting) {
 						tg.lastState = v.isIntersecting;
 						setTimeout(() => tg.callback(v.isIntersecting), 10);
 					}
@@ -245,13 +245,13 @@
 				for (const tag of lowerTags) {
 					items = items.filter((e) =>
 						e.tags.some((e) =>
-							(e.toLowerCase() + "/").startsWith(tag)
-						)
+							(e.toLowerCase() + "/").startsWith(tag),
+						),
 					);
 				}
 
 				const firstLevel = trimTrailingSlash(
-					tags.first() ?? ""
+					tags.first() ?? "",
 				).toLowerCase();
 
 				// Processing archive tags
@@ -264,8 +264,8 @@
 					items = items.filter(
 						(item) =>
 							!item.tags.some((e) =>
-								archiveTags.contains(e.toLowerCase())
-							)
+								archiveTags.contains(e.toLowerCase()),
+							),
 					);
 				}
 				viewItems = items;
@@ -334,6 +334,7 @@
 		{/if}
 		{#if viewType == "links"}
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
 			<div
 				class="clickable-icon nav-action-button"
 				class:is-active={incomingEnabled}
@@ -343,6 +344,7 @@
 				{@html incomingIcon}
 			</div>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
 			<div
 				class="clickable-icon nav-action-button"
 				class:is-active={outgoingEnabled}
@@ -352,6 +354,7 @@
 				{@html outgoingIcon}
 			</div>
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
 			<div
 				class="clickable-icon nav-action-button"
 				class:is-active={onlyFDREnabled}
@@ -364,21 +367,23 @@
 	</div>
 </div>
 {#if showSearch && isMainTree}
-	<div class="search-input-container">
-		<input
-			type="search"
-			spellcheck="false"
-			placeholder="Type to start search..."
-			bind:value={search}
-		/>
-		<!-- svelte-ignore a11y-click-events-have-key-events -->
-		<!-- svelte-ignore a11y-no-static-element-interactions -->
-		<div
-			class="search-input-clear-button"
-			aria-label="Clear search"
-			style="display:{search.trim() == '' ? 'none' : ''};"
-			on:click={clearSearch}
-		/>
+	<div class="search-row">
+		<div class="search-input-container global-search-input-container">
+			<input
+				type="search"
+				spellcheck="false"
+				placeholder="Type to start search..."
+				bind:value={search}
+			/>
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
+			<div
+				class="search-input-clear-button"
+				aria-label="Clear search"
+				style="display:{search.trim() == '' ? 'none' : ''};"
+				on:click={clearSearch}
+			/>
+		</div>
 	</div>
 {/if}
 <div class="nav-files-container node-insert-event" bind:this={scrollParent}>

@@ -9,7 +9,7 @@ export const askString = (app: App, title: string, placeholder: string, initialT
 
 export class PopoverSelectString extends SuggestModal<string> {
     app: App;
-    callback: (e: string | false) => void = () => { };
+    callback?: (e: string | false) => void = () => { };
     title = "";
 
     getSuggestions(query: string): string[] | Promise<string[]> {
@@ -19,8 +19,8 @@ export class PopoverSelectString extends SuggestModal<string> {
         el.createDiv({ text: `${this.title}${value}` });
     }
     onChooseSuggestion(item: string, evt: MouseEvent | KeyboardEvent) {
-        this.callback(item);
-        this.callback = null;
+        this.callback?.(item);
+        this.callback = undefined;
     }
 
     constructor(app: App, title: string, placeholder: string | null, initialText: string, callback: (e: string | false) => void) {
@@ -41,7 +41,7 @@ export class PopoverSelectString extends SuggestModal<string> {
     }
     onClose(): void {
         setTimeout(() => {
-            if (this.callback != null) {
+            if (this.callback) {
                 this.callback(false);
             }
         }, 100);

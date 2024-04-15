@@ -1,6 +1,6 @@
 
 import type { TREE_TYPE, TagFolderSettings, TagInfoDict, ViewItem } from "./types";
-import { V2FI_IDX_CHILDREN, type V2FolderItem, trimPrefix, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, doEvents, waitForRequestAnimationFrame } from "./util";
+import { V2FI_IDX_CHILDREN, type V2FolderItem, trimPrefix, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame } from "./util";
 
 export function performSortExactFirst(_items: ViewItem[], children: V2FolderItem[], leftOverItems: ViewItem[]) {
 
@@ -43,9 +43,9 @@ export async function collectChildren(previousTrail: string, tags: string[], _ta
     for (const item of _items) {
         const itemTags = item.tags;
         itemTags.forEach(itemTag => {
-            const tagLc = lowercaseMap.get(itemTag) ?? lowercaseMap.set(itemTag, itemTag.toLowerCase()).get(itemTag);
+            const tagLc = lowercaseMap.get(itemTag) ?? lowercaseMap.set(itemTag, itemTag.toLowerCase()).get(itemTag)!;
             if (!tagPerItem.has(tagLc)) tagPerItem.set(tagLc, []);
-            tagPerItem.get(tagLc).push(item);
+            tagPerItem.get(tagLc)!.push(item);
         })
     }
     for (const tag of tags) {

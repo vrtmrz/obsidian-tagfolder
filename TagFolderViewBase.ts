@@ -1,4 +1,4 @@
-import { ItemView, Menu, Notice, TFile } from "obsidian";
+import { ItemView, Menu, Notice } from "obsidian";
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 import TagFolderPlugin from "./main";
 import {
@@ -29,9 +29,8 @@ function toggleObjectProp(obj: { [key: string]: any }, propName: string, value: 
     }
 }
 export abstract class TagFolderViewBase extends ItemView {
-    component: TagFolderViewComponent;
-    plugin: TagFolderPlugin;
-    navigation: false;
+    component!: TagFolderViewComponent;
+    plugin!: TagFolderPlugin;
     async saveSettings(settings: TagFolderSettings) {
         this.plugin.settings = { ...this.plugin.settings, ...settings };
         await this.plugin.saveSettings();
@@ -251,7 +250,7 @@ export abstract class TagFolderViewBase extends ItemView {
                                 .setIcon("sheets-in-box")
                                 .onClick(async () => {
                                     const files = targetItems.map(e => e.path);
-                                    await this.plugin.openScrollView(null, displayExpandedTags, expandedTagsAll.join(", "), files);
+                                    await this.plugin.openScrollView(undefined, displayExpandedTags, expandedTagsAll.join(", "), files);
                                 })
                         })
                         menu.addItem(item => {
@@ -296,7 +295,7 @@ export abstract class TagFolderViewBase extends ItemView {
                         app.workspace.openLinkText(path, path, "split");
                     })
             );
-        } else if (!isTagTree) {
+        } else if (!isTagTree && targetTag) {
             const path = targetTag;
             const file = this.app.vault.getAbstractFileByPath(path);
             // Trigger

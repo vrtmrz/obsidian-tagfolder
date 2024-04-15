@@ -6,6 +6,7 @@
 
 	import ScrollViewMarkdown from "ScrollViewMarkdownComponent.svelte";
 	import { onDestroy, onMount } from "svelte";
+	import type TagFolderPlugin from "main";
 
 	export let store: Writable<ScrollViewState> = writable<ScrollViewState>({
 		files: [],
@@ -13,6 +14,8 @@
 		tagPath: "",
 	});
 	export let openfile: (path: string, specialKey: boolean) => void;
+	export let plugin: TagFolderPlugin;
+
 	let state: ScrollViewState = { files: [], title: "", tagPath: "" };
 	$: {
 		store.subscribe((_state) => {
@@ -29,7 +32,7 @@
 				trimTrailingSlash(e)
 					.split("/")
 					.map((e) => renderSpecialTag(e.trim()))
-					.join("/")
+					.join("/"),
 		)
 		.join(", ");
 	function handleOpenFile(e: MouseEvent, file: ScrollViewFile) {
@@ -56,7 +59,7 @@
 					}
 				}
 			},
-			options
+			options,
 		);
 	});
 	onDestroy(() => {
@@ -71,6 +74,7 @@
 	<hr />
 	{#each files as file}
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
+		<!-- svelte-ignore a11y-no-static-element-interactions -->
 		<div
 			class="file"
 			on:click={(evt) => handleOpenFile(evt, file)}
@@ -80,7 +84,7 @@
 				<span>{file.title}</span>
 				<span class="path">({file.path})</span>
 			</div>
-			<ScrollViewMarkdown {file} {observer} />
+			<ScrollViewMarkdown {file} {observer} {plugin} />
 			<hr />
 		</div>
 	{/each}

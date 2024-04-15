@@ -1,18 +1,17 @@
-import { Menu, TFile, type ViewStateResult, WorkspaceLeaf } from "obsidian";
+import { Menu, type ViewStateResult, WorkspaceLeaf } from "obsidian";
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 import {
 	type TagFolderListState,
 	VIEW_TYPE_TAGFOLDER_LIST
 } from "./types";
-import { isSpecialTag, trimTrailingSlash } from "./util";
 import TagFolderPlugin from "./main";
 import { TagFolderViewBase } from "./TagFolderViewBase";
 
 export class TagFolderList extends TagFolderViewBase {
-	component: TagFolderViewComponent;
+
 	plugin: TagFolderPlugin;
-	icon: "stacked-levels";
-	title: string;
+	icon = "stacked-levels";
+	title: string = "";
 
 	onPaneMenu(menu: Menu, source: string): void {
 		super.onPaneMenu(menu, source);
@@ -35,7 +34,9 @@ export class TagFolderList extends TagFolderViewBase {
 		this.state = { ...state };
 		this.title = state.tags.join(",");
 		this.component.$set({ tags: state.tags, title: state.title ?? "" })
-		result = {};
+		result = {
+			history: false
+		};
 		return;
 	}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type TagFolderPlugin from "main";
 	import { MarkdownRenderer } from "obsidian";
 
 	import { onDestroy, onMount } from "svelte";
@@ -6,13 +7,20 @@
 
 	export let file: ScrollViewFile = { path: "" };
 	export let observer: IntersectionObserver;
+	export let plugin: TagFolderPlugin;
 
 	let el: HTMLElement;
 	let renderedContent = "";
 
 	function onAppearing(this: HTMLElement, _: Event) {
 		if (file.content && el && renderedContent != file.content) {
-			MarkdownRenderer.renderMarkdown(file.content, el, file.path, null);
+			MarkdownRenderer.render(
+				plugin.app,
+				file.content,
+				el,
+				file.path,
+				plugin,
+			);
 			renderedContent = file.content;
 		}
 	}
@@ -36,7 +44,13 @@
 		) {
 			el.style.minHeight = `${el.clientHeight}px`;
 			el.innerHTML = "";
-			MarkdownRenderer.renderMarkdown(file.content, el, file.path, null);
+			MarkdownRenderer.render(
+				plugin.app,
+				file.content,
+				el,
+				file.path,
+				plugin,
+			);
 			renderedContent = file.content;
 			el.style.minHeight = "20px";
 		}

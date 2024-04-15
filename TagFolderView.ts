@@ -9,7 +9,7 @@ export interface TagFolderViewState extends ViewState {
 	treeViewType: TREE_TYPE
 }
 export class TagFolderView extends TagFolderViewBase {
-	icon: "stacked-levels";
+	icon = "stacked-levels";
 	treeViewType?: TREE_TYPE;
 
 	getIcon(): string {

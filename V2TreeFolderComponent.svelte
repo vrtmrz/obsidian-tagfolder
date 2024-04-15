@@ -86,15 +86,15 @@
 		evt: MouseEvent,
 		trail: string[],
 		targetTag?: string,
-		targetItems?: ViewItem[]
+		targetItems?: ViewItem[],
 	) => void;
 	export let openFile: (path: string, specialKey: boolean) => void;
 	export let hoverPreview: (e: MouseEvent, path: string) => void;
 	export let openScrollView: (
-		leaf: null,
+		leaf: undefined,
 		title: string,
 		tagPath: string,
-		files: string[]
+		files: string[],
 	) => Promise<void>;
 
 	// The key for keep toggling
@@ -129,7 +129,7 @@
 	});
 	$: sortFunc = selectCompareMethodTags(
 		_setting,
-		viewType == "links" ? {} : _tagInfo
+		viewType == "links" ? {} : _tagInfo,
 	);
 
 	// To Highlight active things.
@@ -142,17 +142,17 @@
 	function handleOpenScroll(
 		e: MouseEvent,
 		trails: string[],
-		filePaths: string[]
+		filePaths: string[],
 	) {
 		if (viewType == "tags") {
 			openScrollView(
-				null,
+				undefined,
 				"",
 				joinPartialPath(removeIntermediatePath(trails)).join(", "),
-				filePaths
+				filePaths,
 			);
 		} else if (viewType == "links") {
-			openScrollView(null, "", `Linked to ${filename}`, filePaths);
+			openScrollView(undefined, "", `Linked to ${filename}`, filePaths);
 		}
 		e.preventDefault();
 	}
@@ -160,7 +160,7 @@
 		if (
 			evt.target instanceof Element &&
 			evt.target.matchParent(
-				".is-clickable.mod-collapsible.nav-folder-title"
+				".is-clickable.mod-collapsible.nav-folder-title",
 			)
 		) {
 			return true;
@@ -261,7 +261,7 @@
 				isSuppressibleLevel = false;
 				isMixedDedicatedTag = false;
 				let tagsAll = uniqueCaseIntensive(
-					_items.flatMap((e) => e.tags)
+					_items.flatMap((e) => e.tags),
 				);
 				if (viewType == "links") {
 					tagsAll = unique(_items.flatMap((e) => e.links));
@@ -282,7 +282,7 @@
 						if (tag == "_unlinked") {
 							linkedItems.set(
 								tag,
-								_items.filter((e) => e.links.contains(tag))
+								_items.filter((e) => e.links.contains(tag)),
 							);
 						} else {
 							const wItems = _items.filter((e) => e.path == tag);
@@ -302,7 +302,7 @@
 							const x = getViewItemFromPath(tag);
 							if (x == undefined) return false;
 							const existLinks = x.links.filter(
-								(e) => !trail.contains(e) && e != thisName
+								(e) => !trail.contains(e) && e != thisName,
 							);
 
 							// Show as a tag,
@@ -343,23 +343,23 @@
 						trail.every(
 							(trail) =>
 								trimTrailingSlash(tag.toLowerCase()) !==
-								trimTrailingSlash(trail.toLowerCase())
-						)
+								trimTrailingSlash(trail.toLowerCase()),
+						),
 					);
 
 					// Remove itself
 					existTags = existTags.filter(
 						(tag) =>
 							tag.toLowerCase() != thisName.toLowerCase() &&
-							tag.toLowerCase() != tagName.toLowerCase()
+							tag.toLowerCase() != tagName.toLowerCase(),
 					);
 					existTags = existTags.filter(
 						(tag) =>
 							!tag
 								.toLowerCase()
 								.endsWith(
-									"/" + trimSlash(thisName).toLowerCase()
-								)
+									"/" + trimSlash(thisName).toLowerCase(),
+								),
 					);
 
 					let escapedPreviousTrail = previousTrail;
@@ -368,7 +368,7 @@
 						// Dedicated tag does not accept other items on the intermediate places.
 
 						existTags = existTags.filter((e) =>
-							(e + "/").startsWith(previousTrail)
+							(e + "/").startsWith(previousTrail),
 						);
 					}
 					if (isMixedDedicatedTag) {
@@ -379,8 +379,8 @@
 						existTags = existTags.map((e) =>
 							(e + "/").startsWith(previousTrail)
 								? escapedPreviousTrail +
-								  e.substring(previousTrail.length)
-								: e
+									e.substring(previousTrail.length)
+								: e,
 						);
 					}
 
@@ -393,7 +393,7 @@
 						} else {
 							// All tags under this note are the same. it can be suppressible
 							const allChildTags = uniqueCaseIntensive(
-								_items.map((e) => e.tags.sort().join("**"))
+								_items.map((e) => e.tags.sort().join("**")),
 							);
 							if (allChildTags.length == 1) {
 								isSuppressibleLevel = true;
@@ -421,8 +421,8 @@
 									let piece = e.substring(0, idx + 1);
 									let idx2 = idx;
 									while (
-										removeItems.contains(
-											piece.toLowerCase()
+										removeItems.some((e) =>
+											e.startsWith(piece.toLowerCase()),
 										)
 									) {
 										idx2 = e.indexOf("/", idx2 + 1);
@@ -433,7 +433,7 @@
 										piece = e.substring(0, idx2 + 1);
 									}
 									return piece;
-								})
+								}),
 							);
 						} else {
 							tagsOnNextLevel = unique(existTags);
@@ -444,26 +444,26 @@
 							trailShortest.every(
 								(trail) =>
 									trimTrailingSlash(tag.toLowerCase()) !==
-									trimTrailingSlash(trail.toLowerCase())
-							)
+									trimTrailingSlash(trail.toLowerCase()),
+							),
 						);
 					}
 
 					// To use as a filter, the previous level should be included in the tags list if in the dedicated level.
-					if (isMixedDedicatedTag) {
+					if (isMixedDedicatedTag || isInDedicatedTag) {
 						existTagsFiltered1 = existTagsFiltered1.map((e) =>
-							e.replace(escapedPreviousTrail, previousTrail)
+							e.replace(escapedPreviousTrail, previousTrail),
 						);
 					}
 
 					// Merge the tags of dedicated tag and normal tag
 					const existTagsFiltered1LC = existTagsFiltered1.map((e) =>
-						e.toLowerCase()
+						e.toLowerCase(),
 					);
 					const existTagsFiltered2 = existTagsFiltered1.map((e) =>
 						existTagsFiltered1LC.contains(e.toLowerCase() + "/")
 							? e + "/"
-							: e
+							: e,
 					);
 					const existTagsFiltered3 =
 						uniqueCaseIntensive(existTagsFiltered2);
@@ -474,18 +474,18 @@
 								!existTagsFiltered3
 									.map((e) => e.toLowerCase())
 									.contains(
-										(previousTrail + tag).toLowerCase()
+										(previousTrail + tag).toLowerCase(),
 									)
 							) {
 								existTagsFiltered4.push(tag);
 							}
 						}
 						tags = uniqueCaseIntensive(
-							removeIntermediatePath(existTagsFiltered4)
+							removeIntermediatePath(existTagsFiltered4),
 						);
 					} else {
 						tags = uniqueCaseIntensive(
-							removeIntermediatePath(existTagsFiltered3)
+							removeIntermediatePath(existTagsFiltered3),
 						);
 					}
 				}
@@ -500,7 +500,7 @@
 	function updateX(
 		param: Parameters<typeof collectTreeChildren>[0] & {
 			isFolderVisible: boolean;
-		}
+		},
 	) {
 		if (isSameAny(param, _lastParam)) {
 			return;
@@ -569,7 +569,7 @@
 				[
 					...tagNameDisp,
 					...suppressLevels.flatMap((e) =>
-						e.split("/").map((e) => renderSpecialTag(e))
+						e.split("/").map((e) => renderSpecialTag(e)),
 					),
 				],
 			];
@@ -577,7 +577,7 @@
 			tagsDisp = [
 				tagNameDisp,
 				...suppressLevels.map((e) =>
-					e.split("/").map((e) => renderSpecialTag(e))
+					e.split("/").map((e) => renderSpecialTag(e)),
 				),
 			];
 		} else {
@@ -594,10 +594,10 @@
 							.map(
 								(ee) =>
 									`<span class="tf-tag-each">${escapeStringToHTML(
-										ee
-									)}</span>`
+										ee,
+									)}</span>`,
 							)
-							.join("")}</span>`
+							.join("")}</span>`,
 				)
 				.join("")
 		: "";
@@ -613,7 +613,7 @@
 					leftOverItems = _items.filter(
 						(e) =>
 							e.tags.contains("_untagged") ||
-							e.tags.contains("_unlinked")
+							e.tags.contains("_unlinked"),
 					);
 				} else {
 					leftOverItems = [];
@@ -634,7 +634,7 @@
 							!children
 								.map((e) => e[V2FI_IDX_CHILDREN])
 								.flat()
-								.find((ee) => e.path == ee.path)
+								.find((ee) => e.path == ee.path),
 					);
 				} else {
 					leftOverItems = _items;
@@ -645,7 +645,7 @@
 			leftOverItems = performSortExactFirst(
 				_items,
 				children,
-				leftOverItems
+				leftOverItems,
 			);
 		}
 	}
@@ -780,7 +780,7 @@
 	function dragStartFiles(args: DragEvent) {
 		if (!draggable) return;
 		const files = _items.map((e) =>
-			app.vault.getAbstractFileByPath(e.path)
+			app.vault.getAbstractFileByPath(e.path),
 		);
 		const param = dm.dragFiles(args, files);
 		if (param) {
@@ -796,9 +796,9 @@
 			...ancestorToLongestTag(
 				ancestorToTags(
 					joinPartialPath(
-						removeIntermediatePath([...trail, ...suppressLevels])
-					)
-				)
+						removeIntermediatePath([...trail, ...suppressLevels]),
+					),
+				),
 			),
 		].map((e) => trimTrailingSlash(e));
 		const expandedTags = expandedTagsAll
@@ -806,7 +806,7 @@
 				e
 					.split("/")
 					.filter((ee) => !isSpecialTag(ee))
-					.join("/")
+					.join("/"),
 			)
 			.filter((e) => e != "")
 			.map((e) => "#" + e)
@@ -848,7 +848,7 @@
 				evt,
 				[...trail, ...suppressLevels],
 				viewType == "tags" ? tagName : filename,
-				_items
+				_items,
 			);
 	}}
 >
@@ -900,7 +900,7 @@
 						handleOpenScroll(
 							e,
 							trail,
-							_items.map((e) => e.path)
+							_items.map((e) => e.path),
 						)}
 				>
 					<span

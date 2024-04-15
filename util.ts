@@ -44,7 +44,7 @@ export function ancestorToTags(ancestors: string[]): string[] {
 					"/" +
 					i.substring(1),
 				],
-		[]
+		[] as string[]
 	)
 }
 
@@ -546,7 +546,7 @@ export async function scheduleOnceIfDuplicated<T>(key: string, proc: () => Promi
 		runningProcess.add(key);
 		await delay(3);
 		if (waitingProcess.has(key)) {
-			const nextProc = waitingProcess.get(key);
+			const nextProc = waitingProcess.get(key)!;
 			waitingProcess.delete(key);
 			runningProcess.delete(key);
 			return scheduleOnceIfDuplicated(key, nextProc);
@@ -574,7 +574,6 @@ export function isSameAny(a: unknown, b: unknown) {
 			return a == b;
 		case "object":
 			if (a === b) return true;
-
 			if (a instanceof Map || a instanceof Set) {
 				if (a.size != (b as typeof a).size) return false;
 				const v = [...a]
@@ -591,8 +590,8 @@ export function isSameAny(a: unknown, b: unknown) {
 				return true;
 			}
 			{
-				const x = Object.values(a);
-				const y = Object.values(b);
+				const x = Object.values(a!);
+				const y = Object.values(b!);
 				if (x.length != y.length) return false;
 				for (let i = 0; i < x.length; i++) {
 					if (!isSameAny(x[i], y[i])) return false;

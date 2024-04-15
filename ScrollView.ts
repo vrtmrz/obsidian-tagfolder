@@ -16,13 +16,13 @@ import { doEvents } from "./util";
 // Show notes as like scroll.
 export class ScrollView extends ItemView {
 
-	component: ScrollViewComponent;
+	component?: ScrollViewComponent;
 	plugin: TagFolderPlugin;
-	icon: "sheets-in-box";
+	icon = "sheets-in-box";
 	store: Writable<ScrollViewState>;
 	state: ScrollViewState = { files: [], title: "", tagPath: "" };
-	title: string;
-	navigation: true;
+	title: string = "";
+	navigation = true;
 
 	getIcon(): string {
 		return "sheets-in-box";
@@ -52,7 +52,9 @@ export class ScrollView extends ItemView {
 		this.state = { ...state };
 		this.title = state.title;
 		await this.updateView();
-		result = {};
+		result = {
+			history: false
+		};
 		return;
 	}
 
@@ -99,12 +101,13 @@ export class ScrollView extends ItemView {
 			target: this.contentEl,
 			props: {
 				store: this.store,
-				openfile: this.plugin.focusFile
+				openfile: this.plugin.focusFile,
+				plugin: this.plugin
 			},
 		});
 	}
 
 	async onClose() {
-		this.component.$destroy();
+		this.component?.$destroy();
 	}
 }
