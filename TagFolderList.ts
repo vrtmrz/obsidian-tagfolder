@@ -6,6 +6,7 @@ import {
 } from "./types";
 import TagFolderPlugin from "./main";
 import { TagFolderViewBase } from "./TagFolderViewBase";
+import { mount, unmount } from "svelte";
 
 export class TagFolderList extends TagFolderViewBase {
 
@@ -37,7 +38,7 @@ export class TagFolderList extends TagFolderViewBase {
 		result = {
 			history: false
 		};
-		return;
+		return await Promise.resolve();
 	}
 
 	getState() {
@@ -69,7 +70,7 @@ export class TagFolderList extends TagFolderViewBase {
 
 	async onOpen() {
 		this.containerEl.empty();
-		this.component = new TagFolderViewComponent({
+		this.component = mount(TagFolderViewComponent, {
 			target: this.containerEl,
 			props: {
 				openFile: this.plugin.focusFile,
@@ -85,12 +86,15 @@ export class TagFolderList extends TagFolderViewBase {
 				saveSettings: this.saveSettings.bind(this),
 			},
 		});
+		return await Promise.resolve();
 	}
 
 	async onClose() {
 		if (this.component) {
-			this.component.$destroy();
+			unmount(this.component);
+			this.component = undefined!;
 		}
+		return await Promise.resolve();
 	}
 
 }

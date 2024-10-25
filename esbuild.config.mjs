@@ -2,7 +2,7 @@ import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
 import sveltePlugin from "esbuild-svelte";
-import sveltePreprocess from "svelte-preprocess";
+import { sveltePreprocess } from "svelte-preprocess";
 import fs from "node:fs";
 import { minify } from "terser";
 const banner = `/*
@@ -14,16 +14,18 @@ if you want to view the source, please visit the github repository of this plugi
 const prod = process.argv[2] === "production";
 
 const terserOpt = {
-	sourceMap: (!prod ? {
-		url: "inline"
-	} : {}),
+	sourceMap: !prod
+		? {
+				url: "inline",
+		  }
+		: {},
 	format: {
 		indent_level: 2,
 		beautify: true,
 		comments: "some",
 		ecma: 2018,
 		preamble: banner,
-		webkit: true
+		webkit: true,
 	},
 	parse: {
 		// parse options
@@ -56,30 +58,31 @@ const terserOpt = {
 	ie8: false,
 	module: false,
 	safari10: false,
-	toplevel: false
-}
+	toplevel: false,
+};
 
 /** @type esbuild.Plugin[] */
-const plugins = [{
-	name: 'my-plugin',
-	setup(build) {
-		build.onEnd(async result => {
-			if (prod) {
-				console.log("tersering...");
-				const src = fs.readFileSync("./main_org.js").toString();
-				// @ts-ignore
-				const ret = await minify(src, terserOpt);
-				if (ret && ret.code) {
-					fs.writeFileSync("./main.js", ret.code);
+const plugins = [
+	{
+		name: "my-plugin",
+		setup(build) {
+			build.onEnd(async (result) => {
+				if (prod) {
+					console.log("tersering...");
+					const src = fs.readFileSync("./main_org.js").toString();
+					// @ts-ignore
+					const ret = await minify(src, terserOpt);
+					if (ret && ret.code) {
+						fs.writeFileSync("./main.js", ret.code);
+					}
+				} else {
+					fs.copyFileSync("./main_org.js", "./main.js");
 				}
-			} else {
-				fs.copyFileSync("./main_org.js", "./main.js");
-			}
-			console.log("tersered...");
-		});
+				console.log("tersered...");
+			});
+		},
 	},
-}];
-
+];
 
 const context = await esbuild.context({
 	banner: {
@@ -101,7 +104,8 @@ const context = await esbuild.context({
 		"@lezer/common",
 		"@lezer/highlight",
 		"@lezer/lr",
-		...builtins],
+		...builtins,
+	],
 	format: "cjs",
 	target: "es2018",
 	logLevel: "info",
@@ -111,23 +115,20 @@ const context = await esbuild.context({
 	outfile: "main_org.js",
 	plugins: [
 		sveltePlugin({
-			preprocess: sveltePreprocess(
-				{
-					preserveComments: false,
-					compilerOptions: {
-						"removeComments": true,
-					}
-				}
-			),
+			preprocess: sveltePreprocess({
+				preserveComments: false,
+				compilerOptions: {
+					removeComments: true,
+				},
+			}),
 			compilerOptions: {
-				css: true,
+				css: "injected",
 				preserveComments: false,
 				preserveWhitespace: false,
 			},
 		}),
-		...plugins
+		...plugins,
 	],
-
 });
 
 if (prod) {

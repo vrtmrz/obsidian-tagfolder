@@ -1,53 +1,58 @@
 <script lang="ts">
-	import { performHide } from "store";
-	import { getContext, onDestroy, onMount } from "svelte";
-	export let cssClass = "";
-	export let isVisible = false;
-	let hidingScheduled = false;
+    import { performHide } from "store";
+    import { getContext, onDestroy, onMount } from "svelte";
+    interface Props {
+        cssClass?: string;
+        isVisible?: boolean;
+        children?: import('svelte').Snippet<[any]>;
+    }
 
-	const { observe, unobserve } = getContext("observer") as {
-		observe: (el: Element, callback: (visibility: boolean) => void) => void;
-		unobserve: (el: Element) => void;
-	};
-	function setIsVisible(visibility: boolean) {
-		if (isVisible != visibility) {
-			if (visibility) {
-				isVisible = visibility;
-			}
-		}
-		hidingScheduled = !visibility;
-	}
+    let { cssClass = "", isVisible = $bindable(false), children }: Props = $props();
+    let hidingScheduled = $state(false);
 
-	onMount(() => {
-		performHide.subscribe(() => {
-			if (hidingScheduled) {
-				isVisible = false;
-				hidingScheduled = false;
-			}
-		});
-	});
-	onDestroy(() => {
-		if (_el) {
-			unobserve(_el);
-		}
-	});
+    const { observe, unobserve } = getContext("observer") as {
+        observe: (el: Element, callback: (visibility: boolean) => void) => void;
+        unobserve: (el: Element) => void;
+    };
+    function setIsVisible(visibility: boolean) {
+        if (isVisible != visibility) {
+            if (visibility) {
+                isVisible = visibility;
+            }
+        }
+        hidingScheduled = !visibility;
+    }
 
-	let _el: HTMLDivElement;
-	let el: HTMLDivElement;
+    onMount(() => {
+        performHide.subscribe(() => {
+            if (hidingScheduled) {
+                isVisible = false;
+                hidingScheduled = false;
+            }
+        });
+    });
+    onDestroy(() => {
+        if (_el) {
+            unobserve(_el);
+        }
+    });
 
-	$: {
-		if (_el != el) {
-			if (_el) {
-				unobserve(_el);
-			}
-			_el = el;
-			if (el) {
-				observe(el, setIsVisible);
-			}
-		}
-	}
+    let _el = $state<HTMLDivElement>();
+    let el = $state<HTMLDivElement>();
+
+    $effect(() => {
+        if (_el != el) {
+            if (_el) {
+                unobserve(_el);
+            }
+            _el = el;
+            if (el) {
+                observe(el, setIsVisible);
+            }
+        }
+    });
 </script>
 
 <div class={cssClass} bind:this={el}>
-	<slot {isVisible} />
+    {@render children?.({ isVisible, })}
 </div>

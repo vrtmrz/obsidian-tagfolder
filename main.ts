@@ -37,7 +37,7 @@ import {
 	type FileCache,
 	enumShowListIn
 } from "types";
-import { allViewItems, allViewItemsByLink, appliedFiles, currentFile, maxDepth, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
+import { allViewItems, allViewItemsByLink, appliedFiles, currentFile, maxDepth, pluginInstance, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
 import {
 	compare,
 	doEvents,
@@ -162,11 +162,11 @@ export default class TagFolderPlugin extends Plugin {
 
 		if (targetFile) {
 			if (specialKey) {
-				this.app.workspace.openLinkText(targetFile.path, targetFile.path, "tab");
+				void this.app.workspace.openLinkText(targetFile.path, targetFile.path, "tab");
 			} else {
 				// const leaf = this.app.workspace.getLeaf(false);
 				// leaf.openFile(targetFile);
-				this.app.workspace.openLinkText(targetFile.path, targetFile.path);
+				void this.app.workspace.openLinkText(targetFile.path, targetFile.path);
 			}
 		}
 	};
@@ -231,7 +231,7 @@ export default class TagFolderPlugin extends Plugin {
 			this.settings.scanDelay,
 			true
 		);
-
+		pluginInstance.set(this);
 		this.registerView(
 			VIEW_TYPE_TAGFOLDER,
 			(leaf) => new TagFolderView(leaf, this, "tags")
@@ -262,14 +262,14 @@ export default class TagFolderPlugin extends Plugin {
 			id: "tagfolder-open",
 			name: "Show Tag Folder",
 			callback: () => {
-				this.activateView();
+				void this.activateView();
 			},
 		});
 		this.addCommand({
 			id: "tagfolder-link-open",
 			name: "Show Link Folder",
 			callback: () => {
-				this.activateViewLink();
+				void this.activateViewLink();
 			},
 		});
 		this.addCommand({
@@ -364,7 +364,7 @@ export default class TagFolderPlugin extends Plugin {
 					setTagSearchString(event, tagString);
 					const leaf = this.getView()?.leaf;
 					if (leaf) {
-						this.app.workspace.revealLeaf(leaf);
+						void this.app.workspace.revealLeaf(leaf);
 					}
 				}
 			}, { capture: true })
@@ -401,12 +401,12 @@ export default class TagFolderPlugin extends Plugin {
 				setTagSearchString(event, tagString);
 				const leaf = this.getView()?.leaf;
 				if (leaf) {
-					this.app.workspace.revealLeaf(leaf);
+					void this.app.workspace.revealLeaf(leaf);
 				}
 			}, { capture: true })
 		);
 		selectedTags.subscribe(newTags => {
-			this.openListView(newTags)
+			void this.openListView(newTags)
 		})
 	}
 
@@ -420,11 +420,11 @@ export default class TagFolderPlugin extends Plugin {
 	}
 
 	metadataCacheChanged(file: TFile) {
-		this.loadFileInfoAsync(file);
+		void this.loadFileInfoAsync(file);
 	}
 	metadataCacheResolve(file: TFile) {
 		if (this.getLinkView() != null) {
-			this.loadFileInfoAsync(file);
+			void this.loadFileInfoAsync(file);
 		}
 	}
 	metadataCacheResolved() {
@@ -475,7 +475,7 @@ export default class TagFolderPlugin extends Plugin {
 	updateFileCachesAll(): boolean {
 		const filesAll = [...this.app.vault.getMarkdownFiles(), ...this.app.vault.getAllLoadedFiles().filter(e => "extension" in e && e.extension == "canvas") as TFile[]];
 		const processFiles = filesAll.filter(file => this.parsedFileCache.get(file.path) ?? 0 != file.stat.mtime);
-		const caches = processFiles.map(entry => this.getFileCacheData(entry)).filter(e => e !== false) as FileCache[];
+		const caches = processFiles.map(entry => this.getFileCacheData(entry)).filter(e => e !== false)
 		this.fileCaches = [...caches];
 		return this.isFileCacheChanged();
 	}
@@ -726,7 +726,7 @@ export default class TagFolderPlugin extends Plugin {
 	lastSearchString = "";
 
 	loadFileInfo(diff?: TFile) {
-		this.loadFileInfoAsync(diff).then(e => {
+		void this.loadFileInfoAsync(diff).then(e => {
 			/* NO op*/
 		});
 	}
@@ -749,7 +749,7 @@ export default class TagFolderPlugin extends Plugin {
 	loadFileTimer?: ReturnType<typeof setTimeout> = undefined;
 	async loadFileInfos(diffs: TFile[]) {
 		if (this.processingFileInfo) {
-			diffs.forEach(e => this.loadFileInfoAsync(e));
+			diffs.forEach(e => void this.loadFileInfoAsync(e));
 			return;
 		}
 		try {
@@ -811,12 +811,14 @@ export default class TagFolderPlugin extends Plugin {
 			} else {
 				const diffs = [...this.loadFileQueue];
 				this.loadFileQueue = [];
-				this.loadFileInfos(diffs);
+				void this.loadFileInfos(diffs);
 			}
 		}, 200);
 	}
 
-	onunload() { }
+	onunload() {
+		pluginInstance.set(undefined!);
+	}
 
 	async openScrollView(leaf: WorkspaceLeaf | undefined, title: string, tagPath: string, files: string[]) {
 		if (!leaf) {
@@ -829,7 +831,7 @@ export default class TagFolderPlugin extends Plugin {
 			state: { files: files.map(e => ({ path: e })), title: title, tagPath: tagPath } as ScrollViewState
 		});
 
-		this.app.workspace.revealLeaf(
+		void this.app.workspace.revealLeaf(
 			leaf
 		);
 	}
@@ -898,7 +900,7 @@ export default class TagFolderPlugin extends Plugin {
 							} as ScrollViewFile;
 
 
-						}) as ScrollViewFile[]
+						})
 					}
 				}
 				await leaf.setViewState(newStat);
@@ -915,7 +917,7 @@ export default class TagFolderPlugin extends Plugin {
 			});
 		} else {
 			const newState = leaves[0].getViewState();
-			leaves[0].setViewState({
+			await leaves[0].setViewState({
 				type: VIEW_TYPE_TAGFOLDER,
 				state: { ...newState, treeViewType: "tags" }
 			})
@@ -930,7 +932,7 @@ export default class TagFolderPlugin extends Plugin {
 			});
 		} else {
 			const newState = leaves[0].getViewState();
-			leaves[0].setViewState({
+			await leaves[0].setViewState({
 				type: VIEW_TYPE_TAGFOLDER_LINK,
 				state: { ...newState, treeViewType: "links" }
 			})
@@ -949,7 +951,7 @@ export default class TagFolderPlugin extends Plugin {
 		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TAGFOLDER);
 		await this.initView();
 		if (leaves.length > 0) {
-			this.app.workspace.revealLeaf(
+			await this.app.workspace.revealLeaf(
 				leaves[0]
 			);
 		}
@@ -958,7 +960,7 @@ export default class TagFolderPlugin extends Plugin {
 		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TAGFOLDER_LINK);
 		await this.initLinkView();
 		if (leaves.length > 0) {
-			this.app.workspace.revealLeaf(
+			await this.app.workspace.revealLeaf(
 				leaves[0]
 			);
 		}
@@ -1045,7 +1047,7 @@ export default class TagFolderPlugin extends Plugin {
 		if (file == null) {
 			file = await this.app.vault.create(this.getTagInfoFilename(), "");
 		}
-		await app.fileManager.processFrontMatter(file, matter => {
+		await this.app.fileManager.processFrontMatter(file, matter => {
 			const ti = Object.entries(this.tagInfo);
 			for (const [key, value] of ti) {
 				if (value === undefined) {
@@ -1086,7 +1088,7 @@ export default class TagFolderPlugin extends Plugin {
 		await this.saveTagInfo();
 		tagFolderSetting.set(this.settings);
 		this.compareItems = getCompareMethodItems(this.settings);
-		this.refreshAllViewItems();
+		void this.refreshAllViewItems(); // (Do not wait for it)
 		// this.compareTags = getCompareMethodTags(this.settings);
 	}
 
@@ -1099,7 +1101,8 @@ export default class TagFolderPlugin extends Plugin {
 			VIEW_TYPE_TAGFOLDER_LIST
 		)) {
 			const state = leaf.getViewState();
-			if (state.state.tags.slice().sort().join("-") == tags.slice().sort().join("-")) {
+			if (!state.state?.tags) continue;
+			if ((state.state.tags as string[]).slice().sort().join("-") == tags.slice().sort().join("-")) {
 				// already shown.
 				this.app.workspace.setActiveLeaf(leaf, { focus: true });
 				return;
@@ -1145,7 +1148,7 @@ export default class TagFolderPlugin extends Plugin {
 			state: { tags: tags, title: title } as TagFolderListState
 		});
 
-		this.app.workspace.revealLeaf(
+		await this.app.workspace.revealLeaf(
 			theLeaf
 		);
 	}
@@ -1197,10 +1200,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Settings for TagFolder" });
-
-
-		containerEl.createEl("h3", { text: "Behavior" });
+		containerEl.createEl("h2", { text: "Behavior" });
 		new Setting(containerEl)
 			.setName("Always Open")
 			.setDesc("Place TagFolder on the left pane and activate it at every Obsidian launch")
@@ -1256,7 +1256,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		containerEl.createEl("h3", { text: "Files" });
+		containerEl.createEl("h2", { text: "Files" });
 		new Setting(containerEl)
 			.setName("Display method")
 			.setDesc("How to show a title of files")
@@ -1333,7 +1333,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 
-		containerEl.createEl("h3", { text: "Tags" });
+		containerEl.createEl("h2", { text: "Tags" });
 
 		const setOrderMethodTag = async (key?: string, order?: string) => {
 			const oldSetting = this.plugin.settings.sortTypeTag.split("_");
@@ -1382,7 +1382,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 
-		containerEl.createEl("h3", { text: "Actions" });
+		containerEl.createEl("h2", { text: "Actions" });
 		new Setting(containerEl)
 			.setName("Search tags inside TagFolder when clicking tags")
 			.addToggle((toggle) => {
@@ -1415,7 +1415,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		containerEl.createEl("h3", { text: "Arrangements" });
+		containerEl.createEl("h2", { text: "Arrangements" });
 
 		new Setting(containerEl)
 			.setName("Hide Items")
@@ -1495,7 +1495,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 
-		containerEl.createEl("h3", { text: "Link Folder" });
+		containerEl.createEl("h2", { text: "Link Folder" });
 		new Setting(containerEl)
 			.setName("Use Incoming")
 			.setDesc("")
@@ -1541,7 +1541,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 
-		containerEl.createEl("h3", { text: "Filters" });
+		containerEl.createEl("h2", { text: "Filters" });
 		new Setting(containerEl)
 			.setName("Target Folders")
 			.setDesc("If configured, the plugin will only target files in it.")
@@ -1605,7 +1605,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 
-		containerEl.createEl("h3", { text: "Misc" });
+		containerEl.createEl("h2", { text: "Misc" });
 
 		new Setting(containerEl)
 			.setName("Tag scanning delay")
@@ -1638,7 +1638,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		containerEl.createEl("h3", { text: "Utilities" });
+		containerEl.createEl("h2", { text: "Utilities" });
 
 		new Setting(containerEl)
 			.setName("Dumping tags for reporting bugs")

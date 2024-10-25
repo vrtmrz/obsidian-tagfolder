@@ -5,12 +5,16 @@
 	import { onDestroy, onMount } from "svelte";
 	import { type ScrollViewFile } from "types";
 
-	export let file: ScrollViewFile = { path: "" };
-	export let observer: IntersectionObserver;
-	export let plugin: TagFolderPlugin;
+	interface Props {
+		file?: ScrollViewFile;
+		observer?: IntersectionObserver;
+		plugin: TagFolderPlugin;
+	}
 
-	let el: HTMLElement;
-	let renderedContent = "";
+	let { file = { path: "" }, observer, plugin }: Props = $props();
+
+	let el = $state<HTMLElement>();
+	let renderedContent = $state("");
 
 	function onAppearing(this: HTMLElement, _: Event) {
 		if (file.content && el && renderedContent != file.content) {
@@ -26,15 +30,19 @@
 	}
 
 	onMount(() => {
-		observer.observe(el);
-		el.addEventListener("appearing", onAppearing);
+		if (el && observer) {
+			observer.observe(el);
+			el.addEventListener("appearing", onAppearing);
+		}
 	});
 	onDestroy(() => {
-		observer.unobserve(el);
-		el.removeEventListener("appearing", onAppearing);
+		if (el && observer) {
+			observer.unobserve(el);
+			el.removeEventListener("appearing", onAppearing);
+		}
 	});
 
-	$: {
+	$effect(() => {
 		if (
 			renderedContent &&
 			file &&
@@ -54,10 +62,10 @@
 			renderedContent = file.content;
 			el.style.minHeight = "20px";
 		}
-	}
+	});
 </script>
 
-<div class="markdownBody" bind:this={el} style="min-height: 1em;" />
+<div class="markdownBody" bind:this={el} style="min-height: 1em;"></div>
 
 <style>
 	.markdownBody {

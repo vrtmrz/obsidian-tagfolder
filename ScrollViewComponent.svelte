@@ -5,47 +5,51 @@
 	import { renderSpecialTag, trimTrailingSlash } from "./util";
 
 	import ScrollViewMarkdown from "ScrollViewMarkdownComponent.svelte";
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy } from "svelte";
 	import type TagFolderPlugin from "main";
 
-	export let store: Writable<ScrollViewState> = writable<ScrollViewState>({
-		files: [],
-		title: "",
-		tagPath: "",
-	});
-	export let openfile: (path: string, specialKey: boolean) => void;
-	export let plugin: TagFolderPlugin;
-
-	let state: ScrollViewState = { files: [], title: "", tagPath: "" };
-	$: {
-		store.subscribe((_state) => {
-			state = { ..._state };
-			return () => {};
-		});
+	interface Props {
+		store?: Writable<ScrollViewState>;
+		openfile: (path: string, specialKey: boolean) => void;
+		plugin: TagFolderPlugin;
 	}
-	$: files = state.files;
-	$: tagPath = state.tagPath
-		.split(", ")
-		.map(
-			(e) =>
-				"#" +
-				trimTrailingSlash(e)
-					.split("/")
-					.map((e) => renderSpecialTag(e.trim()))
-					.join("/"),
-		)
-		.join(", ");
+
+	let {
+		store = writable<ScrollViewState>({
+			files: [],
+			title: "",
+			tagPath: "",
+		}),
+		openfile,
+		plugin,
+	}: Props = $props();
+
+	const _state: ScrollViewState = $derived($store);
+	let files = $derived(_state.files);
+	const tagPath = $derived(
+		_state.tagPath
+			.split(", ")
+			.map(
+				(e) =>
+					"#" +
+					trimTrailingSlash(e)
+						.split("/")
+						.map((e) => renderSpecialTag(e.trim()))
+						.join("/"),
+			)
+			.join(", "),
+	);
 	function handleOpenFile(e: MouseEvent, file: ScrollViewFile) {
 		openfile(file.path, false);
 		e.preventDefault();
 	}
 	// Observe appearing and notify the component that you should render the content.
-	let scrollEl: HTMLElement;
-	let observer: IntersectionObserver;
+	let scrollEl = $state<HTMLElement>();
+	let observer = $state<IntersectionObserver>();
 	const onAppearing = new CustomEvent("appearing", {
 		detail: {},
 	});
-	onMount(() => {
+	$effect(() => {
 		const options = {
 			root: scrollEl,
 			rootMargin: "10px",
@@ -63,7 +67,7 @@
 		);
 	});
 	onDestroy(() => {
-		observer.disconnect();
+		observer?.disconnect();
 	});
 </script>
 
@@ -73,11 +77,11 @@
 	</div>
 	<hr />
 	{#each files as file}
-		<!-- svelte-ignore a11y-click-events-have-key-events -->
-		<!-- svelte-ignore a11y-no-static-element-interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="file"
-			on:click={(evt) => handleOpenFile(evt, file)}
+			onclick={(evt) => handleOpenFile(evt, file)}
 			bind:this={scrollEl}
 		>
 			<div class="header">

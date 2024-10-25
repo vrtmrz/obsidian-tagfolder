@@ -1,22 +1,48 @@
 {
-    "root": true,
-    "parser": "@typescript-eslint/parser",
-    "plugins": [
-      "@typescript-eslint"
-    ],
-    "extends": [
-      "eslint:recommended",
-      "plugin:@typescript-eslint/eslint-recommended",
-      "plugin:@typescript-eslint/recommended"
-    ], 
-    "parserOptions": {
-        "sourceType": "module"
-    },
-    "rules": {
-      "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": ["error", { "args": "none" }],
-      "@typescript-eslint/ban-ts-comment": "off",
-      "no-prototype-builtins": "off",
-      "@typescript-eslint/no-empty-function": "off"
-    } 
-  }
+	"root": true,
+	"parser": "@typescript-eslint/parser",
+	"plugins": ["@typescript-eslint"],
+	"extends": [
+		"eslint:recommended",
+		"plugin:@typescript-eslint/eslint-recommended",
+		"plugin:@typescript-eslint/recommended"
+	],
+	"parserOptions": {
+		"sourceType": "module",
+		"project": ["tsconfig.json"]
+	},
+	"ignorePatterns": [
+		"**/node_modules/*",
+		"**/jest.config.js",
+		"src/lib/coverage",
+		"src/lib/browsertest",
+		"**/test.ts",
+		"**/tests.ts",
+		"**/**test.ts",
+		"**/**.test.ts",
+		"esbuild.*.mjs",
+		"terser.*.mjs",
+		"svelte.config.js"
+	],
+	"rules": {
+		"no-unused-vars": "off",
+		"no-unused-labels": "off",
+		"@typescript-eslint/no-unused-vars": ["error", { "args": "none" }],
+		"@typescript-eslint/ban-ts-comment": "off",
+		"no-prototype-builtins": "off",
+		"@typescript-eslint/no-empty-function": "off",
+		"require-await": "warn",
+		"@typescript-eslint/require-await": "warn",
+		"@typescript-eslint/no-misused-promises": "warn",
+		"@typescript-eslint/no-floating-promises": "warn",
+		"no-async-promise-executor": "warn",
+		"@typescript-eslint/no-explicit-any": "off",
+		"@typescript-eslint/no-unnecessary-type-assertion": "error",
+		"no-constant-condition": [
+			"error",
+			{
+				"checkLoops": false
+			}
+		]
+	}
+}

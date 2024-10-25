@@ -1,5 +1,4 @@
-// svelte.config.js
-import preprocess from "svelte-preprocess";
+import { sveltePreprocess } from "svelte-preprocess";
 
 /**
  * This will add autocompletion if you're working with SvelteKit
@@ -7,11 +6,11 @@ import preprocess from "svelte-preprocess";
  * @type {import('@sveltejs/kit').Config}
  */
 const config = {
-	preprocess: preprocess({
+	preprocess: sveltePreprocess({
 		// ...svelte-preprocess options
 	}),
-	cache:false,
-	compilerOptions: {css: true},
+	cache: false,
+	compilerOptions: { css: "injected" },
 	// ...other svelte options
 };
 

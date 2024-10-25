@@ -12,11 +12,12 @@ import {
 import { writable, type Writable } from "svelte/store";
 import TagFolderPlugin from "./main";
 import { doEvents } from "./util";
+import { mount, unmount } from "svelte";
 
 // Show notes as like scroll.
 export class ScrollView extends ItemView {
 
-	component?: ScrollViewComponent;
+	component?: ReturnType<typeof mount>;
 	plugin: TagFolderPlugin;
 	icon = "sheets-in-box";
 	store: Writable<ScrollViewState>;
@@ -97,17 +98,24 @@ export class ScrollView extends ItemView {
 	}
 
 	async onOpen() {
-		this.component = new ScrollViewComponent({
-			target: this.contentEl,
-			props: {
-				store: this.store,
-				openfile: this.plugin.focusFile,
-				plugin: this.plugin
-			},
-		});
+		const app = mount(ScrollViewComponent,
+			{
+				target: this.contentEl,
+				props: {
+					store: this.store,
+					openfile: this.plugin.focusFile,
+					plugin: this.plugin
+				},
+			});
+		this.component = app;
+		return await Promise.resolve();
 	}
 
 	async onClose() {
-		this.component?.$destroy();
+		if (this.component) {
+			unmount(this.component);
+			this.component = undefined;
+		}
+		return await Promise.resolve();
 	}
 }
