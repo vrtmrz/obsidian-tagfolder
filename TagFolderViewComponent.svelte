@@ -11,12 +11,14 @@
 		type ViewItem,
 		type TagFolderSettings,
 		type TREE_TYPE,
+		type TagFolderListState,
 	} from "./types";
 	import V2TreeFolderComponent from "./V2TreeFolderComponent.svelte";
 	import { onDestroy, onMount, tick } from "svelte";
 	import { setIcon } from "obsidian";
 	import { trimTrailingSlash } from "./util";
 	import { setContext } from "svelte";
+	import type { Writable } from "svelte/store";
 
 	interface Props {
 		hoverPreview: (e: MouseEvent, path: string) => void;
@@ -43,14 +45,15 @@
 		isViewSwitchable: boolean;
 		switchView: () => void;
 		viewType?: TREE_TYPE;
+		stateStore?: Writable<TagFolderListState>;
 	}
 
 	let {
 		hoverPreview,
 		openFile,
 		vaultName = "",
-		title = "",
-		tags = [],
+		title = $bindable<string>(""),
+		tags = $bindable<string[]>([]),
 		saveSettings,
 		showMenu,
 		showLevelSelect,
@@ -60,10 +63,15 @@
 		isViewSwitchable,
 		switchView,
 		viewType = "tags",
+		stateStore,
 	}: Props = $props();
 
 	const isMainTree = $derived(tags.length == 0);
 
+	stateStore?.subscribe((state) => {
+		tags = state.tags;
+		title = state.title;
+	});
 	// let viewItemsSrc = $state([] as ViewItem[]);
 
 	let updatedFiles = $state([] as string[]);

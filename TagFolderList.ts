@@ -7,6 +7,7 @@ import {
 import TagFolderPlugin from "./main";
 import { TagFolderViewBase } from "./TagFolderViewBase";
 import { mount, unmount } from "svelte";
+import { writable } from "svelte/store";
 
 export class TagFolderList extends TagFolderViewBase {
 
@@ -32,14 +33,15 @@ export class TagFolderList extends TagFolderViewBase {
 	state: TagFolderListState = { tags: [], title: "" };
 
 	async setState(state: TagFolderListState, result: ViewStateResult): Promise<void> {
-		this.state = { ...state };
+		this.state = { ...this.state, ...state };
 		this.title = state.tags.join(",");
-		this.component.$set({ tags: state.tags, title: state.title ?? "" })
+		this.stateStore.set(this.state);
 		result = {
 			history: false
 		};
 		return await Promise.resolve();
 	}
+	stateStore = writable<TagFolderListState>(this.state);
 
 	getState() {
 		return this.state;
@@ -84,6 +86,7 @@ export class TagFolderList extends TagFolderViewBase {
 				isViewSwitchable: this.plugin.settings.useMultiPaneList,
 				switchView: this.switchView,
 				saveSettings: this.saveSettings.bind(this),
+				stateStore: this.stateStore,
 			},
 		});
 		return await Promise.resolve();
