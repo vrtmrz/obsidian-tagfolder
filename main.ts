@@ -637,6 +637,14 @@ export default class TagFolderPlugin extends Plugin {
 				const disp = secondsToFreshness(diff);
 				allTags.push(`_VIRTUAL_TAG_FRESHNESS/${disp}`);
 			}
+			// Display folder as tag
+			if (this.settings.displayFolderAsTag) {
+				const path = ["_VIRTUAL_TAG_FOLDER", ...fileCache.file.path.split("/")];
+				path.pop();// Remove filename
+				if (path.length > 0) {
+					allTags.push(`${path.join("/")}`);
+				}
+			}
 			if (
 				allTags.some((tag) =>
 					ignoreDocTags.contains(tag.toLowerCase())
@@ -1369,7 +1377,16 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-
+		new Setting(containerEl)
+			.setName("Display folder as tag")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.displayFolderAsTag)
+					.onChange(async (value) => {
+						this.plugin.settings.displayFolderAsTag = value;
+						await this.plugin.saveSettings();
+					});
+			});
 		new Setting(containerEl)
 			.setName("Store tags in frontmatter for new notes")
 			.setDesc("Otherwise, tags are stored with #hashtags at the top of the note")
@@ -1660,11 +1677,13 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.setButtonText("Copy disguised tags")
 					.setDisabled(false)
 					.onClick(async () => {
-						const x = new Map<string, number>();
+						const x = new Map<string, string>();
 						let i = 0;
 						const itemsAll = await this.plugin.getItemsList("tag");
-						const items = itemsAll.map(e => e.tags.filter(e => e != "_untagged").map(e => x.has(e) ? x.get(e) : (x.set(e, i++), i))).filter(e => e.length);
-						await navigator.clipboard.writeText(items.map(e => e.map(e => `#tag${e}`).join(", ")).join("\n"));
+						const items = itemsAll.map(e => e.tags.filter(e => e != "_untagged").map(e =>
+							e.split("/").map(e => e.startsWith("_VIRTUAL") ? e : x.has(e) ? x.get(e) : (x.set(e, `tag${i++}`), i)).join("/")).filter(e => e.length));
+
+						await navigator.clipboard.writeText(items.map(e => e.map(e => `#${e}`).join(", ")).join("\n"));
 						new Notice("Copied to clipboard");
 					})
 			);

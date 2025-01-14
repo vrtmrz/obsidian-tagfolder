@@ -52,13 +52,14 @@
     const tagsLeft = $derived(isItemVisible? uniqueCaseIntensive(
                 getExtraTags(item.tags, [...trail], _setting.reduceNestedParent)
                     .map((e) => trimSlash(e, false, true))
+                    .map(e=>e.split("/").map(ee => renderSpecialTag(ee)).join("/"))
                     .filter((e) => e != ""),
             ):[]);
     const extraTagsHtml = $derived(`${tagsLeft
                 .map(
                     (e) =>
                         `<span class="tf-tag">${escapeStringToHTML(
-                            renderSpecialTag(e),
+                            e,
                         )}</span>`,
                 )
                 .join("")}`);

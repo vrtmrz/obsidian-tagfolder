@@ -86,6 +86,7 @@ export interface TagFolderSettings {
 	linkShowOnlyFDR: boolean;
 	linkCombineOtherTree: boolean;
 	showListIn: keyof typeof enumShowListIn;
+	displayFolderAsTag: boolean;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -130,7 +131,8 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	},
 	linkShowOnlyFDR: true,
 	linkCombineOtherTree: true,
-	showListIn: ""
+	showListIn: "",
+	displayFolderAsTag: false,
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";
@@ -165,7 +167,8 @@ export const tagDispDict: { [key: string]: string } = {
 	FRESHNESS_04: "📚",
 	FRESHNESS_05: "🗄",
 	_VIRTUAL_TAG_FRESHNESS: "⌛",
-	_VIRTUAL_TAG_CANVAS: "📋 Canvas"
+	_VIRTUAL_TAG_CANVAS: "📋 Canvas",
+	_VIRTUAL_TAG_FOLDER: "📁"
 };
 
 export const VIEW_TYPE_TAGFOLDER = "tagfolder-view";

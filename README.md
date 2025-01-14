@@ -123,6 +123,10 @@ When we enable this feature, our notes will be tagged as their freshness automat
 | 📚    | Within 7 days         |
 | 🗄    | Older than 7 days ago |
 
+##### Display folder as tag
+
+When we enable this feature, the folder will be shown as a tag.
+
 ##### Store tags in frontmatter for new notes
 
 This setting changes how tags are stored in new notes created by TagFolder. When disabled, tags are stored as #hashtags at the top of new notes. When enabled, tags are stored in the frontmatter and displayed in the note's Properties.
