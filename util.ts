@@ -123,7 +123,6 @@ async function pump() {
 			} else {
 				break;
 			}
-			// eslint-disable-next-line no-constant-condition
 		} while (true);
 	} finally {
 		pumping = false;
@@ -140,7 +139,7 @@ export const doEvents = () => {
 			res();
 		};
 		queues.push(proc);
-		pump();
+		void pump();
 	})
 }
 

@@ -94,7 +94,7 @@ export class TagFolderList extends TagFolderViewBase {
 
 	async onClose() {
 		if (this.component) {
-			unmount(this.component);
+			await unmount(this.component);
 			this.component = undefined!;
 		}
 		return await Promise.resolve();

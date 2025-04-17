@@ -6,6 +6,7 @@
 		performHide,
 		searchString,
 		tagFolderSetting,
+		v2expandedTags,
 	} from "./store";
 	import {
 		type ViewItem,
@@ -133,6 +134,7 @@
 	let incomingIcon = $state("");
 	let bothIcon = $state("");
 	let linkIcon = $state("");
+	let closeAllIcon = $state("");
 
 	async function switchIncoming() {
 		let newSet = { ..._setting };
@@ -242,7 +244,11 @@
 				bothIcon = iconDivEl.innerHTML;
 			}
 			setIcon(iconDivEl, "lucide-arrow-left-right");
+
 			switchIcon = iconDivEl.innerHTML;
+
+			setIcon(iconDivEl, "lucide-chevrons-down-up");
+			closeAllIcon = iconDivEl.innerHTML;
 		}
 		const int = setInterval(() => {
 			performHide.set(Date.now());
@@ -297,6 +303,13 @@
 
 	const componentHash = `${Math.random()}`;
 	setContext("viewID", componentHash);
+
+	function closeAllOpenedFolders() {
+		v2expandedTags.update((prev) => {
+			prev.clear();
+			return prev;
+		});
+	}
 </script>
 
 <div hidden bind:this={iconDivEl}></div>
@@ -391,6 +404,17 @@
 				onclick={switchOnlyFDR}
 			>
 				{@html linkIcon}
+			</div>
+		{/if}
+		{#if isMainTree}
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="clickable-icon nav-action-button"
+				aria-label="Collapse all"
+				onclick={closeAllOpenedFolders}
+			>
+				{@html closeAllIcon}
 			</div>
 		{/if}
 	</div>

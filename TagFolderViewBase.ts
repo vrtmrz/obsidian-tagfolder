@@ -15,7 +15,6 @@ import { maxDepth, selectedTags } from "./store";
 import { ancestorToLongestTag, ancestorToTags, isSpecialTag, renderSpecialTag, joinPartialPath, removeIntermediatePath, trimTrailingSlash } from "./util";
 import { askString } from "dialog";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toggleObjectProp(obj: { [key: string]: any }, propName: string, value: string | false) {
 	if (value === false) {
 		const newTagInfoEntries = Object.entries(obj || {}).filter(([key]) => key != propName);
@@ -353,7 +352,7 @@ export abstract class TagFolderViewBase extends ItemView {
 
 		const leaves = this.app.workspace.getLeavesOfType(viewType).filter(e => !e.getViewState().pinned && e != this.leaf);
 		if (leaves.length) {
-			this.app.workspace.revealLeaf(
+			void this.app.workspace.revealLeaf(
 				leaves[0]
 			);
 		}

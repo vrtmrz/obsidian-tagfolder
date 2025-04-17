@@ -50,7 +50,9 @@
     // Compute extra tags. (Only on visible)
     let isItemVisible = $state(false);
     const tagsLeft = $derived(isItemVisible? uniqueCaseIntensive(
-                getExtraTags(item.tags, [...trail], _setting.reduceNestedParent)
+		[
+			...getExtraTags(item.tags, [...trail], _setting.reduceNestedParent),
+			...item.extraTags]
                     .map((e) => trimSlash(e, false, true))
                     .map(e=>e.split("/").map(ee => renderSpecialTag(ee)).join("/"))
                     .filter((e) => e != ""),
@@ -79,10 +81,7 @@
     }
 </script>
 
-<OnDemandRender
-    cssClass="tree-item nav-file"
-    bind:isVisible={isItemVisible}
->
+<OnDemandRender cssClass="tree-item nav-file" bind:isVisible={isItemVisible}>
     {#snippet children({ isVisible })}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
