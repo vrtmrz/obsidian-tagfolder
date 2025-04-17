@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-tagfolder",
 	"name": "TagFolder",
-	"version": "0.18.10",
+	"version": "0.18.11",
 	"minAppVersion": "0.12.0",
 	"description": "Show tags as folder",
 	"author": "vorotamoroz",
