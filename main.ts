@@ -356,9 +356,55 @@ export default class TagFolderPlugin extends Plugin {
 
 		const selectorHashTagLink = 'a.tag[href^="#"]';
 		const selectorHashTagSpan = "span.cm-hashtag.cm-meta";
+		// The tag selectors in the attribute list 
+		const selectorMetadataTag = '.metadata-property[data-property-key="tags"] .multi-select-pill-content span, .metadata-property[data-property-key="tags"] .multi-select-pill';
+		
+		// Handle the label clicks in the attribute list (with the highest priority, registered first)
+		this.register(
+			onElement(document, "click", selectorMetadataTag, (event: MouseEvent, targetEl: HTMLElement) => {
+				if (!this.settings.overrideTagClicking) return;
+				
+				// Immediately stop the default behavior and event propagation
+				event.preventDefault();
+				event.stopPropagation();
+				event.stopImmediatePropagation();
+				
+				// Find the element that contains the labeled text
+				let tagElement: HTMLElement = targetEl;
+				// If the clicked element is ".multi-select-pill", then find the span within it.
+				if (targetEl.classList.contains('multi-select-pill')) {
+					const span = targetEl.querySelector('.multi-select-pill-content span');
+					if (span instanceof HTMLElement) {
+						tagElement = span;
+					}
+				}
+				
+				let tagString = tagElement.innerText.trim();
+				// Remove the # prefix (if it exists)
+				if (tagString.startsWith("#")) {
+					tagString = tagString.substring(1);
+				}
+				
+				if (tagString) {
+					setTagSearchString(event, tagString);
+					const leaf = this.getView()?.leaf;
+					if (leaf) {
+						void this.app.workspace.revealLeaf(leaf);
+					}
+				}
+			}, { capture: true })
+		);
+		
+		// Handle the label links in other places (excluding those in the attribute list, as they have already been handled above)
 		this.register(
 			onElement(document, "click", selectorHashTagLink, (event: MouseEvent, targetEl: HTMLElement) => {
 				if (!this.settings.overrideTagClicking) return;
+								
+				// Check if it is in the attribute list. If so, skip it (as it has already been handled above)
+				if (targetEl.closest('.metadata-property[data-property-key="tags"]')) {
+					return;
+				}
+				
 				const tagString = targetEl.innerText.substring(1);
 				if (tagString) {
 					setTagSearchString(event, tagString);
