@@ -364,6 +364,11 @@ export default class TagFolderPlugin extends Plugin {
 			onElement(document, "click", selectorMetadataTag, (event: MouseEvent, targetEl: HTMLElement) => {
 				if (!this.settings.overrideTagClicking) return;
 				
+				// If the clicked button is the delete button or one of its sub-elements, the search function will not be triggered.
+				if ((event.target as HTMLElement).closest('.multi-select-pill-remove-button')) {
+					return;
+				}
+
 				// Immediately stop the default behavior and event propagation
 				event.preventDefault();
 				event.stopPropagation();
