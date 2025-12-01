@@ -358,14 +358,26 @@ export default class TagFolderPlugin extends Plugin {
 		const selectorHashTagSpan = "span.cm-hashtag.cm-meta";
 		// The tag selectors in the attribute list 
 		const selectorMetadataTag = '.metadata-property[data-property-key="tags"] .multi-select-pill-content span, .metadata-property[data-property-key="tags"] .multi-select-pill';
-		
+		//If the user double-clicks to enter the editing mode instead of performing a search
+		let metadataTagClickTimer: number | null = null;
+		const SINGLE_CLICK_DELAY_MS = 200;
+
 		// Handle the label clicks in the attribute list (with the highest priority, registered first)
 		this.register(
 			onElement(document, "click", selectorMetadataTag, (event: MouseEvent, targetEl: HTMLElement) => {
 				if (!this.settings.overrideTagClicking) return;
-				
+
 				// If the clicked button is the delete button or one of its sub-elements, the search function will not be triggered.
-				if ((event.target as HTMLElement).closest('.multi-select-pill-remove-button')) {
+				const clickedRemoveButton = (event.target as HTMLElement).closest('.multi-select-pill-remove-button');
+				if (clickedRemoveButton) {
+					return;
+				}
+
+				if (event.detail > 1) {
+					if (metadataTagClickTimer) {
+						window.clearTimeout(metadataTagClickTimer);
+						metadataTagClickTimer = null;
+					}
 					return;
 				}
 
@@ -373,30 +385,39 @@ export default class TagFolderPlugin extends Plugin {
 				event.preventDefault();
 				event.stopPropagation();
 				event.stopImmediatePropagation();
-				
-				// Find the element that contains the labeled text
-				let tagElement: HTMLElement = targetEl;
-				// If the clicked element is ".multi-select-pill", then find the span within it.
-				if (targetEl.classList.contains('multi-select-pill')) {
-					const span = targetEl.querySelector('.multi-select-pill-content span');
-					if (span instanceof HTMLElement) {
-						tagElement = span;
+
+				if (metadataTagClickTimer) {
+					window.clearTimeout(metadataTagClickTimer);
+					metadataTagClickTimer = null;
+				}
+
+				metadataTagClickTimer = window.setTimeout(() => {
+					metadataTagClickTimer = null;
+
+					// Find the element that contains the label text.
+					let tagElement: HTMLElement = targetEl;
+					// If the clicked element is a `.multi-select-pill`, find the `span` within it.
+					if (targetEl.classList.contains('multi-select-pill')) {
+						const span = targetEl.querySelector('.multi-select-pill-content span');
+						if (span instanceof HTMLElement) {
+							tagElement = span;
+						}
 					}
-				}
-				
-				let tagString = tagElement.innerText.trim();
-				// Remove the # prefix (if it exists)
-				if (tagString.startsWith("#")) {
-					tagString = tagString.substring(1);
-				}
-				
-				if (tagString) {
-					setTagSearchString(event, tagString);
-					const leaf = this.getView()?.leaf;
-					if (leaf) {
-						void this.app.workspace.revealLeaf(leaf);
+
+					let tagString = tagElement.innerText.trim();
+					// Remove the # prefix (if it exists)
+					if (tagString.startsWith("#")) {
+						tagString = tagString.substring(1);
 					}
-				}
+
+					if (tagString) {
+						setTagSearchString(event, tagString);
+						const leaf = this.getView()?.leaf;
+						if (leaf) {
+							void this.app.workspace.revealLeaf(leaf);
+						}
+					}
+				}, SINGLE_CLICK_DELAY_MS);
 			}, { capture: true })
 		);
 		
