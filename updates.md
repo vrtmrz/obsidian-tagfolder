@@ -1,3 +1,14 @@
+## 0.18.12
+
+### Fixes
+
+- Support the click-to-search function in the attribute list (#98, #128)
+  - Thank you for your contribution, @sunzhi0000-sys! 
+
+### Improved
+- Dependencies are updated to the latest version.
+- Small minor improvements have been made.
+
 ## 0.18.11
 
 Since 0.18.11, I have written this changelog as same as the Self-hosted LiveSync. It is quite useful for us.
