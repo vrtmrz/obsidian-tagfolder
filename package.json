@@ -30,10 +30,10 @@
 		"eslint-plugin-import": "^2.32.0",
 		"eslint-plugin-svelte": "^3.13.0",
 		"obsidian": "^1.10.3",
-		"svelte": "^5.27.0",
-		"svelte-check": "^4.1.6",
+		"svelte": "^5.45.5",
+		"svelte-check": "^4.3.4",
 		"svelte-preprocess": "^6.0.3",
-		"terser": "^5.39.0",
-		"typescript": "^5.8.3"
+		"terser": "^5.44.1",
+		"typescript": "^5.9.3"
 	}
 }
