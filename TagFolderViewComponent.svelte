@@ -69,9 +69,16 @@
 
 	const isMainTree = $derived(tags.length == 0);
 
-	stateStore?.subscribe((state) => {
-		tags = state.tags;
-		title = state.title;
+	$effect(()=>{
+		if (stateStore) {
+			let unsubscribe = stateStore.subscribe((state) => {
+				tags = state.tags;
+				title = state.title;
+			});
+			return () => {
+				unsubscribe();
+			};
+		}
 	});
 	// let viewItemsSrc = $state([] as ViewItem[]);
 
