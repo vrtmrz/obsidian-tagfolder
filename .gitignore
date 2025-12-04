@@ -19,3 +19,6 @@ main_org.js
 
 # obsidian
 data.json
+
+# Test and build files
+.env
