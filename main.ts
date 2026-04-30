@@ -1,6 +1,7 @@
 /// <reference types="svelte" />
 
 import {
+	AbstractInputSuggest,
 	App,
 	debounce,
 	Editor,
@@ -13,6 +14,7 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
+	SuggestModal,
 	TFile,
 	WorkspaceLeaf,
 	TAbstractFile,
@@ -103,6 +105,164 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 			return (a: ViewItem, b: ViewItem) =>
 				compare(a.displayName, b.displayName) * invert;
 	}
+}
+
+type NewNoteTemplateChoice = TFile;
+
+function getCoreTemplatesFolder(app: App): string | null {
+	const internalPlugins = (app as App & {
+		internalPlugins?: {
+			getPluginById?: (id: string) => {
+				instance?: {
+					options?: {
+						folder?: string;
+						templateFolder?: string;
+					};
+				};
+			};
+		};
+	}).internalPlugins;
+	const templatesPlugin = internalPlugins?.getPluginById?.("templates");
+	const folder = templatesPlugin?.instance?.options?.folder ?? templatesPlugin?.instance?.options?.templateFolder;
+	if (!folder) return null;
+	const normalizedFolder = normalizePath(folder);
+	return normalizedFolder == "/" ? "" : normalizedFolder;
+}
+
+function getTemplateFiles(app: App) {
+	const templateFolder = getCoreTemplatesFolder(app);
+	const markdownFiles = app.vault.getMarkdownFiles();
+	const templates = templateFolder == null || templateFolder == ""
+		? markdownFiles
+		: markdownFiles.filter((file) => {
+			const path = normalizePath(file.path);
+			return path == templateFolder || path.startsWith(`${templateFolder}/`);
+		});
+
+	return templates.sort((a, b) => compare(a.path, b.path));
+}
+
+class NewNoteTemplateSuggestModal extends SuggestModal<NewNoteTemplateChoice> {
+	private callback?: (template: NewNoteTemplateChoice | false) => void;
+	private templates: TFile[];
+
+	constructor(app: App, templates: TFile[], callback: (template: NewNoteTemplateChoice | false) => void) {
+		super(app);
+		this.templates = templates;
+		this.callback = callback;
+		this.setPlaceholder("Type to search templates...");
+	}
+
+	getSuggestions(query: string): NewNoteTemplateChoice[] {
+		const normalizedQuery = query.toLowerCase();
+		return this.templates.filter((file) =>
+			file.path.toLowerCase().contains(normalizedQuery)
+		);
+	}
+
+	renderSuggestion(template: NewNoteTemplateChoice, el: HTMLElement) {
+		el.createDiv({ text: template.basename });
+		el.createDiv({ text: template.path, cls: "suggestion-note" });
+	}
+
+	onChooseSuggestion(template: NewNoteTemplateChoice) {
+		this.callback?.(template);
+		this.callback = undefined;
+	}
+
+	onClose(): void {
+		setTimeout(() => {
+			if (this.callback) {
+				this.callback(false);
+				this.callback = undefined;
+			}
+		}, 100);
+	}
+}
+
+class NewNoteTemplateInputSuggest extends AbstractInputSuggest<TFile> {
+	private callback: (template: TFile) => void;
+
+	constructor(app: App, inputEl: HTMLInputElement, callback: (template: TFile) => void) {
+		super(app, inputEl);
+		this.callback = callback;
+	}
+
+	getSuggestions(query: string): TFile[] {
+		const normalizedQuery = query.toLowerCase();
+		return getTemplateFiles(this.app).filter((file) =>
+			file.path.toLowerCase().contains(normalizedQuery)
+			|| file.basename.toLowerCase().contains(normalizedQuery)
+		);
+	}
+
+	renderSuggestion(template: TFile, el: HTMLElement) {
+		el.createDiv({ text: template.basename });
+		el.createDiv({ text: template.path, cls: "suggestion-note" });
+	}
+
+	selectSuggestion(template: TFile) {
+		this.setValue(template.path);
+		this.callback(template);
+		this.close();
+	}
+}
+
+function askNewNoteTemplate(app: App): Promise<NewNoteTemplateChoice | false> {
+	return new Promise((resolve) => {
+		const templates = getTemplateFiles(app);
+		if (templates.length == 0) {
+			new Notice("No templates found");
+			resolve(false);
+			return;
+		}
+		const modal = new NewNoteTemplateSuggestModal(app, templates, resolve);
+		modal.open();
+	});
+}
+
+function getConfiguredNewNoteTemplate(app: App, templatePath: string): TFile | null {
+	const inputPath = normalizePath(templatePath.trim().replace(/^\[\[/, "").replace(/\]\]$/, ""));
+	if (inputPath == "") return null;
+
+	const templateFolder = getCoreTemplatesFolder(app);
+	const candidatePaths = [
+		inputPath,
+		inputPath.endsWith(".md") ? inputPath : `${inputPath}.md`,
+	];
+
+	if (templateFolder != null && templateFolder != "" && !inputPath.startsWith(`${templateFolder}/`)) {
+		candidatePaths.push(
+			`${templateFolder}/${inputPath}`,
+			inputPath.endsWith(".md") ? `${templateFolder}/${inputPath}` : `${templateFolder}/${inputPath}.md`
+		);
+	}
+
+	const file = unique(candidatePaths)
+		.map((path) => app.vault.getAbstractFileByPath(path))
+		.find((file): file is TFile => file instanceof TFile && file.extension == "md");
+
+	if (file == null) {
+		new Notice(`Template not found: ${inputPath}`);
+		return null;
+	}
+
+	return file;
+}
+
+function renderNewNoteTemplate(template: string, expandedTagsAll: string[], expandedTags: string) {
+	const plainTags = expandedTagsAll.filter(e => !isSpecialTag(e));
+	const replacements: Record<string, string> = {
+		expandedTags,
+		tags: expandedTags,
+		tagList: plainTags.join(", "),
+		tagPath: plainTags.join("/"),
+		tagName: plainTags[plainTags.length - 1] ?? "",
+		tagsJson: JSON.stringify(plainTags),
+		tagsYaml: plainTags.map((tag) => `  - ${tag}`).join("\n"),
+	};
+
+	return template.replace(/\{\{(expandedTags|tags|tagList|tagPath|tagName|tagsJson|tagsYaml)\}\}/g, (_, key: keyof typeof replacements) => replacements[key]);
 }
 
 // Thank you @pjeby!
@@ -1251,19 +1411,17 @@ export default class TagFolderPlugin extends Plugin {
 			.join(" ")
 			.trim();
 
+		const selectedTemplate = getConfiguredNewNoteTemplate(this.app, this.settings.newNoteTemplate)
+			?? await askNewNoteTemplate(this.app);
+		if (selectedTemplate === false) return;
+
+		const template = await this.app.vault.read(selectedTemplate);
+		const renderedTemplate = renderNewNoteTemplate(template, expandedTagsAll, expandedTags);
+
 		//@ts-ignore
 		const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
-		if (this.settings.useFrontmatterTagsForNewNotes) {
-			await this.app.fileManager.processFrontMatter(ww, (matter) => {
-				matter.tags = matter.tags ?? [];
-				matter.tags = expandedTagsAll
-					.filter(e => !isSpecialTag(e))
-					.filter(e => matter.tags.indexOf(e) < 0)
-					.concat(matter.tags);
-			});
-		}
-		else {
-			await this.app.vault.append(ww, expandedTags);
+		if (renderedTemplate.trim() != "") {
+			await this.app.vault.modify(ww, renderedTemplate);
 		}
 	}
 }
@@ -1473,6 +1631,22 @@ class TagFolderSettingTab extends PluginSettingTab {
 						this.plugin.settings.useFrontmatterTagsForNewNotes = value;
 						await this.plugin.saveSettings();
 					});
+			});
+		new Setting(containerEl)
+			.setName("Template for new notes")
+			.setDesc("When set to a valid markdown file path, new notes use this template without opening the template picker. The .md extension is optional.")
+			.addText((text) => {
+				text
+					.setPlaceholder("Templates/New note")
+					.setValue(this.plugin.settings.newNoteTemplate)
+					.onChange(async (value) => {
+						this.plugin.settings.newNoteTemplate = normalizePath(value.trim());
+						await this.plugin.saveSettings();
+					});
+				new NewNoteTemplateInputSuggest(this.app, text.inputEl, (template) => {
+					this.plugin.settings.newNoteTemplate = template.path;
+					void this.plugin.saveSettings();
+				});
 			});
 
 		containerEl.createEl("h2", { text: "Actions" });

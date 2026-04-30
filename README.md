@@ -131,6 +131,21 @@ When we enable this feature, the folder will be shown as a tag.
 
 This setting changes how tags are stored in new notes created by TagFolder. When disabled, tags are stored as #hashtags at the top of new notes. When enabled, tags are stored in the frontmatter and displayed in the note's Properties.
 
+##### Template for new notes
+
+When this setting is set to a valid markdown template path, TagFolder uses that template immediately when creating a new note from the tag tree. The `.md` extension is optional. If the setting is empty or invalid, TagFolder opens a template picker.
+
+Templates can include these placeholders, which are replaced with the tags from the clicked location:
+
+| Placeholder        | Replacement                         |
+| ------------------ | ----------------------------------- |
+| `{{expandedTags}}` or `{{tags}}` | Tags as hashtags, e.g. `#tag1 #tag2` |
+| `{{tagList}}`      | Tags as comma-separated text, e.g. `tag1, tag2` |
+| `{{tagPath}}`      | Tags as a slash-separated path, e.g. `tag1/tag2` |
+| `{{tagName}}`      | The last tag in the clicked context |
+| `{{tagsJson}}`     | Tags as a JSON array                |
+| `{{tagsYaml}}`     | Tags as YAML list lines             |
+
 #### Actions
 
 ##### Search tags inside TagFolder when clicking tags
