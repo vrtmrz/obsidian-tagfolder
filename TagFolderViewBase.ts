@@ -1,4 +1,4 @@
-import { ItemView, Menu, Notice } from "obsidian";
+import { ItemView, Menu, Notice, type App } from "obsidian";
 import { mount } from 'svelte'
 import TagFolderPlugin from "./main";
 import {
@@ -27,6 +27,34 @@ function toggleObjectProp(obj: { [key: string]: any }, propName: string, value: 
 		return { ...(obj ?? {}), [propName]: value };
 	}
 }
+
+type TagWranglerPlugin = {
+	rename: (tagName: string, toName?: string) => void | Promise<void>;
+};
+
+type AppWithCommunityPlugins = App & {
+	plugins?: {
+		plugins?: Record<string, unknown>;
+	};
+};
+
+function getTagWranglerPlugin(app: App): TagWranglerPlugin | undefined {
+	const plugin = (app as AppWithCommunityPlugins).plugins?.plugins?.["tag-wrangler"];
+	if (!plugin || typeof (plugin as TagWranglerPlugin).rename != "function") {
+		return undefined;
+	}
+	return plugin as TagWranglerPlugin;
+}
+
+function getRenameTargetTag(expandedTagsAll: string[]) {
+	const tagPath = trimTrailingSlash(expandedTagsAll[expandedTagsAll.length - 1] ?? "");
+	const tagParts = tagPath.split("/").filter((part) => part.trim() != "");
+	if (tagParts.length == 0 || tagParts.some((part) => isSpecialTag(part))) {
+		return undefined;
+	}
+	return tagParts.join("/");
+}
+
 export abstract class TagFolderViewBase extends ItemView {
 	component!: ReturnType<typeof mount>;
 	plugin!: TagFolderPlugin;
@@ -182,6 +210,18 @@ export abstract class TagFolderViewBase extends ItemView {
 						await this.plugin.createNewNote(trail);
 					})
 			);
+			const renameTargetTag = targetTag ? getRenameTargetTag(expandedTagsAll) : undefined;
+			const tagWrangler = renameTargetTag ? getTagWranglerPlugin(this.app) : undefined;
+			if (renameTargetTag && tagWrangler) {
+				menu.addItem((item) =>
+					item
+						.setTitle(`Rename #${renameTargetTag}`)
+						.setIcon("pencil")
+						.onClick(async () => {
+							await tagWrangler.rename(renameTargetTag);
+						})
+				);
+			}
 			if (targetTag) {
 				if (this.plugin.settings.useTagInfo && this.plugin.tagInfo != null) {
 					const tag = targetTag;
