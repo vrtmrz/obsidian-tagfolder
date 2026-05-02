@@ -1413,15 +1413,28 @@ export default class TagFolderPlugin extends Plugin {
 
 		const selectedTemplate = getConfiguredNewNoteTemplate(this.app, this.settings.newNoteTemplate)
 			?? await askNewNoteTemplate(this.app);
-		if (selectedTemplate === false) return;
-
-		const template = await this.app.vault.read(selectedTemplate);
-		const renderedTemplate = renderNewNoteTemplate(template, expandedTagsAll, expandedTags);
 
 		//@ts-ignore
 		const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
-		if (renderedTemplate.trim() != "") {
-			await this.app.vault.modify(ww, renderedTemplate);
+		if (selectedTemplate !== false) {
+			const template = await this.app.vault.read(selectedTemplate);
+			const renderedTemplate = renderNewNoteTemplate(template, expandedTagsAll, expandedTags);
+			if (renderedTemplate.trim() != "") {
+				await this.app.vault.modify(ww, renderedTemplate);
+			}
+			return;
+		}
+
+		if (this.settings.useFrontmatterTagsForNewNotes) {
+			await this.app.fileManager.processFrontMatter(ww, (matter) => {
+				matter.tags = matter.tags ?? [];
+				matter.tags = expandedTagsAll
+					.filter(e => !isSpecialTag(e))
+					.filter(e => matter.tags.indexOf(e) < 0)
+					.concat(matter.tags);
+			});
+		} else {
+			await this.app.vault.append(ww, expandedTags);
 		}
 	}
 }
@@ -1623,7 +1636,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 			});
 		new Setting(containerEl)
 			.setName("Store tags in frontmatter for new notes")
-			.setDesc("Otherwise, tags are stored with #hashtags at the top of the note")
+			.setDesc("When enabled, tags are written to the note Properties. If no new-note template is selected, TagFolder still creates the note and stores tags here instead of as #hashtags.")
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.useFrontmatterTagsForNewNotes)

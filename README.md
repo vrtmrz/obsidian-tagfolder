@@ -9,6 +9,7 @@ My fork keeps the original plugin behavior and adds my changes on top of it.
 ### What I changed
 
 - Added support for creating new notes from a configured template when using TagFolder.
+- When no template is selected, new notes are created with TagFolder's default behavior. If `Store tags in frontmatter for new notes` is enabled, those fallback notes store their tags in Properties/frontmatter; otherwise the tags are inserted as hashtags.
 - Added a TagFolder context-menu action for renaming tags through TagWrangler.
 
 ### Install my build
