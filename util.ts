@@ -20,6 +20,56 @@ export function unique<T>(items: T[]) {
 	return [...new Set<T>([...items])];
 }
 
+export type TagFilterPattern = {
+	pattern: string;
+	regExp?: RegExp;
+	staticPrefix: string;
+};
+
+function normalizeTagFilterValue(value: string) {
+	return trimSlash(value.trim().toLowerCase().replace(/^#/, ""));
+}
+
+function escapeRegExp(value: string) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function tagFilterPatternToRegExp(pattern: string) {
+	return new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`, "u");
+}
+
+export function parseTagFilterPatterns(value: string): TagFilterPattern[] {
+	return value
+		.replace(/[\n ]/g, "")
+		.split(",")
+		.map(normalizeTagFilterValue)
+		.filter((pattern) => pattern != "")
+		.map((pattern) => ({
+			pattern,
+			regExp: pattern.includes("*") ? tagFilterPatternToRegExp(pattern) : undefined,
+			staticPrefix: pattern.split("*")[0],
+		}));
+}
+
+export function tagMatchesFilterPatterns(tag: string, patterns: TagFilterPattern[]) {
+	const normalizedTag = normalizeTagFilterValue(tag);
+	return patterns.some((filter) =>
+		filter.regExp ? filter.regExp.test(normalizedTag) : filter.pattern == normalizedTag
+	);
+}
+
+export function tagOrDescendantMayMatchFilterPatterns(tag: string, patterns: TagFilterPattern[]) {
+	const normalizedTag = normalizeTagFilterValue(tag);
+	const normalizedTagPath = normalizedTag.endsWith("/") ? normalizedTag : `${normalizedTag}/`;
+	return patterns.some((filter) => {
+		if (tagMatchesFilterPatterns(normalizedTag, [filter])) return true;
+		if (!filter.regExp) return filter.pattern.startsWith(normalizedTagPath);
+		return filter.staticPrefix == "" ||
+			filter.staticPrefix.startsWith(normalizedTagPath) ||
+			normalizedTagPath.startsWith(filter.staticPrefix);
+	});
+}
+
 export function trimSlash(src: string, keepStart = false, keepEnd = false) {
 	const st = keepStart ? 0 : (src[0] == "/" ? 1 : 0);
 	const end = keepEnd ? undefined : (src.endsWith("/") ? -1 : undefined);
