@@ -75,6 +75,7 @@ export interface TagFolderSettings {
 	mergeRedundantCombination: boolean;
 	useVirtualTag: boolean;
 	useFrontmatterTagsForNewNotes: boolean,
+	newNoteTemplate: string;
 	doNotSimplifyTags: boolean;
 	overrideTagClicking: boolean;
 	useMultiPaneList: boolean;
@@ -112,6 +113,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	mergeRedundantCombination: false,
 	useVirtualTag: false,
 	useFrontmatterTagsForNewNotes: false,
+	newNoteTemplate: "",
 	doNotSimplifyTags: false,
 	overrideTagClicking: false,
 	useMultiPaneList: false,
