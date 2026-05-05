@@ -180,18 +180,18 @@ export type TREE_TYPE = "tags" | "links";
 
 export const OrderKeyTag: Record<string, string> = {
 	NAME: "Tag name",
-	ITEMS: "Count of items",
+	ITEMS: "Number of files",
 };
 export const OrderDirection: Record<string, string> = {
 	ASC: "Ascending",
 	DESC: "Descending",
 };
 export const OrderKeyItem: Record<string, string> = {
-	DISPNAME: "Displaying name",
+	DISPNAME: "File label",
 	NAME: "File name",
 	MTIME: "Modified time",
 	CTIME: "Created time",
-	FULLPATH: "Fullpath of the file",
+	FULLPATH: "Full file path",
 };
 
 
