@@ -74,7 +74,6 @@ const HideItemsType: Record<string, string> = {
 	ALL_EXCEPT_BOTTOM: "All intermediates",
 };
 
-
 function dotted<T extends Record<string, any>>(object: T, notation: string) {
 	return notation.split('.').reduce((a, b) => (a && (b in a)) ? a[b] : null, object);
 }
@@ -1466,10 +1465,15 @@ class TagFolderSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Behavior" });
+		const refreshAfterSettingChange = () => {
+			this.plugin.loadFileInfo();
+			this.display();
+		};
+
+		containerEl.createEl("h2", { text: "Startup" });
 		new Setting(containerEl)
 			.setName("Always Open")
-			.setDesc("Place TagFolder on the left pane and activate it at every Obsidian launch")
+			.setDesc("Automatically open TagFolder in the left sidebar when Obsidian starts.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.alwaysOpen)
@@ -1478,54 +1482,144 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		containerEl.createEl("h2", { text: "Quick setup" });
 		new Setting(containerEl)
-			.setName("Use pinning")
+			.setName("Choose a starting layout")
+			.setDesc("Apply a common TagFolder layout. You can still adjust every setting below afterwards.")
+			.addButton((button) =>
+				button
+					.setButtonText("Clean nested tree")
+					.onClick(async () => {
+						this.plugin.settings.disableNarrowingDown = false;
+						this.plugin.settings.disableNestedTags = false;
+						this.plugin.settings.hideItems = "ALL_EXCEPT_BOTTOM";
+						this.plugin.settings.reduceNestedParent = true;
+						this.plugin.settings.mergeRedundantCombination = false;
+						await this.plugin.saveSettings();
+						refreshAfterSettingChange();
+					})
+			)
+			.addButton((button) =>
+				button
+					.setButtonText("Show every match")
+					.onClick(async () => {
+						this.plugin.settings.disableNarrowingDown = false;
+						this.plugin.settings.disableNestedTags = false;
+						this.plugin.settings.hideItems = "NONE";
+						this.plugin.settings.reduceNestedParent = true;
+						this.plugin.settings.mergeRedundantCombination = false;
+						await this.plugin.saveSettings();
+						refreshAfterSettingChange();
+					})
+			)
+			.addButton((button) =>
+				button
+					.setButtonText("Split nested tags")
+					.onClick(async () => {
+						this.plugin.settings.disableNarrowingDown = false;
+						this.plugin.settings.disableNestedTags = true;
+						this.plugin.settings.hideItems = "NONE";
+						await this.plugin.saveSettings();
+						refreshAfterSettingChange();
+					})
+		);
+
+		containerEl.createEl("h2", { text: "Simplify tree paths" });
+		new Setting(containerEl)
+			.setName("Merge redundant combinations")
 			.setDesc(
-				"When this feature is enabled, the pin information is saved in the file set in the next configuration."
+				"Merge equivalent tag combinations, such as #a/b and #b/a, when there is no intermediate folder to show."
 			)
 			.addToggle((toggle) => {
 				toggle
-					.setValue(this.plugin.settings.useTagInfo)
+					.setValue(this.plugin.settings.mergeRedundantCombination)
 					.onChange(async (value) => {
-						this.plugin.settings.useTagInfo = value;
-						if (this.plugin.settings.useTagInfo) {
-							await this.plugin.loadTagInfo();
-						}
+						this.plugin.settings.mergeRedundantCombination = value;
 						await this.plugin.saveSettings();
-						pi.setDisabled(!value);
 					});
 			});
-		const pi = new Setting(containerEl)
-			.setName("Pin information file")
-			.setDisabled(!this.plugin.settings.useTagInfo)
-			.addText((text) => {
-				text
-					.setValue(this.plugin.settings.tagInfo)
+		new Setting(containerEl)
+			.setName("Keep intermediate levels")
+			.setDesc(
+				"Keep single-note paths expanded instead of collapsing them. Example: keep #a -> #b instead of showing #a/#b as one row."
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.doNotSimplifyTags)
 					.onChange(async (value) => {
-						this.plugin.settings.tagInfo = value;
-						if (this.plugin.settings.useTagInfo) {
-							await this.plugin.loadTagInfo();
+						this.plugin.settings.doNotSimplifyTags = value;
+						await this.plugin.saveSettings();
+						refreshAfterSettingChange();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Advanced: merge repeated parents")
+			.setDesc("For notes with related nested tags like #a/b and #a/c, avoid showing #a again inside the #a branch.")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.reduceNestedParent)
+					.onChange(async (value) => {
+						this.plugin.settings.reduceNestedParent = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		containerEl.createEl("h2", { text: "Tag nesting and file rows" });
+		new Setting(containerEl)
+			.setName("Hide Items")
+			.setDesc("Hide items on the landing or nested tags")
+			.addDropdown((dd) => {
+				dd.addOptions(HideItemsType)
+					.setValue(this.plugin.settings.hideItems)
+					.onChange(async (key) => {
+						if (
+							key == "NONE" ||
+							key == "DEDICATED_INTERMIDIATES" ||
+							key == "ALL_EXCEPT_BOTTOM"
+						) {
+							this.plugin.settings.hideItems = key;
 						}
 						await this.plugin.saveSettings();
 					});
 			});
 		new Setting(containerEl)
 			.setName("Disable narrowing down")
-			.setDesc(
-				"When this feature is enabled, relevant tags will be shown with the title instead of making a sub-structure."
-			)
+			.setDesc("Disable narrowing down tags")
 			.addToggle((toggle) => {
 				toggle
-					.setValue(this.plugin.settings.disableNarrowingDown)
+					.setValue(!this.plugin.settings.disableNarrowingDown)
 					.onChange(async (value) => {
-						this.plugin.settings.disableNarrowingDown = value;
+						this.plugin.settings.disableNarrowingDown = !value;
 						await this.plugin.saveSettings();
 					});
 			});
-		containerEl.createEl("h2", { text: "Files" });
 		new Setting(containerEl)
-			.setName("Display method")
-			.setDesc("How to show a title of files")
+			.setName("Do not treat nested tags as dedicated levels")
+			.setDesc("Treat nested tags as normal tags")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.disableNestedTags)
+					.onChange(async (value) => {
+						this.plugin.settings.disableNestedTags = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Keep untagged items on the root")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(!this.plugin.settings.expandUntaggedToRoot)
+					.onChange(async (value) => {
+						this.plugin.settings.expandUntaggedToRoot = !value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		containerEl.createEl("h2", { text: "File display" });
+		new Setting(containerEl)
+			.setName("Display Method")
+			.setDesc("You can configure how the entry shows.")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOptions({
@@ -1563,8 +1657,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 					.onChange((order) => setOrderMethod(undefined, order));
 			});
 		new Setting(containerEl)
-			.setName("Prioritize items which are not contained in sub-folder")
-			.setDesc("If this has been enabled, the items which have no more extra tags are first.")
+			.setName("Sort exact items first")
+			.setDesc("Sort items that belong exactly to the folder before items that are shown in sub-folders.")
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.sortExactFirst)
@@ -1599,7 +1693,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 
-		containerEl.createEl("h2", { text: "Tags" });
+		containerEl.createEl("h2", { text: "Tag folder display" });
 
 		const setOrderMethodTag = async (key?: string, order?: string) => {
 			const oldSetting = this.plugin.settings.sortTypeTag.split("_");
@@ -1645,6 +1739,41 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
+
+		containerEl.createEl("h2", { text: "Pinned tags and aliases" });
+		new Setting(containerEl)
+			.setName("Use pinning")
+			.setDesc(
+				"Pin tags using metadata from the pin information file."
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.useTagInfo)
+					.onChange(async (value) => {
+						this.plugin.settings.useTagInfo = value;
+						if (this.plugin.settings.useTagInfo) {
+							await this.plugin.loadTagInfo();
+						}
+						await this.plugin.saveSettings();
+						pi.setDisabled(!value);
+					});
+			});
+		const pi = new Setting(containerEl)
+			.setName("Pin information file")
+			.setDisabled(!this.plugin.settings.useTagInfo)
+			.addText((text) => {
+				text
+					.setValue(this.plugin.settings.tagInfo)
+					.onChange(async (value) => {
+						this.plugin.settings.tagInfo = value;
+						if (this.plugin.settings.useTagInfo) {
+							await this.plugin.loadTagInfo();
+						}
+						await this.plugin.saveSettings();
+					});
+			});
+
+		containerEl.createEl("h2", { text: "New notes and templates" });
 		new Setting(containerEl)
 			.setName("Store tags in frontmatter for new notes")
 			.setDesc("When enabled, tags are written to the note Properties. If no new-note template is selected, TagFolder still creates the note and stores tags here instead of as #hashtags.")
@@ -1672,165 +1801,6 @@ class TagFolderSettingTab extends PluginSettingTab {
 					void this.plugin.saveSettings();
 				});
 			});
-
-		containerEl.createEl("h2", { text: "Actions" });
-		new Setting(containerEl)
-			.setName("Search tags inside TagFolder when clicking tags")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.overrideTagClicking)
-					.onChange(async (value) => {
-						this.plugin.settings.overrideTagClicking = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		new Setting(containerEl)
-			.setName("List files in a separated pane")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.useMultiPaneList)
-					.onChange(async (value) => {
-						this.plugin.settings.useMultiPaneList = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		new Setting(containerEl)
-			.setName("Show list in")
-			.setDesc("This option applies to the newly opened list")
-			.addDropdown((dropdown) => {
-				dropdown
-					.addOptions(enumShowListIn)
-					.setValue(this.plugin.settings.showListIn)
-					.onChange(async (value) => {
-						this.plugin.settings.showListIn = value as keyof typeof enumShowListIn;
-						await this.plugin.saveSettings();
-					});
-			});
-		containerEl.createEl("h2", { text: "Arrangements" });
-
-		new Setting(containerEl)
-			.setName("Hide Items")
-			.setDesc("Hide items on the landing or nested tags")
-			.addDropdown((dd) => {
-				dd.addOptions(HideItemsType)
-					.setValue(this.plugin.settings.hideItems)
-					.onChange(async (key) => {
-						if (
-							key == "NONE" ||
-							key == "DEDICATED_INTERMIDIATES" ||
-							key == "ALL_EXCEPT_BOTTOM"
-						) {
-							this.plugin.settings.hideItems = key;
-						}
-						await this.plugin.saveSettings();
-					});
-			});
-		new Setting(containerEl)
-			.setName("Merge redundant combinations")
-			.setDesc(
-				"When this feature is enabled, a/b and b/a are merged into a/b if there is no intermediates."
-			)
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.mergeRedundantCombination)
-					.onChange(async (value) => {
-						this.plugin.settings.mergeRedundantCombination = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		new Setting(containerEl)
-			.setName("Do not simplify empty folders")
-			.setDesc(
-				"Keep empty folders, even if they can be simplified."
-			)
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.doNotSimplifyTags)
-					.onChange(async (value) => {
-						this.plugin.settings.doNotSimplifyTags = value;
-						await this.plugin.saveSettings();
-					});
-			});
-
-		new Setting(containerEl)
-			.setName("Do not treat nested tags as dedicated levels")
-			.setDesc("Treat nested tags as normal tags")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.disableNestedTags)
-					.onChange(async (value) => {
-						this.plugin.settings.disableNestedTags = value;
-						await this.plugin.saveSettings();
-					});
-			});
-		new Setting(containerEl)
-			.setName("Reduce duplicated parents in nested tags")
-			.setDesc("If enabled, #web/css, #web/javascript will merged into web -> css -> javascript")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.reduceNestedParent)
-					.onChange(async (value) => {
-						this.plugin.settings.reduceNestedParent = value;
-						await this.plugin.saveSettings();
-					});
-			});
-
-		new Setting(containerEl)
-			.setName("Keep untagged items on the root")
-			.addToggle((toggle) => {
-				toggle
-					.setValue(this.plugin.settings.expandUntaggedToRoot)
-					.onChange(async (value) => {
-						this.plugin.settings.expandUntaggedToRoot = value;
-						await this.plugin.saveSettings();
-					});
-			});
-
-		containerEl.createEl("h2", { text: "Link Folder" });
-		new Setting(containerEl)
-			.setName("Use Incoming")
-			.setDesc("")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.linkConfig.incoming.enabled)
-					.onChange(async (value) => {
-						this.plugin.settings.linkConfig.incoming.enabled = value;
-						await this.plugin.saveSettings();
-					})
-			);
-		new Setting(containerEl)
-			.setName("Use Outgoing")
-			.setDesc("")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.linkConfig.outgoing.enabled)
-					.onChange(async (value) => {
-						this.plugin.settings.linkConfig.outgoing.enabled = value;
-						await this.plugin.saveSettings();
-					})
-			);
-		new Setting(containerEl)
-			.setName("Hide indirectly linked notes")
-			.setDesc("")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.linkShowOnlyFDR)
-					.onChange(async (value) => {
-						this.plugin.settings.linkShowOnlyFDR = value;
-						await this.plugin.saveSettings();
-					})
-			);
-		new Setting(containerEl)
-			.setName("Connect linked tree")
-			.setDesc("")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.linkCombineOtherTree)
-					.onChange(async (value) => {
-						this.plugin.settings.linkCombineOtherTree = value;
-						await this.plugin.saveSettings();
-					})
-			);
 
 		containerEl.createEl("h2", { text: "Filters" });
 		new Setting(containerEl)
@@ -1896,7 +1866,97 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 
-		containerEl.createEl("h2", { text: "Misc" });
+		containerEl.createEl("h2", { text: "Actions and panes" });
+		new Setting(containerEl)
+			.setName("Search tags inside TagFolder when clicking tags")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.overrideTagClicking)
+					.onChange(async (value) => {
+						this.plugin.settings.overrideTagClicking = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("List files in a separated pane")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.useMultiPaneList)
+					.onChange(async (value) => {
+						this.plugin.settings.useMultiPaneList = value;
+						await this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Show list in")
+			.setDesc("This option applies to the newly opened list")
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOptions(enumShowListIn)
+					.setValue(this.plugin.settings.showListIn)
+					.onChange(async (value) => {
+						this.plugin.settings.showListIn = value as keyof typeof enumShowListIn;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		containerEl.createEl("h2", { text: "Link folder" });
+		new Setting(containerEl)
+			.setName("Open")
+			.setDesc("Press Ctrl+P and run `Show Link Folder` to open this separate pane. It builds a folder-like tree from note links instead of tags.")
+			.addButton((button) =>
+				button
+					.setButtonText("Open")
+					.onClick(() => {
+						void this.plugin.activateViewLink();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Use Incoming")
+			.setDesc("")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.linkConfig.incoming.enabled)
+					.onChange(async (value) => {
+						this.plugin.settings.linkConfig.incoming.enabled = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Use Outgoing")
+			.setDesc("")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.linkConfig.outgoing.enabled)
+					.onChange(async (value) => {
+						this.plugin.settings.linkConfig.outgoing.enabled = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Hide indirectly linked notes")
+			.setDesc("")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.linkShowOnlyFDR)
+					.onChange(async (value) => {
+						this.plugin.settings.linkShowOnlyFDR = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Connect linked tree")
+			.setDesc("")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.linkCombineOtherTree)
+					.onChange(async (value) => {
+						this.plugin.settings.linkCombineOtherTree = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		containerEl.createEl("h2", { text: "Advanced" });
 
 		new Setting(containerEl)
 			.setName("Tag scanning delay")
