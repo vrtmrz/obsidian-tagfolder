@@ -56,7 +56,9 @@ import {
 	trimTrailingSlash,
 	isSpecialTag,
 	trimPrefix,
-	uniqueCaseIntensive
+	uniqueCaseIntensive,
+	parseTagFilterPatterns,
+	tagMatchesFilterPatterns
 } from "./util";
 import { ScrollView } from "./ScrollView";
 import { TagFolderView } from "./TagFolderView";
@@ -784,14 +786,8 @@ export default class TagFolderPlugin extends Plugin {
 
 	async getItemsList(mode: "tag" | "link"): Promise<ViewItem[]> {
 		const items: ViewItem[] = [];
-		const ignoreDocTags = this.settings.ignoreDocTags
-			.toLowerCase()
-			.replace(/[\n ]/g, "")
-			.split(",");
-		const ignoreTags = this.settings.ignoreTags
-			.toLowerCase()
-			.replace(/[\n ]/g, "")
-			.split(",");
+		const ignoreDocTags = parseTagFilterPatterns(this.settings.ignoreDocTags);
+		const ignoreTags = parseTagFilterPatterns(this.settings.ignoreTags);
 
 		const ignoreFolders = this.settings.ignoreFolders
 			.toLowerCase()
@@ -814,10 +810,7 @@ export default class TagFolderPlugin extends Plugin {
 
 
 		const today = Date.now();
-		const archiveTags = this.settings.archiveTags
-			.toLowerCase()
-			.replace(/[\n ]/g, "")
-			.split(",");
+		const archiveTags = parseTagFilterPatterns(this.settings.archiveTags);
 
 		for (const fileCache of this.fileCaches) {
 			if (
@@ -890,7 +883,7 @@ export default class TagFolderPlugin extends Plugin {
 
 			if (
 				allTags.some((tag) =>
-					ignoreDocTags.contains(tag.toLowerCase())
+					tagMatchesFilterPatterns(tag, ignoreDocTags)
 				)
 			) {
 				continue;
@@ -931,7 +924,7 @@ export default class TagFolderPlugin extends Plugin {
 			if (w.every((e) => e)) continue;
 
 			allTags = allTags.filter(
-				(tag) => !ignoreTags.contains(tag.toLowerCase())
+				(tag) => !tagMatchesFilterPatterns(tag, ignoreTags)
 			);
 
 			// if (this.settings.reduceNestedParent) {
@@ -941,7 +934,7 @@ export default class TagFolderPlugin extends Plugin {
 			const links = [...fileCache.links];
 			if (links.length == 0) links.push("_unlinked");
 			if (this.settings.disableNarrowingDown && mode == "tag") {
-				const archiveTagsMatched = allTags.filter(e => archiveTags.contains(e.toLowerCase()));
+				const archiveTagsMatched = allTags.filter(e => tagMatchesFilterPatterns(e, archiveTags));
 				const targetTags = archiveTagsMatched.length == 0 ? allTags : archiveTagsMatched;
 				for (const tags of targetTags) {
 					items.push({
@@ -1860,12 +1853,12 @@ class TagFolderSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Ignore note Tag")
 			.setDesc(
-				"If the note has the tag listed below, the note would be treated as there was not."
+				"If the note has a matching tag listed below, the note would be treated as there was not. Use * for glob matching."
 			)
 			.addTextArea((text) =>
 				text
 					.setValue(this.plugin.settings.ignoreDocTags)
-					.setPlaceholder("test,test1,test2")
+					.setPlaceholder("test,#tag1/*")
 					.onChange(async (value) => {
 						this.plugin.settings.ignoreDocTags = value;
 						await this.plugin.saveSettings();
@@ -1873,11 +1866,11 @@ class TagFolderSettingTab extends PluginSettingTab {
 			);
 		new Setting(containerEl)
 			.setName("Ignore Tag")
-			.setDesc("Tags in the list would be treated as there were not.")
+			.setDesc("Matching tags in the list would be treated as there were not. Use * for glob matching.")
 			.addTextArea((text) =>
 				text
 					.setValue(this.plugin.settings.ignoreTags)
-					.setPlaceholder("test,test1,test2")
+					.setPlaceholder("test,#tag1/*")
 					.onChange(async (value) => {
 						this.plugin.settings.ignoreTags = value;
 						await this.plugin.saveSettings();
@@ -1885,11 +1878,11 @@ class TagFolderSettingTab extends PluginSettingTab {
 			);
 		new Setting(containerEl)
 			.setName("Archive tags")
-			.setDesc("If configured, notes with these tags will be moved under the tag.")
+			.setDesc("If configured, notes with matching tags will be moved under the tag. Use * for glob matching.")
 			.addTextArea((text) =>
 				text
 					.setValue(this.plugin.settings.archiveTags)
-					.setPlaceholder("archived, discontinued")
+					.setPlaceholder("archived,#archive/*")
 					.onChange(async (value) => {
 						this.plugin.settings.archiveTags = value;
 						await this.plugin.saveSettings();

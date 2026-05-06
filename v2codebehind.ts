@@ -1,6 +1,6 @@
 
 import type { TREE_TYPE, TagFolderSettings, TagInfoDict, ViewItem } from "./types";
-import { V2FI_IDX_CHILDREN, type V2FolderItem, trimPrefix, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame } from "./util";
+import { V2FI_IDX_CHILDREN, type V2FolderItem, trimPrefix, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame, parseTagFilterPatterns, tagMatchesFilterPatterns, tagOrDescendantMayMatchFilterPatterns } from "./util";
 
 export function performSortExactFirst(_items: ViewItem[], children: V2FolderItem[], leftOverItems: ViewItem[]) {
 
@@ -156,17 +156,10 @@ export async function collectTreeChildren(
             if (isMainTree && isRoot) {
                 // Remove all items which have been already archived except is on the root.
 
-                const archiveTags = _setting.archiveTags
-                    .toLowerCase()
-                    .replace(/[\n ]/g, "")
-                    .split(",");
+                const archiveTags = parseTagFilterPatterns(_setting.archiveTags);
                 wChildren = wChildren
                     .map((e) =>
-                        archiveTags.some((aTag) =>
-                            `${aTag}//`.startsWith(
-                                e[V2FI_IDX_TAG].toLowerCase() + "/"
-                            )
-                        )
+                        tagOrDescendantMayMatchFilterPatterns(e[V2FI_IDX_TAG], archiveTags)
                             ? e
                             : ([
                                 e[V2FI_IDX_TAG],
@@ -175,9 +168,7 @@ export async function collectTreeChildren(
                                 e[V2FI_IDX_CHILDREN].filter(
                                     (items) =>
                                         !items.tags.some((e) =>
-                                            archiveTags.contains(
-                                                e.toLowerCase()
-                                            )
+                                            tagMatchesFilterPatterns(e, archiveTags)
                                         )
                                 ),
                             ] as V2FolderItem)
