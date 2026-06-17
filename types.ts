@@ -19,6 +19,7 @@ export interface TagInfoDict {
 	[key: string]: TagInfo;
 }
 export interface TagInfo {
+	[key: string]: unknown;
 	key?: string;
 	mark?: string;
 	alt?: string;

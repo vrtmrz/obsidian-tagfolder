@@ -15,7 +15,7 @@ import { maxDepth, selectedTags } from "./store";
 import { ancestorToLongestTag, ancestorToTags, isSpecialTag, renderSpecialTag, joinPartialPath, removeIntermediatePath, trimTrailingSlash } from "./util";
 import { askString } from "dialog";
 
-function toggleObjectProp(obj: { [key: string]: any }, propName: string, value: string | false) {
+function toggleObjectProp(obj: { [key: string]: unknown }, propName: string, value: string | false) {
 	if (value === false) {
 		const newTagInfoEntries = Object.entries(obj || {}).filter(([key]) => key != propName);
 		if (newTagInfoEntries.length == 0) {

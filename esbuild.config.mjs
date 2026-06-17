@@ -39,7 +39,7 @@ const terserOpt = {
 	sourceMap: !prod
 		? {
 				url: "inline",
-		  }
+			}
 		: {},
 	format: {
 		indent_level: 2,
