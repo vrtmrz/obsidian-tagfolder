@@ -90,13 +90,13 @@ export function secondsToFreshness(totalAsMSec: number) {
 const queues = [] as (() => void)[];
 
 export function waitForRequestAnimationFrame() {
-	return new Promise<void>(res => requestAnimationFrame(() => res()));
+	return new Promise<void>(res => window.requestAnimationFrame(() => res()));
 }
 function delay(num?: number) {
-	return new Promise<void>(res => setTimeout(() => res(), num || 5));
+	return new Promise<void>(res => window.setTimeout(() => res(), num || 5));
 }
 function nextTick() {
-	return new Promise<void>(res => setTimeout(() => res(), 0));
+	return new Promise<void>(res => window.setTimeout(() => res(), 0));
 }
 
 // This is based on nothing.
@@ -109,21 +109,18 @@ async function pump() {
 	if (pumping) return;
 	try {
 		pumping = true;
-		do {
-			const proc = queues.shift();
-			if (proc) {
-				proc();
-				const now = Date.now();
-				if (now - startContinuousProcessing > 120) {
-					const w = waits[waitIdx];
-					waitIdx = (waitIdx + 1) % waits.length;
-					await w();
-					startContinuousProcessing = Date.now();
-				}
-			} else {
-				break;
+		let proc = queues.shift();
+		while (proc) {
+			proc();
+			const now = Date.now();
+			if (now - startContinuousProcessing > 120) {
+				const w = waits[waitIdx];
+				waitIdx = (waitIdx + 1) % waits.length;
+				await w();
+				startContinuousProcessing = Date.now();
 			}
-		} while (true);
+			proc = queues.shift();
+		}
 	} finally {
 		pumping = false;
 	}
@@ -479,7 +476,7 @@ export function measure(key: string) {
 export function isSameViewItems(a: ViewItem[][], b: ViewItem[][]) {
 	if (a === b) return true;
 	if (a.length != b.length) return false;
-	for (const i in a) {
+	for (let i = 0; i < a.length; i++) {
 		if (a[i].length != b[i].length) {
 			return false;
 		}
@@ -492,7 +489,7 @@ export function _isSameViewItem(a: ViewItem[], b: ViewItem[]) {
 	if (!a || !b) return false;
 	if (a === b) return true;
 	if (a.length != b.length) return false;
-	for (const j in a) {
+	for (let j = 0; j < a.length; j++) {
 		if (a[j] === b[j]) return true;
 		for (const k in a[j]) {
 			if (!isSameObj(a[j][k as keyof ViewItem], b[j][k as keyof ViewItem])) return false;
@@ -503,12 +500,12 @@ export function _isSameViewItem(a: ViewItem[], b: ViewItem[]) {
 export function isSameV2FolderItem(a: V2FolderItem[][], b: V2FolderItem[][]) {
 	if (a === b) return true;
 	if (a.length != b.length) return false;
-	for (const i in a) {
+	for (let i = 0; i < a.length; i++) {
 		if (a[i].length != b[i].length) {
 			return false;
 		}
 		if (a[i] === b[i]) return true;
-		for (const j in a[i]) {
+		for (let j = 0; j < a[i].length; j++) {
 			if (a[i][j][V2FI_IDX_TAG] !== b[i][j][V2FI_IDX_TAG]) return false;
 			if (a[i][j][V2FI_IDX_TAGNAME] !== b[i][j][V2FI_IDX_TAGNAME]) return false;
 			if (!isSameObj(a[i][j][V2FI_IDX_TAGDISP], b[i][j][V2FI_IDX_TAGDISP])) return false;

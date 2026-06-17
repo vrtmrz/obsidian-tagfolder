@@ -10,7 +10,6 @@
 }
 
 .tagfolder-tag::before {
-	all: inherit;
 	color: inherit;
 	font: inherit;
 }

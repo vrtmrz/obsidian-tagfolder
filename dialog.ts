@@ -30,7 +30,7 @@ export class PopoverSelectString extends SuggestModal<string> {
         this.setPlaceholder(placeholder ?? ">");
         this.callback = callback;
 
-        setTimeout(() => {
+        window.setTimeout(() => {
             this.inputEl.value = initialText;
             // this.inputEl.onchange();
         })
@@ -40,7 +40,7 @@ export class PopoverSelectString extends SuggestModal<string> {
         }
     }
     onClose(): void {
-        setTimeout(() => {
+        window.setTimeout(() => {
             if (this.callback) {
                 this.callback(false);
             }

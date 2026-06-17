@@ -21,5 +21,6 @@
             "es2019.array"
         ]
 	},
-	"include": ["**/*.ts"]
+	"include": ["**/*.ts", "**/*.svelte"],
+	"exclude": ["utilsdeno"]
 }

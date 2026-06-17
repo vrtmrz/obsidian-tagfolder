@@ -27,10 +27,10 @@ export function performSortExactFirst(_items: ViewItem[], children: V2FolderItem
     return [...wk2];
 }
 function delay() {
-    return new Promise<void>(res => setTimeout(() => res(), 5));
+    return new Promise<void>(res => window.setTimeout(() => res(), 5));
 }
 function nextTick() {
-    return new Promise<void>(res => setTimeout(() => res(), 0));
+    return new Promise<void>(res => window.setTimeout(() => res(), 0));
 }
 const delays = [nextTick, delay, nextTick, waitForRequestAnimationFrame];
 let delayIdx = 0;

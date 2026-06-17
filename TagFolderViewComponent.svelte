@@ -221,7 +221,7 @@
 					const tg = observingElements.get(v.target);
 					if (tg && tg.lastState !== v.isIntersecting) {
 						tg.lastState = v.isIntersecting;
-						setTimeout(() => tg.callback(v.isIntersecting), 10);
+						window.setTimeout(() => tg.callback(v.isIntersecting), 10);
 					}
 				}
 			}
@@ -257,12 +257,12 @@
 			setIcon(iconDivEl, "lucide-chevrons-down-up");
 			closeAllIcon = iconDivEl.innerHTML;
 		}
-		const int = setInterval(() => {
+		const int = window.setInterval(() => {
 			performHide.set(Date.now());
 		}, 5000);
 
 		return () => {
-			clearInterval(int);
+			window.clearInterval(int);
 		};
 	});
 	onDestroy(() => {
