@@ -109,21 +109,18 @@ async function pump() {
 	if (pumping) return;
 	try {
 		pumping = true;
-		do {
-			const proc = queues.shift();
-			if (proc) {
-				proc();
-				const now = Date.now();
-				if (now - startContinuousProcessing > 120) {
-					const w = waits[waitIdx];
-					waitIdx = (waitIdx + 1) % waits.length;
-					await w();
-					startContinuousProcessing = Date.now();
-				}
-			} else {
-				break;
+		let proc = queues.shift();
+		while (proc) {
+			proc();
+			const now = Date.now();
+			if (now - startContinuousProcessing > 120) {
+				const w = waits[waitIdx];
+				waitIdx = (waitIdx + 1) % waits.length;
+				await w();
+				startContinuousProcessing = Date.now();
 			}
-		} while (true);
+			proc = queues.shift();
+		}
 	} finally {
 		pumping = false;
 	}

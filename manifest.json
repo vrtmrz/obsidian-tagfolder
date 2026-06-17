@@ -3,7 +3,7 @@
     "name": "TagFolder",
     "version": "0.18.14",
     "minAppVersion": "1.7.2",
-    "description": "Show tags as folder",
+    "description": "Show tags as folder.",
     "author": "vorotamoroz",
     "authorUrl": "https://github.com/vrtmrz",
     "isDesktopOnly": false
