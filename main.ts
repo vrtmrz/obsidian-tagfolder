@@ -106,21 +106,31 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 
 type NewNoteTemplateChoice = TFile;
 
-function getCoreTemplatesFolder(app: App): string | null {
+type CoreTemplatesOptions = {
+	folder?: string;
+	templateFolder?: string;
+};
+
+type CoreTemplatesPluginInstance = {
+	options?: CoreTemplatesOptions;
+	insertTemplate?: (template: TFile) => Promise<void> | void;
+};
+
+function getCoreTemplatesPlugin(app: App): CoreTemplatesPluginInstance | null {
 	const internalPlugins = (app as App & {
 		internalPlugins?: {
 			getPluginById?: (id: string) => {
-				instance?: {
-					options?: {
-						folder?: string;
-						templateFolder?: string;
-					};
-				};
+				instance?: CoreTemplatesPluginInstance;
 			};
 		};
 	}).internalPlugins;
-	const templatesPlugin = internalPlugins?.getPluginById?.("templates");
-	const folder = templatesPlugin?.instance?.options?.folder ?? templatesPlugin?.instance?.options?.templateFolder;
+
+	return internalPlugins?.getPluginById?.("templates")?.instance ?? null;
+}
+
+function getCoreTemplatesFolder(app: App): string | null {
+	const options = getCoreTemplatesPlugin(app)?.options;
+	const folder = options?.folder ?? options?.templateFolder;
 	if (!folder) return null;
 	const normalizedFolder = normalizePath(folder);
 	return normalizedFolder == "/" ? "" : normalizedFolder;
@@ -254,7 +264,7 @@ function normalizeNewNoteTemplatePath(templatePath: string) {
 	return normalizedPath == "/" ? "" : normalizedPath;
 }
 
-function renderNewNoteTemplate(template: string, expandedTagsAll: string[], expandedTags: string) {
+function renderTagFolderTemplateVariables(template: string, expandedTagsAll: string[], expandedTags: string) {
 	const plainTags = expandedTagsAll.filter(e => !isSpecialTag(e));
 	const replacements: Record<string, string> = {
 		expandedTags,
@@ -267,6 +277,24 @@ function renderNewNoteTemplate(template: string, expandedTagsAll: string[], expa
 	};
 
 	return template.replace(/\{\{(expandedTags|tags|tagList|tagPath|tagName|tagsJson|tagsYaml)\}\}/g, (_, key: keyof typeof replacements) => replacements[key]);
+}
+
+async function insertNewNoteTemplate(app: App, note: TFile, template: TFile, expandedTagsAll: string[], expandedTags: string) {
+	const templatesPlugin = getCoreTemplatesPlugin(app);
+	const activeMarkdownView = app.workspace.getActiveViewOfType(MarkdownView);
+
+	if (templatesPlugin?.insertTemplate && activeMarkdownView?.file == note) {
+		await templatesPlugin.insertTemplate(template);
+		const editor = activeMarkdownView.editor;
+		editor.setValue(renderTagFolderTemplateVariables(editor.getValue(), expandedTagsAll, expandedTags));
+		return;
+	}
+
+	const templateContent = await app.vault.read(template);
+	const renderedTemplate = renderTagFolderTemplateVariables(templateContent, expandedTagsAll, expandedTags);
+	if (renderedTemplate.trim() != "") {
+		await app.vault.modify(note, renderedTemplate);
+	}
 }
 
 // Thank you @pjeby!
@@ -1427,11 +1455,7 @@ export default class TagFolderPlugin extends Plugin {
 		const ww = await this.app.fileManager.createAndOpenMarkdownFile();
 		if (!(ww instanceof TFile)) return;
 		if (selectedTemplate != null && selectedTemplate !== false) {
-			const template = await this.app.vault.read(selectedTemplate);
-			const renderedTemplate = renderNewNoteTemplate(template, expandedTagsAll, expandedTags);
-			if (renderedTemplate.trim() != "") {
-				await this.app.vault.modify(ww, renderedTemplate);
-			}
+			await insertNewNoteTemplate(this.app, ww, selectedTemplate, expandedTagsAll, expandedTags);
 			return;
 		}
 
