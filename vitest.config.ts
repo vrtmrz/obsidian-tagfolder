@@ -14,5 +14,9 @@ export default defineConfig({
 	test: {
 		environment: "jsdom",
 		setupFiles: ["./tests/setup.ts"],
+		coverage: {
+			include: ["new-note-template.ts", "util.ts", "v2codebehind.ts"],
+			exclude: ["tests/**"],
+		},
 	},
 });

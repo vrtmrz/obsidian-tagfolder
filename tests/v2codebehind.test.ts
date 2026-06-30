@@ -33,21 +33,27 @@ async function collectTagTree({
 	items,
 	setting = {},
 	isRoot = true,
+	isMainTree = true,
 	depth = 1,
 	expandLimit = 0,
 	trailLower = [],
 	previousTrail = "",
 	isSuppressibleLevel = false,
+	viewType = "tags",
+	linkedItems = new Map(),
 }: {
 	tags: string[];
 	items: ReturnType<typeof viewItem>[];
 	setting?: Partial<TagFolderSettings>;
 	isRoot?: boolean;
+	isMainTree?: boolean;
 	depth?: number;
 	expandLimit?: number;
 	trailLower?: string[];
 	previousTrail?: string;
 	isSuppressibleLevel?: boolean;
+	viewType?: "tags" | "links";
+	linkedItems?: Map<string, ReturnType<typeof viewItem>[]>;
 }) {
 	return collectTreeChildren({
 		key: "test-tree",
@@ -56,13 +62,13 @@ async function collectTagTree({
 		tags,
 		trailLower,
 		_setting: { ...settings, ...setting },
-		isMainTree: true,
+		isMainTree,
 		isSuppressibleLevel,
-		viewType: "tags",
+		viewType,
 		previousTrail,
 		_tagInfo: {},
 		_items: items,
-		linkedItems: new Map(),
+		linkedItems,
 		isRoot,
 		sortFunc,
 	});
@@ -159,6 +165,38 @@ describe("collectTreeChildren", () => {
 
 		expect(result.children).toEqual([]);
 		expect(result.suppressLevels).toEqual(["report", "todo"]);
+	});
+
+	it("does not collect children when rendering a separated list", async () => {
+		const result = await collectTagTree({
+			tags: ["project/client"],
+			items: [viewItem("alpha.md", ["project/client"])],
+			isMainTree: false,
+		});
+
+		expect(result.children).toEqual([]);
+		expect(result.suppressLevels).toEqual([]);
+	});
+
+	it("collects link folders from a precomputed linked-item map", async () => {
+		const linked = viewItem("linked.md", []);
+		const fallback = viewItem("fallback.md", []);
+		const linkedItems = new Map([
+			["linked.md", [linked]],
+			["missing.md", [fallback]],
+		]);
+
+		const result = await collectTagTree({
+			tags: ["linked.md", "missing.md"],
+			items: [linked, fallback],
+			viewType: "links",
+			linkedItems,
+		});
+
+		expect(treeSummary(result.children)).toEqual([
+			["linked.md", ["linked.md"]],
+			["missing.md", ["fallback.md"]],
+		]);
 	});
 
 	it("keeps overlapping exact, parent, and child tag memberships separate by default", async () => {
