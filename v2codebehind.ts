@@ -1,6 +1,6 @@
 
 import type { TREE_TYPE, TagFolderSettings, TagInfoDict, ViewItem } from "./types";
-import { V2FI_IDX_CHILDREN, type V2FolderItem, trimPrefix, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame } from "./util";
+import { V2FI_IDX_CHILDREN, type V2FolderItem, trimTrailingSlash, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame } from "./util";
 
 export function performSortExactFirst(_items: ViewItem[], children: V2FolderItem[], leftOverItems: ViewItem[]) {
 
@@ -50,12 +50,14 @@ export async function collectChildren(previousTrail: string, tags: string[], _ta
     }
     for (const tag of tags) {
         const tagLC = tag.toLowerCase();
-        const tagNestedLC = trimPrefix(tagLC, previousTrailLC);
+        const tagNestedLC = previousTrailLC && !tagLC.startsWith(previousTrailLC)
+            ? previousTrailLC + tagLC
+            : "";
         const items: ViewItem[] = [];
         for (const [itemTag, tempItems] of tagPerItem) {
             if (pathMatch(itemTag, tagLC)) {
                 items.push(...tempItems);
-            } else if (pathMatch(itemTag, tagNestedLC)) {
+            } else if (tagNestedLC && pathMatch(itemTag, tagNestedLC)) {
                 items.push(...tempItems);
             }
         }
@@ -161,11 +163,10 @@ export async function collectTreeChildren(
                     .replace(/[\n ]/g, "")
                     .split(",");
                 wChildren = wChildren
-                    .map((e) =>
-                        archiveTags.some((aTag) =>
-                            `${aTag}//`.startsWith(
-                                e[V2FI_IDX_TAG].toLowerCase() + "/"
-                            )
+                    .map((e) => {
+                        const childTagPath = `${trimTrailingSlash(e[V2FI_IDX_TAG].toLowerCase())}/`;
+                        return archiveTags.some((aTag) =>
+                            `${trimTrailingSlash(aTag)}/`.startsWith(childTagPath)
                         )
                             ? e
                             : ([
@@ -181,7 +182,7 @@ export async function collectTreeChildren(
                                         )
                                 ),
                             ] as V2FolderItem)
-                    )
+                    })
                     .filter(
                         (child) => child[V2FI_IDX_CHILDREN].length != 0
                     );
