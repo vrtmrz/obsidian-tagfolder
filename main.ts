@@ -34,7 +34,8 @@ import {
 	type ViewItem,
 	VIEW_TYPE_TAGFOLDER_LINK,
 	type FileCache,
-	enumShowListIn
+	enumShowListIn,
+	type DISPLAY_METHOD
 } from "types";
 import { allViewItems, allViewItemsByLink, appliedFiles, currentFile, maxDepth, pluginInstance, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
 import {
@@ -55,15 +56,10 @@ import {
 	trimPrefix,
 	uniqueCaseIntensive
 } from "./util";
+import { renderTagFolderTemplateVariables } from "./new-note-template";
 import { ScrollView } from "./ScrollView";
 import { TagFolderView } from "./TagFolderView";
 import { TagFolderList } from "./TagFolderList";
-
-export type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
-
-// The `Intermidiate` is spelt incorrectly, but it is already used as the key of the configuration.
-// Leave it to the future.
-export type HIDE_ITEMS_TYPE = "NONE" | "DEDICATED_INTERMIDIATES" | "ALL_EXCEPT_BOTTOM";
 
 const HideItemsType: Record<string, string> = {
 	NONE: "Hide nothing",
@@ -252,21 +248,6 @@ function normalizeNewNoteTemplatePath(templatePath: string) {
 	if (inputPath == "") return "";
 	const normalizedPath = normalizePath(inputPath);
 	return normalizedPath == "/" ? "" : normalizedPath;
-}
-
-function renderNewNoteTemplate(template: string, expandedTagsAll: string[], expandedTags: string) {
-	const plainTags = expandedTagsAll.filter(e => !isSpecialTag(e));
-	const replacements: Record<string, string> = {
-		expandedTags,
-		tags: expandedTags,
-		tagList: plainTags.join(", "),
-		tagPath: plainTags.join("/"),
-		tagName: plainTags[plainTags.length - 1] ?? "",
-		tagsJson: JSON.stringify(plainTags),
-		tagsYaml: plainTags.map((tag) => `  - ${tag}`).join("\n"),
-	};
-
-	return template.replace(/\{\{(expandedTags|tags|tagList|tagPath|tagName|tagsJson|tagsYaml)\}\}/g, (_, key: keyof typeof replacements) => replacements[key]);
 }
 
 // Thank you @pjeby!
@@ -1428,7 +1409,7 @@ export default class TagFolderPlugin extends Plugin {
 		if (!(ww instanceof TFile)) return;
 		if (selectedTemplate != null && selectedTemplate !== false) {
 			const template = await this.app.vault.read(selectedTemplate);
-			const renderedTemplate = renderNewNoteTemplate(template, expandedTagsAll, expandedTags);
+			const renderedTemplate = renderTagFolderTemplateVariables(template, expandedTagsAll, expandedTags);
 			if (renderedTemplate.trim() != "") {
 				await this.app.vault.modify(ww, renderedTemplate);
 			}

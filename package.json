@@ -8,9 +8,10 @@
 		"dev": "node --env-file=.env esbuild.config.mjs",
 		"build": "node esbuild.config.mjs production",
 		"lint": "eslint .",
+		"test": "vitest run",
 		"svelte-check": "svelte-check --tsconfig ./tsconfig.json",
 		"tsc-check": "tsc --noEmit",
-		"check": "npm run lint && npm run svelte-check && npm run tsc-check",
+		"check": "npm run lint && npm run test && npm run svelte-check && npm run tsc-check",
 		"version": "node version-bump.mjs"
 	},
 	"keywords": [],
@@ -27,12 +28,14 @@
 		"eslint-plugin-obsidianmd": "^0.3.0",
 		"eslint-plugin-svelte": "^3.13.0",
 		"globals": "^14.0.0",
+		"jsdom": "^29.1.1",
 		"obsidian": "^1.10.3",
 		"svelte": "^5.45.5",
 		"svelte-check": "^4.3.4",
 		"svelte-eslint-parser": "^1.8.0",
 		"svelte-preprocess": "^6.0.3",
 		"terser": "^5.44.1",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.9"
 	}
 }
