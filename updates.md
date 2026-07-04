@@ -1,3 +1,16 @@
+## 0.18.16
+
+### Fixes
+
+-   Fixed nested tag collection when rendering a subtree with a previous trail, so relative child tags are matched against their full tag path correctly.
+-   Fixed archive tag filtering at the root tree so descendant archive branches remain visible while archived notes are hidden from unrelated root folders.
+
+### Digging the weeds
+
+-   Added CI for pull requests and pushes to `main`.
+-   Added automated tests for TagFolder template rendering, tag tree collection, archive filtering, and utility functions.
+-   Added coverage reporting for the new test suite.
+
 ## ~~0.18.12~~ 0.18.13
 
 (0.18.12 was skipped due to a versioning mistake)
