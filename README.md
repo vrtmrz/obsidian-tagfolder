@@ -133,7 +133,9 @@ This setting changes how tags are stored in new notes created by TagFolder. When
 
 ##### Template for new notes
 
-When this setting is set to a valid markdown template path, TagFolder uses that template immediately when creating a new note from the tag tree. The `.md` extension is optional. If the setting is empty or invalid, TagFolder opens a template picker.
+When this setting is set to a valid markdown template path, TagFolder uses that template immediately when creating a new note from the tag tree. The `.md` extension is optional. If a non-empty path is invalid, TagFolder opens a template picker. If the setting is empty, TagFolder creates the note without a template and uses the configured Properties or hashtag behaviour.
+
+Settings suggestions are captured when the settings tab opens; reopen the tab to refresh them. The new-note template selection dialog captures a fresh list each time it opens.
 
 Templates can include these placeholders, which are replaced with the tags from the clicked location:
 
@@ -292,3 +294,7 @@ If the note has the tag that is set in here, the note would be treated as there 
 Tags that were set here would be treated as there were not.
 
 ##### Archive tags
+
+## Development
+
+Contributor setup, tests, and UI/Vault workflow architecture are documented in [the developer guide](docs/devs.md).
