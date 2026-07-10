@@ -21,6 +21,8 @@
 	"author": "vorotamoroz",
 	"license": "MIT",
 	"devDependencies": {
+		"@emnapi/core": "1.11.2",
+		"@emnapi/runtime": "1.11.2",
 		"@eslint/js": "^9.39.1",
 		"@tsconfig/svelte": "^5.0.4",
 		"@types/node": "^22.20.1",
