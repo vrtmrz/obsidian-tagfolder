@@ -62,6 +62,7 @@ import {
 } from "./util";
 import {
 	chooseNewNoteTemplate,
+	filterNewNoteTemplateChoices,
 	populateNewNote,
 	type NewNoteTemplateChoice,
 } from "./new-note-workflow";
@@ -141,44 +142,51 @@ function getTemplateFiles(app: App) {
 	return templates.sort((a, b) => compare(a.path, b.path));
 }
 
-class NewNoteTemplateInputSuggest extends AbstractInputSuggest<TFile> {
-	private callback: (template: TFile) => void;
+function captureNewNoteTemplates(app: App): NewNoteTemplateChoice[] {
+	return getTemplateFiles(app).map((file) => ({
+		path: file.path,
+		name: file.basename,
+	}));
+}
 
-	constructor(app: App, inputEl: HTMLInputElement, callback: (template: TFile) => void) {
+class NewNoteTemplateInputSuggest extends AbstractInputSuggest<NewNoteTemplateChoice> {
+	private readonly templates: readonly NewNoteTemplateChoice[];
+	private callback: (template: NewNoteTemplateChoice) => void;
+
+	constructor(
+		app: App,
+		inputEl: HTMLInputElement,
+		templates: readonly NewNoteTemplateChoice[],
+		callback: (template: NewNoteTemplateChoice) => void,
+	) {
 		super(app, inputEl);
+		this.templates = templates;
 		this.callback = callback;
 	}
 
-	getSuggestions(query: string): TFile[] {
-		const normalizedQuery = query.toLowerCase();
-		return getTemplateFiles(this.app).filter((file) =>
-			file.path.toLowerCase().contains(normalizedQuery)
-			|| file.basename.toLowerCase().contains(normalizedQuery)
-		);
+	getSuggestions(query: string): NewNoteTemplateChoice[] {
+		return filterNewNoteTemplateChoices(this.templates, query);
 	}
 
-	renderSuggestion(template: TFile, el: HTMLElement) {
-		el.createDiv({ text: template.basename });
+	renderSuggestion(template: NewNoteTemplateChoice, el: HTMLElement) {
+		el.createDiv({ text: template.name });
 		el.createDiv({ text: template.path, cls: "suggestion-note" });
 	}
 
-	selectSuggestion(template: TFile) {
+	selectSuggestion(template: NewNoteTemplateChoice) {
 		this.setValue(template.path);
 		this.callback(template);
 		this.close();
 	}
 }
 
-async function askNewNoteTemplate(ui: UiInteractions, app: App): Promise<NewNoteTemplateChoice | null> {
-	const templates = getTemplateFiles(app).map((file) => ({
-		path: file.path,
-		name: file.basename,
-	}));
-	if (templates.length == 0) {
-		new Notice("No templates found");
-		return null;
+async function askNewNoteTemplate(ui: UiInteractions, app: App): Promise<NewNoteTemplateChoice | null | undefined> {
+	const templates = captureNewNoteTemplates(app);
+	const selectedTemplate = await chooseNewNoteTemplate(ui, templates);
+	if (selectedTemplate === undefined) {
+		new Notice("No templates found. Add a template, then try again.");
 	}
-	return await chooseNewNoteTemplate(ui, templates);
+	return selectedTemplate;
 }
 
 function getConfiguredNewNoteTemplate(app: App, templatePath: string): NewNoteTemplateChoice | null {
@@ -1370,10 +1378,17 @@ export default class TagFolderPlugin extends Plugin {
 			.trim();
 
 		const configuredTemplatePath = normalizeNewNoteTemplatePath(this.settings.newNoteTemplate);
-		const selectedTemplate = configuredTemplatePath == ""
-			? null
-			: (getConfiguredNewNoteTemplate(this.app, configuredTemplatePath)
-				?? await askNewNoteTemplate(this.ui, this.app));
+		let selectedTemplate: NewNoteTemplateChoice | null = null;
+		if (configuredTemplatePath != "") {
+			const configuredTemplate = getConfiguredNewNoteTemplate(this.app, configuredTemplatePath);
+			if (configuredTemplate != null) {
+				selectedTemplate = configuredTemplate;
+			} else {
+				const promptedTemplate = await askNewNoteTemplate(this.ui, this.app);
+				if (promptedTemplate === undefined) return;
+				selectedTemplate = promptedTemplate;
+			}
+		}
 
 		//@ts-ignore
 		const ww = await this.app.fileManager.createAndOpenMarkdownFile();
@@ -1413,6 +1428,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+		const newNoteTemplates = captureNewNoteTemplates(this.app);
 
 		new Setting(containerEl).setName("Behavior").setHeading();
 		new Setting(containerEl)
@@ -1615,7 +1631,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						this.plugin.settings.newNoteTemplate = normalizeNewNoteTemplatePath(value);
 						await this.plugin.saveSettings();
 					});
-				new NewNoteTemplateInputSuggest(this.app, text.inputEl, (template) => {
+				new NewNoteTemplateInputSuggest(this.app, text.inputEl, newNoteTemplates, (template) => {
 					this.plugin.settings.newNoteTemplate = template.path;
 					void this.plugin.saveSettings();
 				});

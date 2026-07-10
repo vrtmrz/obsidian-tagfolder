@@ -12,12 +12,24 @@ export interface NewNoteTemplateChoice {
 	readonly name: string;
 }
 
-/** Requests one template by identity, or returns `null` when dismissed or empty. */
+/** Filters one captured template snapshot by name or Vault-relative path. */
+export function filterNewNoteTemplateChoices(
+	templates: readonly NewNoteTemplateChoice[],
+	query: string,
+): NewNoteTemplateChoice[] {
+	const normalizedQuery = query.toLowerCase();
+	return templates.filter((template) =>
+		template.path.toLowerCase().includes(normalizedQuery)
+		|| template.name.toLowerCase().includes(normalizedQuery)
+	);
+}
+
+/** Requests one captured template by identity, returns `null` when dismissed, or `undefined` when empty. */
 export async function chooseNewNoteTemplate(
 	ui: UiInteractions,
 	templates: readonly NewNoteTemplateChoice[],
-): Promise<NewNoteTemplateChoice | null> {
-	if (templates.length == 0) return null;
+): Promise<NewNoteTemplateChoice | null | undefined> {
+	if (templates.length == 0) return undefined;
 	return await ui.pickOne(
 		{
 			items: templates,
