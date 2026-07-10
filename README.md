@@ -292,3 +292,7 @@ If the note has the tag that is set in here, the note would be treated as there 
 Tags that were set here would be treated as there were not.
 
 ##### Archive tags
+
+## Development
+
+Contributor setup, tests, and UI/Vault workflow architecture are documented in [the developer guide](docs/devs.md).

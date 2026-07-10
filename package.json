@@ -12,6 +12,8 @@
 		"coverage": "vitest run --coverage",
 		"svelte-check": "svelte-check --tsconfig ./tsconfig.json",
 		"tsc-check": "tsc --noEmit",
+		"check:e2e:obsidian": "tsc -p test/e2e-obsidian/tsconfig.json",
+		"test:e2e:obsidian:new-note-template": "npm run build && tsx test/e2e-obsidian/new-note-template.mts",
 		"check": "npm run lint && npm run test && npm run svelte-check && npm run tsc-check",
 		"version": "node version-bump.mjs"
 	},
@@ -21,9 +23,10 @@
 	"devDependencies": {
 		"@eslint/js": "^9.39.1",
 		"@tsconfig/svelte": "^5.0.4",
-		"@types/node": "^22.7.9",
+		"@types/node": "^22.20.1",
 		"@typescript-eslint/parser": "^8.48.1",
 		"@vitest/coverage-v8": "^4.1.9",
+		"@vrtmrz/obsidian-test-session": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.3/vrtmrz-obsidian-test-session-0.0.0.tgz",
 		"esbuild": "^0.28.1",
 		"esbuild-svelte": "^0.9.3",
 		"eslint": "^9.39.1",
@@ -32,12 +35,18 @@
 		"globals": "^14.0.0",
 		"jsdom": "^29.1.1",
 		"obsidian": "^1.10.3",
+		"playwright": "^1.61.1",
 		"svelte": "^5.45.5",
 		"svelte-check": "^4.3.4",
 		"svelte-eslint-parser": "^1.8.0",
 		"svelte-preprocess": "^6.0.3",
 		"terser": "^5.44.1",
+		"tsx": "^4.23.0",
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.9"
+	},
+	"dependencies": {
+		"@vrtmrz/obsidian-plugin-kit": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.3/vrtmrz-obsidian-plugin-kit-0.0.0.tgz",
+		"@vrtmrz/ui-interactions": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.3/vrtmrz-ui-interactions-0.0.0.tgz"
 	}
 }

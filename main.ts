@@ -14,12 +14,16 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
-	SuggestModal,
 	TFile,
 	WorkspaceLeaf,
 	TAbstractFile,
 	type MarkdownFileInfo,
 } from "obsidian";
+import { createObsidianUi, type UiInteractions } from "@vrtmrz/obsidian-plugin-kit/ui";
+import {
+	createObsidianVaultTextAccess,
+	type VaultTextAccess,
+} from "@vrtmrz/obsidian-plugin-kit/vault";
 
 import {
 	DEFAULT_SETTINGS,
@@ -56,7 +60,11 @@ import {
 	trimPrefix,
 	uniqueCaseIntensive
 } from "./util";
-import { renderTagFolderTemplateVariables } from "./new-note-template";
+import {
+	chooseNewNoteTemplate,
+	populateNewNote,
+	type NewNoteTemplateChoice,
+} from "./new-note-workflow";
 import { ScrollView } from "./ScrollView";
 import { TagFolderView } from "./TagFolderView";
 import { TagFolderList } from "./TagFolderList";
@@ -100,8 +108,6 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 	}
 }
 
-type NewNoteTemplateChoice = TFile;
-
 function getCoreTemplatesFolder(app: App): string | null {
 	const internalPlugins = (app as App & {
 		internalPlugins?: {
@@ -135,44 +141,6 @@ function getTemplateFiles(app: App) {
 	return templates.sort((a, b) => compare(a.path, b.path));
 }
 
-class NewNoteTemplateSuggestModal extends SuggestModal<NewNoteTemplateChoice> {
-	private callback?: (template: NewNoteTemplateChoice | false) => void;
-	private templates: TFile[];
-
-	constructor(app: App, templates: TFile[], callback: (template: NewNoteTemplateChoice | false) => void) {
-		super(app);
-		this.templates = templates;
-		this.callback = callback;
-		this.setPlaceholder("Type to search templates...");
-	}
-
-	getSuggestions(query: string): NewNoteTemplateChoice[] {
-		const normalizedQuery = query.toLowerCase();
-		return this.templates.filter((file) =>
-			file.path.toLowerCase().contains(normalizedQuery)
-		);
-	}
-
-	renderSuggestion(template: NewNoteTemplateChoice, el: HTMLElement) {
-		el.createDiv({ text: template.basename });
-		el.createDiv({ text: template.path, cls: "suggestion-note" });
-	}
-
-	onChooseSuggestion(template: NewNoteTemplateChoice) {
-		this.callback?.(template);
-		this.callback = undefined;
-	}
-
-	onClose(): void {
-		window.setTimeout(() => {
-			if (this.callback) {
-				this.callback(false);
-				this.callback = undefined;
-			}
-		}, 100);
-	}
-}
-
 class NewNoteTemplateInputSuggest extends AbstractInputSuggest<TFile> {
 	private callback: (template: TFile) => void;
 
@@ -201,20 +169,19 @@ class NewNoteTemplateInputSuggest extends AbstractInputSuggest<TFile> {
 	}
 }
 
-function askNewNoteTemplate(app: App): Promise<NewNoteTemplateChoice | false> {
-	return new Promise((resolve) => {
-		const templates = getTemplateFiles(app);
-		if (templates.length == 0) {
-			new Notice("No templates found");
-			resolve(false);
-			return;
-		}
-		const modal = new NewNoteTemplateSuggestModal(app, templates, resolve);
-		modal.open();
-	});
+async function askNewNoteTemplate(ui: UiInteractions, app: App): Promise<NewNoteTemplateChoice | null> {
+	const templates = getTemplateFiles(app).map((file) => ({
+		path: file.path,
+		name: file.basename,
+	}));
+	if (templates.length == 0) {
+		new Notice("No templates found");
+		return null;
+	}
+	return await chooseNewNoteTemplate(ui, templates);
 }
 
-function getConfiguredNewNoteTemplate(app: App, templatePath: string): TFile | null {
+function getConfiguredNewNoteTemplate(app: App, templatePath: string): NewNoteTemplateChoice | null {
 	const inputPath = normalizeNewNoteTemplatePath(templatePath);
 	if (inputPath == "") return null;
 
@@ -240,7 +207,7 @@ function getConfiguredNewNoteTemplate(app: App, templatePath: string): TFile | n
 		return null;
 	}
 
-	return file;
+	return { path: file.path, name: file.basename };
 }
 
 function normalizeNewNoteTemplatePath(templatePath: string) {
@@ -260,6 +227,8 @@ function onElement<T extends HTMLElement | Document>(el: T, event: string, selec
 
 export default class TagFolderPlugin extends Plugin {
 	settings: TagFolderSettings = { ...DEFAULT_SETTINGS };
+	ui!: UiInteractions;
+	vaultText!: VaultTextAccess;
 
 	// Folder opening status.
 	expandedFolders: string[] = ["root"];
@@ -367,6 +336,8 @@ export default class TagFolderPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		this.ui = createObsidianUi(this.app);
+		this.vaultText = createObsidianVaultTextAccess(this.app.vault);
 		this.hoverPreview = this.hoverPreview.bind(this);
 		this.modifyFile = this.modifyFile.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
@@ -1402,31 +1373,28 @@ export default class TagFolderPlugin extends Plugin {
 		const selectedTemplate = configuredTemplatePath == ""
 			? null
 			: (getConfiguredNewNoteTemplate(this.app, configuredTemplatePath)
-				?? await askNewNoteTemplate(this.app));
+				?? await askNewNoteTemplate(this.ui, this.app));
 
 		//@ts-ignore
 		const ww = await this.app.fileManager.createAndOpenMarkdownFile();
 		if (!(ww instanceof TFile)) return;
-		if (selectedTemplate != null && selectedTemplate !== false) {
-			const template = await this.app.vault.read(selectedTemplate);
-			const renderedTemplate = renderTagFolderTemplateVariables(template, expandedTagsAll, expandedTags);
-			if (renderedTemplate.trim() != "") {
-				await this.app.vault.modify(ww, renderedTemplate);
-			}
-			return;
-		}
-
-		if (this.settings.useFrontmatterTagsForNewNotes) {
-			await this.app.fileManager.processFrontMatter(ww, (matter) => {
-				matter.tags = matter.tags ?? [];
-				matter.tags = expandedTagsAll
-					.filter(e => !isSpecialTag(e))
-					.filter(e => matter.tags.indexOf(e) < 0)
-					.concat(matter.tags);
-			});
-		} else {
-			await this.app.vault.append(ww, expandedTags);
-		}
+		await populateNewNote({
+			vault: this.vaultText,
+			notePath: ww.path,
+			template: selectedTemplate,
+			expandedTagsAll,
+			expandedTags,
+			frontmatterTags: expandedTagsAll.filter(e => !isSpecialTag(e)),
+			useFrontmatterTags: this.settings.useFrontmatterTagsForNewNotes,
+			applyFrontmatterTags: async (frontmatterTags) => {
+				await this.app.fileManager.processFrontMatter(ww, (matter) => {
+					matter.tags = matter.tags ?? [];
+					matter.tags = frontmatterTags
+						.filter(e => matter.tags.indexOf(e) < 0)
+						.concat(matter.tags);
+				});
+			},
+		});
 	}
 }
 
