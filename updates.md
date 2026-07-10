@@ -1,3 +1,17 @@
+## 0.18.17
+
+### Improved
+
+-   Improved new-note template selection so that suggestions show both the template name and its Vault-relative path.
+-   Template suggestions in the settings tab are now captured when the tab opens, avoiding repeated Vault enumeration and sorting while typing.
+-   The new-note template selection dialogue captures a fresh template list each time it opens, without installing a Vault watcher.
+-   When no templates are available, TagFolder now asks for the action to be retried after a template has been added, instead of creating a note without the requested template.
+
+### Digging the weeds
+
+-   Refactored UI interactions and Vault text operations into explicit Fancy Kit capabilities.
+-   Added App-free workflow tests and a local real-Obsidian scenario for template selection and persisted note content.
+
 ## 0.18.16
 
 ### Fixes
