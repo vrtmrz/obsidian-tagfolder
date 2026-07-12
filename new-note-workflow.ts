@@ -4,6 +4,15 @@ import { renderTagFolderTemplateVariables } from "./new-note-template";
 
 export const NEW_NOTE_TEMPLATE_INTERACTION_ID = "new-note-template";
 
+/** UI capability required by the new-note template workflow. */
+export type NewNoteTemplateUi = Pick<UiInteractions, "pickOne">;
+
+/** Vault text capability required while populating a new note. */
+export type NewNoteVaultTextAccess = Pick<
+	VaultTextAccess,
+	"readText" | "modifyText" | "appendText"
+>;
+
 /** Template identity and labels exposed to the application workflow. */
 export interface NewNoteTemplateChoice {
 	/** Vault-relative template path. */
@@ -26,7 +35,7 @@ export function filterNewNoteTemplateChoices(
 
 /** Requests one captured template by identity, returns `null` when dismissed, or `undefined` when empty. */
 export async function chooseNewNoteTemplate(
-	ui: UiInteractions,
+	ui: NewNoteTemplateUi,
 	templates: readonly NewNoteTemplateChoice[],
 ): Promise<NewNoteTemplateChoice | null | undefined> {
 	if (templates.length == 0) return undefined;
@@ -44,7 +53,7 @@ export async function chooseNewNoteTemplate(
 /** Inputs owned by TagFolder while populating a newly created note. */
 export interface PopulateNewNoteOptions {
 	/** Injectable path-based Vault text capability. */
-	readonly vault: VaultTextAccess;
+	readonly vault: NewNoteVaultTextAccess;
 	/** Vault-relative path of the already created note. */
 	readonly notePath: string;
 	/** Selected template, or `null` to apply tags without a template. */
