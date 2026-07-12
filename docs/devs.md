@@ -41,9 +41,9 @@ The UI transcript verifies the stable interaction ID and selected object identit
 
 The path-based Vault capability deliberately does not replace real Obsidian coverage for `TFile` identity, Vault events, MetadataCache propagation, or frontmatter processing.
 
-## Fancy Kit preview
+## Fancy Kit dependencies
 
-Until Fancy Kit is published to npm, its packages are pinned to immutable tarballs from one GitHub prerelease. Update the UI interactions, Obsidian plug-in kit, and test-session URLs together when a migration needs a newer preview.
+The three Fancy Kit packages are pinned to exact npm versions so the tested dependency set remains reproducible. Review and update the UI interactions, Obsidian plug-in kit, and test-session versions together when adopting a newer contract.
 
 Real-Obsidian scenarios are local-only and currently validated on Linux only.
 
