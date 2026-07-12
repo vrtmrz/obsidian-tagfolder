@@ -127,4 +127,34 @@ describe("new-note workflow", () => {
 		expect(applyFrontmatterTags).toHaveBeenCalledWith(["project/client"]);
 		expect(vault.transcript).toEqual([]);
 	});
+
+	it("propagates a Vault write failure without changing the note", async () => {
+		const writeFailure = new Error("Vault write failed");
+		const vault = createVaultTextTestHarness({
+			files: {
+				[template.path]: "# {{tagName}}",
+				"Untitled.md": "Original",
+			},
+			onOperation: (operation) => {
+				if (operation.kind === "modifyText") throw writeFailure;
+			},
+		});
+
+		await expect(populateNewNote({
+			vault: vault.vault,
+			notePath: "Untitled.md",
+			template,
+			expandedTagsAll: ["project/client"],
+			expandedTags: "#project/client",
+			frontmatterTags: ["project/client"],
+			useFrontmatterTags: false,
+			applyFrontmatterTags: vi.fn(),
+		})).rejects.toBe(writeFailure);
+
+		expect(vault.transcript).toEqual([
+			{ kind: "readText", path: template.path },
+			{ kind: "modifyText", path: "Untitled.md", content: "# project/client" },
+		]);
+		expect(vault.getFile("Untitled.md")).toBe("Original");
+	});
 });
