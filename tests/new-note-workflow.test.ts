@@ -1,8 +1,9 @@
 import {
 	createUiTestHarness,
+	createVaultFrontmatterTestHarness,
 	createVaultTextTestHarness,
 } from "@vrtmrz/obsidian-plugin-kit/testing";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
 	chooseNewNoteTemplate,
 	filterNewNoteTemplateChoices,
@@ -46,19 +47,22 @@ describe("new-note workflow", () => {
 				"Untitled.md": "",
 			},
 		});
+		const frontmatter = createVaultFrontmatterTestHarness({
+			files: { "Untitled.md": {} },
+		});
 
 		const selected = await chooseNewNoteTemplate(ui.ui, [template]);
 		expect(selected).not.toBeUndefined();
 		if (selected === undefined) throw new Error("Expected a captured template selection");
 		await populateNewNote({
 			vault: vault.vault,
+			frontmatter: frontmatter.vault,
 			notePath: "Untitled.md",
 			template: selected,
 			expandedTagsAll: ["project/client"],
 			expandedTags: "#project/client",
 			frontmatterTags: ["project/client"],
 			useFrontmatterTags: false,
-			applyFrontmatterTags: vi.fn(),
 		});
 
 		expect(ui.transcript).toEqual([
@@ -88,19 +92,22 @@ describe("new-note workflow", () => {
 			{ kind: "pickOne", interactionId: NEW_NOTE_TEMPLATE_INTERACTION_ID, value: null },
 		]);
 		const vault = createVaultTextTestHarness({ files: { "Untitled.md": "" } });
+		const frontmatter = createVaultFrontmatterTestHarness({
+			files: { "Untitled.md": {} },
+		});
 
 		const selected = await chooseNewNoteTemplate(ui.ui, [template]);
 		expect(selected).not.toBeUndefined();
 		if (selected === undefined) throw new Error("Expected a dismissed template selection");
 		await populateNewNote({
 			vault: vault.vault,
+			frontmatter: frontmatter.vault,
 			notePath: "Untitled.md",
 			template: selected,
 			expandedTagsAll: ["project/client"],
 			expandedTags: "#project/client",
 			frontmatterTags: ["project/client"],
 			useFrontmatterTags: false,
-			applyFrontmatterTags: vi.fn(),
 		});
 
 		expect(vault.transcript).toEqual([
@@ -109,23 +116,34 @@ describe("new-note workflow", () => {
 		ui.assertDone();
 	});
 
-	it("delegates frontmatter mutation without issuing a text write", async () => {
+	it("prepends missing frontmatter tags without issuing a text write", async () => {
 		const vault = createVaultTextTestHarness({ files: { "Untitled.md": "" } });
-		const applyFrontmatterTags = vi.fn<(tags: readonly string[]) => Promise<void>>(async () => {});
+		const frontmatter = createVaultFrontmatterTestHarness({
+			files: {
+				"Untitled.md": { tags: ["existing", "project/client"] },
+			},
+		});
 
 		await populateNewNote({
 			vault: vault.vault,
+			frontmatter: frontmatter.vault,
 			notePath: "Untitled.md",
 			template: null,
 			expandedTagsAll: ["project/client"],
 			expandedTags: "#project/client",
-			frontmatterTags: ["project/client"],
+			frontmatterTags: ["project/client", "new"],
 			useFrontmatterTags: true,
-			applyFrontmatterTags,
 		});
 
-		expect(applyFrontmatterTags).toHaveBeenCalledWith(["project/client"]);
 		expect(vault.transcript).toEqual([]);
+		expect(frontmatter.transcript).toEqual([
+			{
+				kind: "updateFrontmatter",
+				path: "Untitled.md",
+				before: { tags: ["existing", "project/client"] },
+				after: { tags: ["new", "existing", "project/client"] },
+			},
+		]);
 	});
 
 	it("propagates a Vault write failure without changing the note", async () => {
@@ -139,16 +157,19 @@ describe("new-note workflow", () => {
 				if (operation.kind === "modifyText") throw writeFailure;
 			},
 		});
+		const frontmatter = createVaultFrontmatterTestHarness({
+			files: { "Untitled.md": {} },
+		});
 
 		await expect(populateNewNote({
 			vault: vault.vault,
+			frontmatter: frontmatter.vault,
 			notePath: "Untitled.md",
 			template,
 			expandedTagsAll: ["project/client"],
 			expandedTags: "#project/client",
 			frontmatterTags: ["project/client"],
 			useFrontmatterTags: false,
-			applyFrontmatterTags: vi.fn(),
 		})).rejects.toBe(writeFailure);
 
 		expect(vault.transcript).toEqual([
@@ -156,5 +177,31 @@ describe("new-note workflow", () => {
 			{ kind: "modifyText", path: "Untitled.md", content: "# project/client" },
 		]);
 		expect(vault.getFile("Untitled.md")).toBe("Original");
+	});
+
+	it("propagates a frontmatter failure without issuing a text write", async () => {
+		const failure = new Error("Frontmatter write failed");
+		const vault = createVaultTextTestHarness({ files: { "Untitled.md": "" } });
+		const frontmatter = createVaultFrontmatterTestHarness({
+			files: { "Untitled.md": { tags: ["existing"] } },
+			onOperation: () => {
+				throw failure;
+			},
+		});
+
+		await expect(populateNewNote({
+			vault: vault.vault,
+			frontmatter: frontmatter.vault,
+			notePath: "Untitled.md",
+			template: null,
+			expandedTagsAll: ["project/client"],
+			expandedTags: "#project/client",
+			frontmatterTags: ["project/client"],
+			useFrontmatterTags: true,
+		})).rejects.toBe(failure);
+
+		expect(vault.transcript).toEqual([]);
+		expect(frontmatter.getFrontmatter("Untitled.md")).toEqual({ tags: ["existing"] });
+		expect(frontmatter.transcript[0]?.after).toBeNull();
 	});
 });

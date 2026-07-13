@@ -21,7 +21,9 @@ import {
 } from "obsidian";
 import { createObsidianUi, type UiInteractions } from "@vrtmrz/obsidian-plugin-kit/ui";
 import {
+	createObsidianVaultFrontmatterAccess,
 	createObsidianVaultTextAccess,
+	type VaultFrontmatterAccess,
 	type VaultTextAccess,
 } from "@vrtmrz/obsidian-plugin-kit/vault";
 
@@ -237,6 +239,7 @@ export default class TagFolderPlugin extends Plugin {
 	settings: TagFolderSettings = { ...DEFAULT_SETTINGS };
 	ui!: UiInteractions;
 	vaultText!: VaultTextAccess;
+	vaultFrontmatter!: VaultFrontmatterAccess;
 
 	// Folder opening status.
 	expandedFolders: string[] = ["root"];
@@ -346,6 +349,7 @@ export default class TagFolderPlugin extends Plugin {
 		await this.loadSettings();
 		this.ui = createObsidianUi(this.app);
 		this.vaultText = createObsidianVaultTextAccess(this.app.vault);
+		this.vaultFrontmatter = createObsidianVaultFrontmatterAccess(this.app);
 		this.hoverPreview = this.hoverPreview.bind(this);
 		this.modifyFile = this.modifyFile.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
@@ -1395,20 +1399,13 @@ export default class TagFolderPlugin extends Plugin {
 		if (!(ww instanceof TFile)) return;
 		await populateNewNote({
 			vault: this.vaultText,
+			frontmatter: this.vaultFrontmatter,
 			notePath: ww.path,
 			template: selectedTemplate,
 			expandedTagsAll,
 			expandedTags,
 			frontmatterTags: expandedTagsAll.filter(e => !isSpecialTag(e)),
 			useFrontmatterTags: this.settings.useFrontmatterTagsForNewNotes,
-			applyFrontmatterTags: async (frontmatterTags) => {
-				await this.app.fileManager.processFrontMatter(ww, (matter) => {
-					matter.tags = matter.tags ?? [];
-					matter.tags = frontmatterTags
-						.filter(e => matter.tags.indexOf(e) < 0)
-						.concat(matter.tags);
-				});
-			},
 		});
 	}
 }
