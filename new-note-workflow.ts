@@ -1,5 +1,8 @@
 import type { UiInteractions } from "@vrtmrz/obsidian-plugin-kit/ui";
-import type { VaultTextAccess } from "@vrtmrz/obsidian-plugin-kit/vault";
+import type {
+	VaultFrontmatterAccess,
+	VaultTextAccess,
+} from "@vrtmrz/obsidian-plugin-kit/vault";
 import { renderTagFolderTemplateVariables } from "./new-note-template";
 
 export const NEW_NOTE_TEMPLATE_INTERACTION_ID = "new-note-template";
@@ -11,6 +14,12 @@ export type NewNoteTemplateUi = Pick<UiInteractions, "pickOne">;
 export type NewNoteVaultTextAccess = Pick<
 	VaultTextAccess,
 	"readText" | "modifyText" | "appendText"
+>;
+
+/** Frontmatter capability required while populating a new note. */
+export type NewNoteVaultFrontmatterAccess = Pick<
+	VaultFrontmatterAccess,
+	"updateFrontmatter"
 >;
 
 /** Template identity and labels exposed to the application workflow. */
@@ -54,6 +63,8 @@ export async function chooseNewNoteTemplate(
 export interface PopulateNewNoteOptions {
 	/** Injectable path-based Vault text capability. */
 	readonly vault: NewNoteVaultTextAccess;
+	/** Injectable path-based Vault frontmatter capability. */
+	readonly frontmatter: NewNoteVaultFrontmatterAccess;
 	/** Vault-relative path of the already created note. */
 	readonly notePath: string;
 	/** Selected template, or `null` to apply tags without a template. */
@@ -62,12 +73,10 @@ export interface PopulateNewNoteOptions {
 	readonly expandedTagsAll: readonly string[];
 	/** Expanded hashtag string used by template variables or body append. */
 	readonly expandedTags: string;
-	/** Non-special tags supplied to the frontmatter callback. */
+	/** Non-special tags supplied to the frontmatter update. */
 	readonly frontmatterTags: readonly string[];
 	/** Whether no-template tags should be written through frontmatter. */
 	readonly useFrontmatterTags: boolean;
-	/** Consumer-owned Obsidian frontmatter mutation. */
-	readonly applyFrontmatterTags: (tags: readonly string[]) => Promise<void>;
 }
 
 /** Populates a new note from a template, frontmatter tags, or appended hashtags. */
@@ -86,7 +95,12 @@ export async function populateNewNote(options: PopulateNewNoteOptions): Promise<
 	}
 
 	if (options.useFrontmatterTags) {
-		await options.applyFrontmatterTags(options.frontmatterTags);
+		await options.frontmatter.updateFrontmatter(options.notePath, (value) => {
+			const currentTags = (value.tags ?? []) as string[];
+			value.tags = options.frontmatterTags
+				.filter((tag) => currentTags.indexOf(tag) < 0)
+				.concat(currentTags);
+		});
 		return;
 	}
 

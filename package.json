@@ -48,7 +48,7 @@
 		"vitest": "^4.1.9"
 	},
 	"dependencies": {
-		"@vrtmrz/obsidian-plugin-kit": "0.1.0",
+		"@vrtmrz/obsidian-plugin-kit": "0.1.1-rc.0",
 		"@vrtmrz/ui-interactions": "0.1.0"
 	}
 }

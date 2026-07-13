@@ -68,12 +68,77 @@ async function verifyTemplateWorkflow(testSession: TagFolderTestSession): Promis
 	});
 }
 
+async function verifyFrontmatterWorkflow(testSession: TagFolderTestSession): Promise<void> {
+	await withObsidianPage(testSession.session.remoteDebuggingPort, async (page) => {
+		const createdPath = await page.evaluate(async (pluginId) => {
+			const obsidianApp = (
+				globalThis as typeof globalThis & {
+					app?: {
+						plugins?: {
+							plugins?: Record<
+								string,
+								{
+									settings: {
+										newNoteTemplate: string;
+										useFrontmatterTagsForNewNotes: boolean;
+									};
+									createNewNote(tags: string[]): Promise<void>;
+								}
+							>;
+						};
+						vault?: { getMarkdownFiles(): Array<{ path: string }> };
+					};
+				}
+			).app;
+			const plugin = obsidianApp?.plugins?.plugins?.[pluginId];
+			const vault = obsidianApp?.vault;
+			if (!plugin || !vault) throw new Error(`TagFolder is not loaded: ${pluginId}`);
+
+			const before = new Set(vault.getMarkdownFiles().map((file) => file.path));
+			plugin.settings.newNoteTemplate = "";
+			plugin.settings.useFrontmatterTagsForNewNotes = true;
+			await plugin.createNewNote(["project/client"]);
+
+			const created = vault.getMarkdownFiles().find((file) => !before.has(file.path));
+			if (!created) throw new Error("TagFolder did not create a frontmatter note");
+			return created.path;
+		}, TAGFOLDER_PLUGIN_ID);
+
+		const result = await page.waitForFunction((notePath) => {
+			const obsidianApp = (
+				globalThis as typeof globalThis & {
+					app?: {
+						metadataCache?: {
+							getFileCache(file: unknown): { frontmatter?: Record<string, unknown> } | null;
+						};
+						vault?: {
+							getAbstractFileByPath(path: string): unknown;
+							read(file: unknown): Promise<string>;
+						};
+					};
+				}
+			).app;
+			const vault = obsidianApp?.vault;
+			const file = vault?.getAbstractFileByPath(notePath);
+			if (!vault || !file) return null;
+			const tags = obsidianApp?.metadataCache?.getFileCache(file)?.frontmatter?.tags;
+			if (!Array.isArray(tags) || tags[0] !== "project/client") return null;
+			return vault.read(file).then((content) => ({ content, tags }));
+		}, createdPath, { timeout: 10_000 });
+		const value = await result.jsonValue() as { content: string; tags: unknown };
+		if (!value.content.includes("project/client")) {
+			throw new Error(`Frontmatter tags were not serialised: ${JSON.stringify(value)}`);
+		}
+	});
+}
+
 async function main(): Promise<void> {
 	let testSession: TagFolderTestSession | undefined;
 	try {
 		testSession = await startTagFolderTestSession();
 		await verifyTemplateWorkflow(testSession);
-		console.log("TagFolder template selection and Vault write passed in real Obsidian");
+		await verifyFrontmatterWorkflow(testSession);
+		console.log("TagFolder template, Vault write, and frontmatter tags passed in real Obsidian");
 	} finally {
 		if (testSession) await stopTagFolderTestSession(testSession);
 	}

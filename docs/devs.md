@@ -14,11 +14,12 @@ The App-free Vitest suite includes TagFolder tree utilities and the new-note app
 
 ## UI and Vault boundaries
 
-The plug-in owns one `UiInteractions` capability and one `VaultTextAccess` capability for its lifetime:
+The plug-in owns one `UiInteractions` capability, one `VaultTextAccess` capability, and one `VaultFrontmatterAccess` capability for its lifetime:
 
 ```ts
 this.ui = createObsidianUi(this.app);
 this.vaultText = createObsidianVaultTextAccess(this.app.vault);
+this.vaultFrontmatter = createObsidianVaultFrontmatterAccess(this.app);
 ```
 
 `new-note-workflow.ts` accepts those capabilities instead of constructing an Obsidian template modal or reading and writing `TFile` instances directly. TagFolder still owns template variables, frontmatter policy, note creation, settings, and visible labels.
@@ -35,9 +36,12 @@ const vault = createVaultTextTestHarness({
 		"Untitled.md": "",
 	},
 });
+const frontmatter = createVaultFrontmatterTestHarness({
+	files: { "Untitled.md": { tags: [] } },
+});
 ```
 
-The UI transcript verifies the stable interaction ID and selected object identity. The Vault transcript verifies template reads, note writes, write ordering, and the absence of text writes when frontmatter owns the update.
+The UI transcript verifies the stable interaction ID and selected object identity. The Vault text transcript verifies template reads, note writes, write ordering, and the absence of text writes when frontmatter owns the update. The frontmatter transcript verifies tag merging and rollback when a simulated update fails.
 
 The path-based Vault capability deliberately does not replace real Obsidian coverage for `TFile` identity, Vault events, MetadataCache propagation, or frontmatter processing.
 
@@ -52,4 +56,4 @@ npm run check:e2e:obsidian
 npm run test:e2e:obsidian:new-note-template
 ```
 
-The real scenario uses the production UI and Vault adapters. It selects a template through Obsidian, creates a real note, and verifies the persisted content; it never installs a scripted driver into the plug-in.
+The real scenario uses the production UI and Vault adapters. It selects a template through Obsidian, creates real notes, and verifies both persisted template content and frontmatter tags; it never installs a scripted driver into the plug-in.

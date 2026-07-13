@@ -1,3 +1,10 @@
+## Unreleased
+
+### Digging the weeds
+
+-   Refactored new-note frontmatter updates through the shared Fancy Kit Vault capability without changing the visible workflow.
+-   Added App-free frontmatter transcript and failure tests, and extended the local real-Obsidian scenario to verify persisted frontmatter tags.
+
 ## 0.18.17
 
 ### Improved
