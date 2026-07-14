@@ -71,6 +71,8 @@ describe("release workflow contracts", () => {
 		expect(workflow).toContain("expected_head_sha");
 		expect(workflow).toContain("actions: write");
 		expect(workflow).toContain("gh workflow run release.yml");
+		expect(workflow).toContain("group: finalise-release");
+		expect(workflow).toContain("cancel-in-progress: false");
 	});
 
 	it("supports an explicit tag and draft state in the publishing workflow", () => {

@@ -16,6 +16,10 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: finalise-release
+  cancel-in-progress: false
+
 jobs:
   finalise:
     runs-on: ubuntu-latest
