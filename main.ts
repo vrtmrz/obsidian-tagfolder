@@ -71,6 +71,14 @@ import {
 import { ScrollView } from "./ScrollView";
 import { TagFolderView } from "./TagFolderView";
 import { TagFolderList } from "./TagFolderList";
+import {
+	buildNoteLookupItems,
+	normaliseLookupTags,
+	type LookupTagCondition,
+	type NoteLookupPolicy,
+	type NoteLookupSource,
+} from "./note-lookup";
+import { openNoteLookup } from "./note-lookup-modal";
 
 const HideItemsType: Record<string, string> = {
 	NONE: "Hide nothing",
@@ -227,6 +235,13 @@ function normalizeNewNoteTemplatePath(templatePath: string) {
 	return normalizedPath == "/" ? "" : normalizedPath;
 }
 
+function splitSettingList(value: string) {
+	return value
+		.split(/[\n,]/)
+		.map((entry) => entry.trim())
+		.filter((entry) => entry != "");
+}
+
 // Thank you @pjeby!
 function onElement<T extends HTMLElement | Document>(el: T, event: string, selector: string, callback: CallableFunction, options: EventListenerOptions) {
 	//@ts-ignore
@@ -345,6 +360,62 @@ export default class TagFolderPlugin extends Plugin {
 		return filename;
 	}
 
+	getNoteLookupPolicy(): NoteLookupPolicy {
+		const redirects: Record<string, string> = {};
+		if (this.settings.useTagInfo && this.tagInfo) {
+			for (const [tag, info] of Object.entries(this.tagInfo)) {
+				if (info.redirect) redirects[tag] = info.redirect;
+			}
+		}
+		return {
+			targetFolders: splitSettingList(this.settings.targetFolders),
+			ignoreFolders: splitSettingList(this.settings.ignoreFolders),
+			ignoreDocumentTags: splitSettingList(this.settings.ignoreDocTags),
+			ignoreTags: splitSettingList(this.settings.ignoreTags),
+			redirects,
+			splitNestedTags: this.settings.disableNestedTags,
+		};
+	}
+
+	captureNoteLookupItems(policy: NoteLookupPolicy) {
+		const sources: NoteLookupSource[] = [];
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			const metadata = this.app.metadataCache.getFileCache(file);
+			if (!metadata) continue;
+			sources.push({
+				path: file.path,
+				title: this.getFileTitle(file),
+				tags: getAllTags(metadata) ?? [],
+				mtime: file.stat.mtime,
+			});
+		}
+		return buildNoteLookupItems(sources, policy);
+	}
+
+	openNoteLookupDialog(sourceFile?: TFile) {
+		const policy = this.getNoteLookupPolicy();
+		const notes = this.captureNoteLookupItems(policy);
+		let initialConditions: LookupTagCondition[] = [];
+		if (sourceFile) {
+			const metadata = this.app.metadataCache.getFileCache(sourceFile);
+			const ignoredTags = new Set(
+				[...policy.ignoreTags, ...policy.ignoreDocumentTags]
+					.map((tag) => tag.trim().replace(/^#/, "").toLowerCase()),
+			);
+			const sourceTags = metadata ? (getAllTags(metadata) ?? []) : [];
+			initialConditions = normaliseLookupTags(sourceTags, policy)
+				.filter((tag) => !ignoredTags.has(tag.toLowerCase()))
+				.map((tag) => ({ tag, excluded: false }));
+		}
+
+		openNoteLookup(this.app, {
+			notes,
+			initialConditions,
+			excludedPath: sourceFile?.path,
+			openNote: (path, newTab) => this.focusFile(path, newTab),
+		});
+	}
+
 	async onload() {
 		await this.loadSettings();
 		this.ui = createObsidianUi(this.app);
@@ -419,6 +490,21 @@ export default class TagFolderPlugin extends Plugin {
 				const tags = getAllTags(cache) ?? [];
 				const tagsWithoutPrefix = tags.map((e) => trimPrefix(e, "#"));
 				await this.createNewNote(tagsWithoutPrefix);
+			},
+		});
+		this.addCommand({
+			id: "tagfolder-open-note-by-tags",
+			name: "Open note by tags",
+			callback: () => this.openNoteLookupDialog(),
+		});
+		this.addCommand({
+			id: "tagfolder-open-note-with-similar-tags",
+			name: "Open note with similar tags",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!(file instanceof TFile) || file.extension != "md") return false;
+				if (!checking) this.openNoteLookupDialog(file);
+				return true;
 			},
 		});
 		this.metadataCacheChanged = this.metadataCacheChanged.bind(this);

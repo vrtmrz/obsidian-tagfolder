@@ -1,3 +1,18 @@
+## 0.18.19-beta.1
+
+14th July, 2026
+
+I have finally implemented a feature I have wanted for a very long time. I hope you will all enjoy it too.
+
+### New features
+
+-   Added `Open note by tags`, which opens a keyboard-friendly dialogue for finding and opening notes by tag.
+-   Search incrementally with tag completion. Press `Space` or `Enter` to add a tag, remove selected tags without leaving the keyboard, and prefix a tag with `-` to exclude matching notes.
+-   Positive tags use OR matching, so a note only needs one selected tag to remain visible. Notes matching more selected tags appear first, with the match count shown beside each result.
+-   Filter the remaining notes by typing part of a file name or Vault-relative path in the separate note field.
+-   Added `Open note with similar tags`, which starts with the active note's tags selected and omits the active note itself from the results.
+-   The lookup dialogue follows the active Obsidian theme and remains usable on narrow mobile screens, including when the software keyboard reduces the available height.
+
 ## 0.18.18
 
 ### Digging the weeds

@@ -150,6 +150,22 @@ Templates can include these placeholders, which are replaced with the tags from 
 
 #### Actions
 
+##### Open notes by tags
+
+Run `Open note by tags` from the command palette to find and open a note by incrementally adding tag conditions. Positive tags use OR matching and results with more matching tags appear first. Prefix a tag with `-` to exclude matching notes completely. A separate note input fuzzily filters titles and Vault-relative paths.
+
+Run `Open note with similar tags` while a Markdown note is active to start with that note's tags selected. The active note itself is omitted from the results.
+
+The dialogue is keyboard-operable:
+
+- Type a tag, then press `Space` or `Enter` to accept a completion.
+- Press `Backspace` in an empty tag input to remove the last tag, or press `ArrowLeft` to select a tag chip and remove it with `Backspace` or `Delete`.
+- Press `Tab` or `Shift+Tab` to switch between the tag and note inputs.
+- Press `ArrowUp` or `ArrowDown` to select a completion or note.
+- Press `Enter` to open the selected note, or `Ctrl+Enter`/`Cmd+Enter` to open it in a new tab.
+
+See the [complete interaction design](docs/note-lookup-design.md) for focus, nested-tag matching, accessibility, and IME behaviour.
+
 ##### Search tags inside TagFolder when clicking tags
 We can search tags inside TagFolder when clicking tags instead of opening the default search pane.
 With control and shift keys, we can remove the tag from the search condition or add an exclusion of it to that.

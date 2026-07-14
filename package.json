@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-tagfolder",
-	"version": "0.18.18",
+	"version": "0.18.19-beta.1",
 	"description": "Show tags as folder.",
 	"main": "main.js",
 	"type": "module",
@@ -13,7 +13,9 @@
 		"svelte-check": "svelte-check --tsconfig ./tsconfig.json",
 		"tsc-check": "tsc --noEmit",
 		"check:e2e:obsidian": "tsc -p test/e2e-obsidian/tsconfig.json",
-		"test:e2e:obsidian:new-note-template": "npm run build && tsx test/e2e-obsidian/new-note-template.mts",
+		"prepare:e2e:obsidian": "tsx test/e2e-obsidian/install-obsidian.mts",
+		"test:e2e:obsidian:new-note-template": "npm run build && npm run prepare:e2e:obsidian && tsx test/e2e-obsidian/new-note-template.mts",
+		"test:e2e:obsidian:note-lookup": "npm run build && npm run prepare:e2e:obsidian && tsx test/e2e-obsidian/note-lookup.mts",
 		"check": "npm run lint && npm run test && npm run svelte-check && npm run tsc-check",
 		"version": "node version-bump.mjs"
 	},

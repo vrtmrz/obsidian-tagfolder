@@ -1,5 +1,9 @@
 # Developer guide
 
+## Interaction design
+
+- [Note lookup design](note-lookup-design.md) specifies tag completion, note ranking, focus, and keyboard interaction for the command-palette note lookup.
+
 ## Setup and checks
 
 Install the locked dependencies and run the repository gate:
@@ -52,11 +56,13 @@ The three Fancy Kit packages are pinned to exact npm versions so the tested depe
 Real-Obsidian scenarios are local-only and currently validated on Linux only.
 
 ```bash
+npm run prepare:e2e:obsidian
 npm run check:e2e:obsidian
 npm run test:e2e:obsidian:new-note-template
+npm run test:e2e:obsidian:note-lookup
 ```
 
-The real scenario uses the production UI and Vault adapters. It selects a template through Obsidian, creates real notes, and verifies both persisted template content and frontmatter tags; it never installs a scripted driver into the plug-in.
+The preparation command explicitly downloads and extracts the official Obsidian 1.12.7 AppImage into the ignored `_testdata/obsidian` cache. Both test commands run this idempotent preparation automatically. The real scenarios use the production UI and Vault adapters. They select a template through Obsidian, create real notes, verify persisted template content and frontmatter tags, and drive the note-lookup commands and keyboard interaction; they never install a scripted driver into the plug-in.
 
 ## Release process
 
@@ -70,3 +76,13 @@ The repository uses three manually gated workflows. Configure the GitHub `releas
 6. After BRAT succeeds, mark the pull request ready and merge it with a merge commit. A merge commit keeps the tagged release commit in `main` history.
 
 If BRAT validation fails, do not move or replace the published tag. Leave the pull request in draft and prepare a new patch release. If the tag exists but publishing dispatch or build fails, rerun `Release Obsidian Plugin` manually for the existing tag instead of rerunning Finalise.
+
+### Beta pre-releases for BRAT
+
+A beta from an unmerged feature branch uses an immutable semantic pre-release version, such as `0.18.19-beta.1`. Prepare `package.json`, the lockfile, `manifest.json`, `versions.json`, and `updates.md` on the feature branch, then open a draft pull request and record its reviewed full head SHA.
+
+Treat tag creation and publication as separate approvals. Create the beta tag at the reviewed head, then manually dispatch `Release Obsidian Plugin` for that tag with `draft` and `prerelease` both set to `true`. Do not use `Finalise Release Tags` for this path because the stable finalisation workflow deliberately dispatches releases with `prerelease=false`.
+
+After approving the `release` environment, verify the draft release name, tag, `manifest.json` version, archive contents, individual assets, provenance, and pre-release status. Publish it as a pre-release without marking it as the latest stable release, install the repository through BRAT, and exercise the feature-specific scenario before merging the draft pull request.
+
+If BRAT validation fails, leave the failed beta tag and release immutable, keep the pull request in draft, and prepare the next pre-release version, such as `0.18.19-beta.2`.
