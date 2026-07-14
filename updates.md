@@ -1,3 +1,16 @@
+## 0.18.19-beta.2
+
+14th July, 2026
+
+I have finally implemented a feature I have wanted for a very long time. I hope you will all enjoy it too.
+
+### Fixes
+
+-   Fixed the note lookup dialogue on iPhone so that its title and Close control remain below the status area.
+-   Limited the selected-tag field on phones to two rows, with additional tags scrolling inside the field, so that the note filter and results receive more space.
+-   Reduced the selected-tag field's corner radius on phones while retaining Obsidian's standard pill treatment for individual tags.
+-   Truncated long tag labels and prevented the selected-tag field from scrolling horizontally on narrow screens.
+
 ## 0.18.19-beta.1
 
 14th July, 2026

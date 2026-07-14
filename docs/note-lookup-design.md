@@ -37,6 +37,8 @@ Note
 
 Selected tags are displayed as removable chips. Positive tags use the normal tag treatment; excluded tags use a visually distinct treatment and retain the leading minus sign. Tag completions appear as a popover over the content only while the tag input is focused and contains text, so they do not reduce the result list's height.
 
+On phone-sized viewports, the selected-tag field is limited to approximately two compact chip rows or 15% of the available viewport height, whichever is smaller. This gives the note results priority. Additional chips can still scroll vertically inside the field for removal, rather than pushing the note field and results off screen. Long tag labels are truncated with an ellipsis, and the field does not scroll horizontally. The field uses Obsidian's compact radius while individual tags retain the standard pill shape.
+
 The implementation uses Obsidian's `multi-select-pill`, `suggestion-container`, `suggestion-item`, and `is-selected` structures. Theme-owned variables define pill colours, borders, radii, suggestion selection, and mobile spacing. Plug-in CSS is limited to the two-field layout, compact result details, and the dashed excluded-tag state.
 
 Each compact note row places the file name and parent path on its first line, followed by the positive-tag match count. An alternative title and the matching tags use a smaller second line when present. On narrow mobile viewports, matching tags are omitted from the row so that the file name, path, and more results remain visible. The result list takes all remaining dialogue height and scrolls independently.
@@ -44,6 +46,8 @@ Each compact note row places the file name and parent path on its first line, fo
 The active note uses Obsidian's standard suggestion selection background. File details and the match count are vertically centred within each row, and the count keeps a fixed area at the right edge. When horizontal space is limited, the parent path shrinks first, then an overlong file name is truncated with an ellipsis without overlapping the match count or creating horizontal scrolling.
 
 The result list is not a third focus target. It has an active row, shown by the `▸` marker above, while DOM focus remains in one of the two inputs.
+
+On iPhone, the dialogue uses Obsidian's phone dialogue width, maximum height, and safe-area variables. This keeps the title and standard Close control below the status area while preserving Obsidian's normal mobile touch target.
 
 ## Focus model
 

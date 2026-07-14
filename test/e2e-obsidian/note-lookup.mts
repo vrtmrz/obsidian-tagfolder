@@ -28,6 +28,10 @@ async function seedLookupNotes(testSession: TagFolderTestSession): Promise<void>
 			await vault.create("Beta.md", "#foo");
 			await vault.create("Archived.md", "#bar #archive");
 			await vault.create("This is an extremely long note filename for a narrow mobile screen.md", "#foo #bar");
+			await vault.create(
+				"Mobile tags.md",
+				"#TypeScript #Obsidian #P2P #WebRTC #CRDT #Research #Project #Mobile #Testing #Keyboard #Responsive #Accessibility",
+			);
 		});
 
 		await page.waitForFunction(() => {
@@ -39,9 +43,79 @@ async function seedLookupNotes(testSession: TagFolderTestSession): Promise<void>
 					};
 			}
 		).app;
-			const file = obsidianApp?.vault?.getAbstractFileByPath("Alpha.md");
-			return file != null && (obsidianApp?.metadataCache?.getFileCache(file)?.tags?.length ?? 0) >= 2;
+			const alpha = obsidianApp?.vault?.getAbstractFileByPath("Alpha.md");
+			const mobile = obsidianApp?.vault?.getAbstractFileByPath("Mobile tags.md");
+			return alpha != null
+				&& mobile != null
+				&& (obsidianApp?.metadataCache?.getFileCache(alpha)?.tags?.length ?? 0) >= 2
+				&& (obsidianApp?.metadataCache?.getFileCache(mobile)?.tags?.length ?? 0) >= 12;
 		}, undefined, { timeout: 10_000 });
+	});
+}
+
+async function verifyPhoneLayout(testSession: TagFolderTestSession): Promise<void> {
+	await withObsidianPage(testSession.session.remoteDebuggingPort, async (page) => {
+		await page.setViewportSize({ width: 390, height: 430 });
+		await page.evaluate(() => {
+			document.body.classList.add("is-mobile", "is-phone");
+			document.body.style.setProperty("--safe-area-inset-top", "47px");
+			document.body.style.setProperty("--safe-area-inset-right", "0px");
+			document.body.style.setProperty("--safe-area-inset-bottom", "34px");
+			document.body.style.setProperty("--safe-area-inset-left", "0px");
+		});
+
+		try {
+			await executeCommand(page, OPEN_BY_TAGS_COMMAND);
+			const modal = page.locator(".tagfolder-note-lookup-modal");
+			await modal.waitFor({ state: "visible", timeout: 10_000 });
+			const tagInput = modal.locator("#tagfolder-note-lookup-tag-input");
+			for (const tag of [
+				"TypeScript", "Obsidian", "P2P", "WebRTC", "CRDT", "Research",
+				"Project", "Mobile", "Testing", "Keyboard", "Responsive", "Accessibility",
+			]) {
+				await tagInput.fill(tag);
+				await tagInput.press("Enter");
+			}
+
+			const layout = await modal.evaluate((element) => {
+				const close = element.querySelector<HTMLElement>(".modal-close-button");
+				const tagShell = element.querySelector<HTMLElement>(".tag-input-shell");
+				const tagChips = element.querySelector<HTMLElement>(".tag-chips");
+				const noteInput = element.querySelector<HTMLElement>("#tagfolder-note-lookup-note-input");
+				if (!close || !tagShell || !tagChips || !noteInput) throw new Error("Phone layout elements were unavailable");
+				const modalRect = element.getBoundingClientRect();
+				const closeRect = close.getBoundingClientRect();
+				const shellRect = tagShell.getBoundingClientRect();
+				const noteRect = noteInput.getBoundingClientRect();
+				const shellStyle = getComputedStyle(tagShell);
+				const inputHeight = Number.parseFloat(shellStyle.getPropertyValue("--input-height"));
+				const shellRadius = Number.parseFloat(shellStyle.borderTopLeftRadius);
+				const safeAreaTop = 47;
+				return {
+					modalClearsSafeArea: modalRect.top >= safeAreaTop - 1,
+					closeClearsSafeArea: closeRect.top >= safeAreaTop,
+					closeHasTouchTarget: closeRect.width >= 44 && closeRect.height >= 44,
+					tagsStayInsideModal: shellRect.left >= modalRect.left && shellRect.right <= modalRect.right,
+					tagsDoNotScrollHorizontally: tagShell.scrollWidth <= tagShell.clientWidth,
+					tagAreaPrioritisesNotes: tagChips.clientHeight <= Math.min(inputHeight * 1.5, innerHeight * 0.15) + 1,
+					tagFieldUsesCompactRadius: shellRadius <= 12,
+					noteInputRemainsVisible: noteRect.bottom <= innerHeight,
+				};
+			});
+			if (!Object.values(layout).every(Boolean)) {
+				throw new Error(`Phone layout did not respect safe areas and tag bounds: ${JSON.stringify(layout)}`);
+			}
+			await tagInput.press("Escape");
+		} finally {
+			await page.evaluate(() => {
+				document.body.classList.remove("is-mobile", "is-phone");
+				for (const property of [
+					"--safe-area-inset-top", "--safe-area-inset-right",
+					"--safe-area-inset-bottom", "--safe-area-inset-left",
+				]) document.body.style.removeProperty(property);
+			});
+			await page.setViewportSize({ width: 1280, height: 960 });
+		}
 	});
 }
 
@@ -173,6 +247,7 @@ async function main(): Promise<void> {
 		testSession = await startTagFolderTestSession();
 		await seedLookupNotes(testSession);
 		await verifyLookupWorkflow(testSession);
+		await verifyPhoneLayout(testSession);
 		console.log("TagFolder note lookup passed in real Obsidian");
 	} finally {
 		if (testSession) await stopTagFolderTestSession(testSession);

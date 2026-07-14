@@ -443,6 +443,13 @@
 		border-radius: var(--input-radius);
 		box-shadow: var(--input-shadow);
 	}
+	.tag-input-shell {
+		width: 100%;
+		max-width: 100%;
+		min-width: 0;
+		overflow: hidden;
+		border-radius: var(--radius-s);
+	}
 	.tag-input-shell:focus-within,
 	.note-input:focus {
 		border-color: var(--interactive-accent);
@@ -460,6 +467,9 @@
 		align-items: center;
 		flex-wrap: wrap;
 		gap: 0.3rem;
+		width: 100%;
+		max-width: 100%;
+		min-width: 0;
 		min-height: 2.25rem;
 		padding: 0.3rem 0.45rem;
 	}
@@ -493,8 +503,16 @@
 		--pill-corner-shape: var(--tag-corner-shape);
 		--pill-weight: var(--tag-weight);
 		font-size: var(--tag-size);
+		min-width: 0;
+		max-width: 100%;
 		height: auto;
 		box-shadow: none;
+	}
+	.tag-chip .multi-select-pill-content {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.tag-chip.excluded {
 		--pill-color: var(--text-error);
@@ -657,12 +675,23 @@
 			height: calc(100dvh - 0.75rem);
 			max-height: calc(100dvh - 0.75rem);
 		}
+		:global(body.is-phone .tagfolder-note-lookup-modal) {
+			width: var(--dialog-width);
+			max-width: var(--dialog-max-width);
+			height: 100%;
+			max-height: var(--dialog-max-height);
+			margin-top: auto;
+		}
 		.note-lookup,
 		.tag-field {
 			gap: 0.3rem;
 		}
 		.tag-chips {
 			padding: 0.2rem 0.3rem;
+			max-height: min(calc(var(--input-height) * 1.5), 15dvh);
+			overflow-x: hidden;
+			overflow-y: auto;
+			align-content: flex-start;
 		}
 		.note-input {
 			padding: 0.4rem 0.55rem;
