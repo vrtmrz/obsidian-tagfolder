@@ -1,3 +1,31 @@
+## 0.18.19-beta.2
+
+14th July, 2026
+
+I have finally implemented a feature I have wanted for a very long time. I hope you will all enjoy it too.
+
+### Fixes
+
+-   Fixed the note lookup dialogue on iPhone so that its title and Close control remain below the status area.
+-   Limited the selected-tag field on phones to two rows, with additional tags scrolling inside the field, so that the note filter and results receive more space.
+-   Reduced the selected-tag field's corner radius on phones while retaining Obsidian's standard pill treatment for individual tags.
+-   Truncated long tag labels and prevented the selected-tag field from scrolling horizontally on narrow screens.
+
+## 0.18.19-beta.1
+
+14th July, 2026
+
+I have finally implemented a feature I have wanted for a very long time. I hope you will all enjoy it too.
+
+### New features
+
+-   Added `Open note by tags`, which opens a keyboard-friendly dialogue for finding and opening notes by tag.
+-   Search incrementally with tag completion. Press `Space` or `Enter` to add a tag, remove selected tags without leaving the keyboard, and prefix a tag with `-` to exclude matching notes.
+-   Positive tags use OR matching, so a note only needs one selected tag to remain visible. Notes matching more selected tags appear first, with the match count shown beside each result.
+-   Filter the remaining notes by typing part of a file name or Vault-relative path in the separate note field.
+-   Added `Open note with similar tags`, which starts with the active note's tags selected and omits the active note itself from the results.
+-   The lookup dialogue follows the active Obsidian theme and remains usable on narrow mobile screens, including when the software keyboard reduces the available height.
+
 ## 0.18.18
 
 ### Digging the weeds
