@@ -61,6 +61,9 @@ describe("release workflow contracts", () => {
 		expect(workflow).toContain("Validate the published release with BRAT");
 		expect(workflow).toContain("merge it with a merge commit");
 		expect(workflow).toContain("gh workflow run ci.yml");
+		expect(workflow).toContain("<<'EOF'");
+		expect(workflow).toContain('sed -i "s/__VERSION__/${VERSION}/g"');
+		expect(workflow).not.toContain("<<EOF");
 	});
 
 	it("fixes finalisation to the reviewed head and explicitly dispatches publishing", () => {
