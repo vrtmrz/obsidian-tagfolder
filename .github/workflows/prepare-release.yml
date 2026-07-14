@@ -94,7 +94,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           RELEASE_BRANCH: ${{ steps.prepare.outputs.branch }}
         run: |
-          cat > /tmp/release-pr-body.md <<EOF
+          cat > /tmp/release-pr-body.md <<'EOF'
           > [!IMPORTANT]
           > **Merge intentionally on hold**
           >
@@ -103,7 +103,7 @@ jobs:
           ## Release checklist
 
           - [ ] Review and polish `updates.md`
-          - [ ] Confirm `package.json`, `manifest.json`, and `versions.json` use `${VERSION}`
+          - [ ] Confirm `package.json`, `manifest.json`, and `versions.json` use `__VERSION__`
           - [ ] Confirm CI has passed
           - [ ] Run `Finalise Release Tags` with this pull request's fixed head SHA
           - [ ] Approve `Finalise Release Tags` for the `release` environment to create the fixed tag
@@ -115,6 +115,7 @@ jobs:
 
           If BRAT validation fails, do not move the published tag. Keep this pull request in draft and prepare a new patch release.
           EOF
+          sed -i "s/__VERSION__/${VERSION}/g" /tmp/release-pr-body.md
 
           gh pr create \
             --base main \
