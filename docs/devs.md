@@ -57,3 +57,16 @@ npm run test:e2e:obsidian:new-note-template
 ```
 
 The real scenario uses the production UI and Vault adapters. It selects a template through Obsidian, creates real notes, and verifies both persisted template content and frontmatter tags; it never installs a scripted driver into the plug-in.
+
+## Release process
+
+The repository uses three manually gated workflows. Configure the GitHub `release` environment with a required reviewer before using them.
+
+1. Run `Prepare Release PR` with the target version. It checks out `main`, runs the locked build and test gate, updates `package.json`, `manifest.json`, `versions.json`, and the `Unreleased` section in `updates.md`, pushes `release/<version>`, opens a draft pull request, and explicitly dispatches CI for the release branch. Explicit dispatch is required because branch and pull-request events created with `GITHUB_TOKEN` do not start another workflow.
+2. Review the release changes and release notes. Keep the pull request in draft and record its full head commit SHA.
+3. Run `Finalise Release Tags` with the version and reviewed SHA, then approve its `release` environment deployment. It validates the exact branch head, creates the tag, and explicitly dispatches `Release Obsidian Plugin`. Explicit dispatch is required because a tag pushed with `GITHUB_TOKEN` does not start a tag-push workflow.
+4. Approve the separate `Release Obsidian Plugin` deployment to the `release` environment, inspect the draft GitHub Release and its assets, then publish it as the latest stable release while leaving the release pull request in draft.
+5. Install the published build through BRAT and verify start-up, tree display, new-note templates, frontmatter tags, and any regression scenario relevant to the release.
+6. After BRAT succeeds, mark the pull request ready and merge it with a merge commit. A merge commit keeps the tagged release commit in `main` history.
+
+If BRAT validation fails, do not move or replace the published tag. Leave the pull request in draft and prepare a new patch release. If the tag exists but publishing dispatch or build fails, rerun `Release Obsidian Plugin` manually for the existing tag instead of rerunning Finalise.

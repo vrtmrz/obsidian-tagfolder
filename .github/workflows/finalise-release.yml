@@ -1,0 +1,94 @@
+name: Finalise Release Tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 0.18.18
+        required: true
+        type: string
+      release_branch:
+        description: Release PR branch. Defaults to release/<version>.
+        required: false
+        type: string
+      expected_head_sha:
+        description: Full head commit SHA reviewed in the release PR
+        required: true
+        type: string
+
+jobs:
+  finalise:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      actions: write
+      contents: write
+
+    steps:
+      - name: Resolve release branch
+        id: branch
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE_BRANCH_INPUT: ${{ inputs.release_branch }}
+        run: |
+          set -euo pipefail
+          BRANCH="${RELEASE_BRANCH_INPUT}"
+          if [[ -z "${BRANCH}" ]]; then
+            BRANCH="release/${VERSION}"
+          fi
+          git check-ref-format --branch "${BRANCH}"
+          echo "name=${BRANCH}" >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.branch.outputs.name }}
+          fetch-depth: 0
+
+      - name: Validate release head
+        env:
+          VERSION: ${{ inputs.version }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          if [[ "${ACTUAL_HEAD_SHA}" != "${EXPECTED_HEAD_SHA}" ]]; then
+            echo "Release branch head is ${ACTUAL_HEAD_SHA}, expected ${EXPECTED_HEAD_SHA}." >&2
+            exit 1
+          fi
+          node release-process.mjs validate "${VERSION}"
+          git fetch --tags --force
+          if git rev-parse --verify --quiet "refs/tags/${VERSION}" >/dev/null; then
+            echo "Release tag already exists: ${VERSION}" >&2
+            exit 1
+          fi
+
+      - name: Create and push release tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          git tag "${VERSION}"
+          git push origin "${VERSION}"
+
+      - name: Dispatch release workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml \
+            --ref "${VERSION}" \
+            --field tag="${VERSION}" \
+            --field draft=true \
+            --field prerelease=false
+
+      - name: Summarise next steps
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          {
+            echo "Created tag \`${VERSION}\` and explicitly dispatched the release workflow."
+            echo ""
+            echo "Approve the release environment, inspect and publish the draft GitHub Release, then validate it with BRAT."
+            echo "Keep the release pull request in draft until BRAT succeeds, then merge it with a merge commit."
+          } >> "${GITHUB_STEP_SUMMARY}"

@@ -1,0 +1,130 @@
+name: Prepare Release PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 0.18.18
+        required: true
+        type: string
+      release_branch:
+        description: Release branch name. Defaults to release/<version>.
+        required: false
+        type: string
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare release changes
+        id: prepare
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE_BRANCH_INPUT: ${{ inputs.release_branch }}
+        run: |
+          set -euo pipefail
+          node release-process.mjs input "${VERSION}"
+
+          BRANCH="${RELEASE_BRANCH_INPUT}"
+          if [[ -z "${BRANCH}" ]]; then
+            BRANCH="release/${VERSION}"
+          fi
+          git check-ref-format --branch "${BRANCH}"
+
+          if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
+            echo "Release branch already exists: ${BRANCH}" >&2
+            exit 1
+          fi
+          git fetch --tags --force
+          if git rev-parse --verify --quiet "refs/tags/${VERSION}" >/dev/null; then
+            echo "Release tag already exists: ${VERSION}" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${BRANCH}"
+          npm version "${VERSION}" --no-git-tag-version
+          node release-process.mjs prepare "${VERSION}"
+          npm run check
+          npm run build
+          npm run check:e2e:obsidian
+
+          RELEASE_FILES=(package.json package-lock.json manifest.json versions.json)
+          if [[ -f updates.md ]]; then
+            RELEASE_FILES+=(updates.md)
+          fi
+          git add "${RELEASE_FILES[@]}"
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "Release preparation produced no tracked changes" >&2
+            exit 1
+          fi
+          git commit -m "${VERSION}"
+          git push --set-upstream origin "${BRANCH}"
+
+          echo "branch=${BRANCH}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create draft release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          RELEASE_BRANCH: ${{ steps.prepare.outputs.branch }}
+        run: |
+          cat > /tmp/release-pr-body.md <<EOF
+          > [!IMPORTANT]
+          > **Merge intentionally on hold**
+          >
+          > Keep this pull request in draft, and leave `main` on the previous release, until the published build has passed BRAT validation.
+
+          ## Release checklist
+
+          - [ ] Review and polish `updates.md`
+          - [ ] Confirm `package.json`, `manifest.json`, and `versions.json` use `${VERSION}`
+          - [ ] Confirm CI has passed
+          - [ ] Run `Finalise Release Tags` with this pull request's fixed head SHA
+          - [ ] Approve `Finalise Release Tags` for the `release` environment to create the fixed tag
+          - [ ] Approve `Release Obsidian Plugin` for the `release` environment
+          - [ ] Inspect the draft GitHub Release and its assets
+          - [ ] Publish the GitHub Release as the latest stable release while keeping this pull request in draft
+          - [ ] Validate the published release with BRAT
+          - [ ] Mark this pull request ready and merge it with a merge commit
+
+          If BRAT validation fails, do not move the published tag. Keep this pull request in draft and prepare a new patch release.
+          EOF
+
+          gh pr create \
+            --base main \
+            --head "${RELEASE_BRANCH}" \
+            --draft \
+            --title "${VERSION}" \
+            --body-file /tmp/release-pr-body.md
+
+      - name: Dispatch CI for release branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ steps.prepare.outputs.branch }}
+        run: gh workflow run ci.yml --ref "${RELEASE_BRANCH}"
