@@ -1,4 +1,10 @@
-import { withObsidianPage } from "@vrtmrz/obsidian-test-session";
+import {
+	assertLocatorHasMinimumTouchTarget,
+	assertLocatorWithinSafeArea,
+	assertLocatorWithinViewport,
+	assertNoHorizontalOverflow,
+	withObsidianPage,
+} from "@vrtmrz/obsidian-test-session";
 import type { Page } from "playwright";
 import {
 	TAGFOLDER_PLUGIN_ID,
@@ -77,33 +83,51 @@ async function verifyPhoneLayout(testSession: TagFolderTestSession): Promise<voi
 				await tagInput.press("Enter");
 			}
 
+			const safeAreaInsets = {
+				top: 47,
+				right: 0,
+				bottom: 34,
+				left: 0,
+			};
+			const modalTitle = modal.locator(".modal-title");
+			const closeButton = modal.locator(".modal-close-button");
+			const tagShell = modal.locator(".tag-input-shell");
+			const noteInput = modal.locator("#tagfolder-note-lookup-note-input");
+			await assertLocatorWithinSafeArea(page, modalTitle, {
+				label: "note lookup title",
+				safeAreaInsets,
+			});
+			await assertLocatorWithinSafeArea(page, closeButton, {
+				label: "note lookup close button",
+				safeAreaInsets,
+			});
+			await assertLocatorHasMinimumTouchTarget(page, closeButton, {
+				label: "note lookup close button",
+			});
+			await assertNoHorizontalOverflow(page, tagShell, {
+				label: "note lookup tag field",
+			});
+			await assertLocatorWithinViewport(page, noteInput, {
+				label: "note lookup note field",
+			});
+
 			const layout = await modal.evaluate((element) => {
-				const close = element.querySelector<HTMLElement>(".modal-close-button");
 				const tagShell = element.querySelector<HTMLElement>(".tag-input-shell");
 				const tagChips = element.querySelector<HTMLElement>(".tag-chips");
-				const noteInput = element.querySelector<HTMLElement>("#tagfolder-note-lookup-note-input");
-				if (!close || !tagShell || !tagChips || !noteInput) throw new Error("Phone layout elements were unavailable");
+				if (!tagShell || !tagChips) throw new Error("Phone layout elements were unavailable");
 				const modalRect = element.getBoundingClientRect();
-				const closeRect = close.getBoundingClientRect();
 				const shellRect = tagShell.getBoundingClientRect();
-				const noteRect = noteInput.getBoundingClientRect();
 				const shellStyle = getComputedStyle(tagShell);
 				const inputHeight = Number.parseFloat(shellStyle.getPropertyValue("--input-height"));
 				const shellRadius = Number.parseFloat(shellStyle.borderTopLeftRadius);
-				const safeAreaTop = 47;
 				return {
-					modalClearsSafeArea: modalRect.top >= safeAreaTop - 1,
-					closeClearsSafeArea: closeRect.top >= safeAreaTop,
-					closeHasTouchTarget: closeRect.width >= 44 && closeRect.height >= 44,
 					tagsStayInsideModal: shellRect.left >= modalRect.left && shellRect.right <= modalRect.right,
-					tagsDoNotScrollHorizontally: tagShell.scrollWidth <= tagShell.clientWidth,
 					tagAreaPrioritisesNotes: tagChips.clientHeight <= Math.min(inputHeight * 1.5, innerHeight * 0.15) + 1,
 					tagFieldUsesCompactRadius: shellRadius <= 12,
-					noteInputRemainsVisible: noteRect.bottom <= innerHeight,
 				};
 			});
 			if (!Object.values(layout).every(Boolean)) {
-				throw new Error(`Phone layout did not respect safe areas and tag bounds: ${JSON.stringify(layout)}`);
+				throw new Error(`Phone layout did not preserve TagFolder-specific tag proportions and bounds: ${JSON.stringify(layout)}`);
 			}
 			await tagInput.press("Escape");
 		} finally {
