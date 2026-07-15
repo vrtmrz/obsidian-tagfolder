@@ -30,7 +30,7 @@
 		"@types/node": "^22.20.1",
 		"@typescript-eslint/parser": "^8.48.1",
 		"@vitest/coverage-v8": "^4.1.9",
-		"@vrtmrz/obsidian-test-session": "0.1.0",
+		"@vrtmrz/obsidian-test-session": "0.2.0",
 		"esbuild": "^0.28.1",
 		"esbuild-svelte": "^0.9.3",
 		"eslint": "^9.39.1",
