@@ -115,6 +115,11 @@
 		onlyFDREnabled = _setting.linkShowOnlyFDR;
 	});
 	let showSearch = $state(false);
+	$effect(() => {
+		if ($searchString.trim() !== "") {
+			showSearch = true;
+		}
+	});
 	function toggleSearch() {
 		showSearch = !showSearch;
 		if (!showSearch) {
