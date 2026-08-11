@@ -1,3 +1,15 @@
+## Unreleased
+
+11th August, 2026
+
+### Improved
+
+-   When clicking a tag in a note to filter TagFolder, the applied tag is now shown immediately in the search field, so the filter can be cleared with one click. Thank you @boabab for the contribution.
+
+### Digging the weeds
+
+-   Updated the real-Obsidian mobile layout coverage to use the shared assertions from the test-session package.
+
 ## 0.18.19
 
 14th July, 2026
