@@ -106,6 +106,14 @@ Dotted path to retrieve title from frontmatter.
 
 #### Tags
 
+##### Suggested tag tree styles
+
+Select a suggested style to see a small example beneath the setting, then choose `Apply` to update the related tag-tree settings together. The applied settings remain individually editable.
+
+- `Simple list` shows notes directly beneath each tag and displays their other tags as labels.
+- `Drill-down` uses other tags as additional folders and shows notes at the deepest matching level.
+- `Full tree` also shows notes at intermediate levels.
+
 ##### Order method
 
 You can order tags by:

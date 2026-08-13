@@ -17,6 +17,7 @@ import {
 	TFile,
 	WorkspaceLeaf,
 	TAbstractFile,
+	type ButtonComponent,
 	type MarkdownFileInfo,
 } from "obsidian";
 import { createObsidianUi, type UiInteractions } from "@vrtmrz/obsidian-plugin-kit/ui";
@@ -79,6 +80,13 @@ import {
 	type NoteLookupSource,
 } from "./note-lookup";
 import { openNoteLookup } from "./note-lookup-modal";
+import {
+	applyTagTreeStyleSuggestion,
+	findTagTreeStyleSuggestion,
+	renderTagTreeStylePreview,
+	TAG_TREE_STYLE_SUGGESTIONS,
+	type TagTreeStyleSuggestion,
+} from "./tag-tree-style-suggestions";
 
 const HideItemsType: Record<string, string> = {
 	NONE: "Hide nothing",
@@ -1647,6 +1655,47 @@ class TagFolderSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl).setName("Tags").setHeading();
+
+		let selectedTagTreeStyle: TagTreeStyleSuggestion | undefined;
+		let applyTagTreeStyleButton: ButtonComponent | undefined;
+		const tagTreeStyleSuggestionEl = containerEl.createDiv({
+			cls: "tagfolder-style-suggestion",
+		});
+		new Setting(tagTreeStyleSuggestionEl)
+			.setName("Suggested tag tree style")
+			.setDesc("Apply a suggested combination of tag tree settings.")
+			.addDropdown((dropdown) => {
+				dropdown.addOption("", "Select a style");
+				for (const suggestion of TAG_TREE_STYLE_SUGGESTIONS) {
+					dropdown.addOption(suggestion.id, suggestion.name);
+				}
+				dropdown.setValue("").onChange((value) => {
+					selectedTagTreeStyle = findTagTreeStyleSuggestion(value);
+					applyTagTreeStyleButton?.setDisabled(!selectedTagTreeStyle);
+					renderTagTreeStylePreview(tagTreeStylePreviewEl, selectedTagTreeStyle);
+				});
+			})
+			.addButton((button) => {
+				applyTagTreeStyleButton = button;
+				button
+					.setButtonText("Apply")
+					.setDisabled(true)
+					.onClick(async () => {
+						if (!selectedTagTreeStyle) return;
+						const appliedStyleName = selectedTagTreeStyle.name;
+						this.plugin.settings = applyTagTreeStyleSuggestion(
+							this.plugin.settings,
+							selectedTagTreeStyle,
+						);
+						await this.plugin.saveSettings();
+						this.display();
+						new Notice(`Applied '${appliedStyleName}' settings.`);
+					});
+			});
+		const tagTreeStylePreviewEl = tagTreeStyleSuggestionEl.createDiv({
+			cls: "tagfolder-style-preview",
+		});
+		renderTagTreeStylePreview(tagTreeStylePreviewEl);
 
 		const setOrderMethodTag = async (key?: string, order?: string) => {
 			const oldSetting = this.plugin.settings.sortTypeTag.split("_");
