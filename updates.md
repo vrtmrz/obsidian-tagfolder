@@ -1,3 +1,16 @@
+## Unreleased
+
+14th August, 2026
+
+### New features
+
+-   Added `Simple list`, `Drill-down`, and `Full tree` suggestions to make the tag-tree structure easier to configure (PR #158).
+-   Each suggestion includes a compact example and applies only the related tag-tree settings, leaving every resulting setting individually editable.
+
+### Digging the weeds
+
+-   Added real-Obsidian coverage for applying a suggested style and for the desktop and mobile preview layouts.
+
 ## 0.18.20
 
 11th August, 2026
