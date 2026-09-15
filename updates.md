@@ -1,3 +1,15 @@
+## Unreleased
+
+15th September, 2026
+
+### Improved
+
+-   Added a sort order button to the file list pane, with sorting options available directly in the menu (PR #161). Thank you @DDDDZJQ for the contribution.
+
+### Digging the weeds
+
+-   Added regression tests for the file list sort button and menu, and for the existing tag and link tree controls.
+
 ## 0.18.21
 
 14th August, 2026
