@@ -61,7 +61,8 @@ import {
 	trimTrailingSlash,
 	isSpecialTag,
 	trimPrefix,
-	uniqueCaseIntensive
+	uniqueCaseIntensive,
+	selectCompareMethodItemsByTagGroup
 } from "./util";
 import {
 	chooseNewNoteTemplate,
@@ -102,6 +103,10 @@ function dotted<T extends Record<string, unknown>>(object: T, notation: string):
 function getCompareMethodItems(settings: TagFolderSettings) {
 	const invert = settings.sortType.contains("_DESC") ? -1 : 1;
 	switch (settings.sortType) {
+		case "TAGGROUP_ASC":
+		case "TAGGROUP_DESC":
+			// Keeps items sharing a tag combination together, following the tag tree.
+			return selectCompareMethodItemsByTagGroup(settings);
 		case "DISPNAME_ASC":
 		case "DISPNAME_DESC":
 			return (a: ViewItem, b: ViewItem) =>
