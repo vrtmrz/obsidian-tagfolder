@@ -13,6 +13,7 @@ import { writable, type Writable } from "svelte/store";
 import TagFolderPlugin from "./main";
 import { doEvents } from "./util";
 import { mount, unmount } from "svelte";
+import { tr } from "./i18n";
 
 // Show notes as like scroll.
 export class ScrollView extends ItemView {
@@ -41,7 +42,7 @@ export class ScrollView extends ItemView {
 	}
 
 	getDisplayText() {
-		return this.state.tagPath || "Tags scroll";
+		return this.state.tagPath || tr("Tags scroll");
 	}
 
 	async setFile(filenames: ScrollViewFile[]) {

@@ -8,6 +8,13 @@ This is the plugin that shows your tags like folders.
 
 Install this plugin, press `Ctrl+p`, and choose "Show Tag Folder".
 
+### Localization
+
+TagFolder ships with a built-in Simplified Chinese interface.
+
+-   Go to **Settings → TagFolder → Language** and choose `Auto (follow Obsidian)`, `English`, or `简体中文`.
+-   `Auto` follows the Obsidian interface language and falls back to English when the language cannot be matched.
+
 ### Behavior
 
 This plugin creates a tree by tags permutation.

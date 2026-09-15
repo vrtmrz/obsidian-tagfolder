@@ -1,4 +1,5 @@
 import type { TFile } from "obsidian";
+import type { LanguagePreference } from "./i18n";
 
 export type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
 
@@ -94,6 +95,7 @@ export interface TagFolderSettings {
 	linkCombineOtherTree: boolean;
 	showListIn: keyof typeof enumShowListIn;
 	displayFolderAsTag: boolean;
+	uiLanguage: LanguagePreference;
 }
 
 export const DEFAULT_SETTINGS: TagFolderSettings = {
@@ -141,6 +143,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	linkCombineOtherTree: true,
 	showListIn: "",
 	displayFolderAsTag: false,
+	uiLanguage: "auto",
 };
 
 export const VIEW_TYPE_SCROLL = "tagfolder-view-scroll";

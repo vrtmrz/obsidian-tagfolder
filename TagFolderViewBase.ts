@@ -14,6 +14,7 @@ import {
 import { maxDepth, selectedTags } from "./store";
 import { ancestorToLongestTag, ancestorToTags, isSpecialTag, renderSpecialTag, joinPartialPath, removeIntermediatePath, trimTrailingSlash } from "./util";
 import { askString } from "dialog";
+import { tr } from "./i18n";
 
 function toggleObjectProp(obj: { [key: string]: unknown }, propName: string, value: string | false) {
 	if (value === false) {
@@ -68,7 +69,7 @@ export abstract class TagFolderViewBase extends ItemView {
 		const menu = new Menu();
 
 		menu.addItem((item) => {
-			item.setTitle("Tags")
+			item.setTitle(tr("Tags"))
 				.setIcon("hashtag")
 				.onClick((evt2) => {
 					const menu2 = new Menu();
@@ -77,9 +78,9 @@ export abstract class TagFolderViewBase extends ItemView {
 							menu2.addItem((item) => {
 								const newSetting = `${key}_${direction}`;
 								item.setTitle(
-									OrderKeyTag[key] +
+									tr(OrderKeyTag[key]) +
 									" " +
-									OrderDirection[direction]
+									tr(OrderDirection[direction])
 								).onClick(async () => {
 									//@ts-ignore
 									this.plugin.settings.sortTypeTag =
@@ -101,7 +102,7 @@ export abstract class TagFolderViewBase extends ItemView {
 			return item;
 		});
 		menu.addItem((item) => {
-			item.setTitle("Items")
+			item.setTitle(tr("Items"))
 				.setIcon("document")
 				.onClick((evt2) => {
 					const menu2 = new Menu();
@@ -110,9 +111,9 @@ export abstract class TagFolderViewBase extends ItemView {
 							menu2.addItem((item) => {
 								const newSetting = `${key}_${direction}`;
 								item.setTitle(
-									OrderKeyItem[key] +
+									tr(OrderKeyItem[key]) +
 									" " +
-									OrderDirection[direction]
+									tr(OrderDirection[direction])
 								).onClick(async () => {
 									//@ts-ignore
 									this.plugin.settings.sortType = newSetting;
@@ -143,7 +144,7 @@ export abstract class TagFolderViewBase extends ItemView {
 		};
 		for (const level of [2, 3, 4, 5]) {
 			menu.addItem((item) => {
-				item.setTitle(`Level ${level - 1}`).onClick(() => {
+				item.setTitle(tr("Level {n}", { n: level - 1 })).onClick(() => {
 					void setLevel(level);
 				});
 				if (this.plugin.settings.expandLimit == level)
@@ -153,7 +154,7 @@ export abstract class TagFolderViewBase extends ItemView {
 		}
 
 		menu.addItem((item) => {
-			item.setTitle("No limit")
+			item.setTitle(tr("No limit"))
 				// .setIcon("hashtag")
 				.onClick(() => {
 					void setLevel(0);
@@ -194,17 +195,17 @@ export abstract class TagFolderViewBase extends ItemView {
 			if (navigator && navigator.clipboard) {
 				menu.addItem((item) =>
 					item
-						.setTitle(`Copy tags:${expandedTags}`)
+						.setTitle(tr("Copy tags:{tags}", { tags: expandedTags }))
 						.setIcon("hashtag")
 						.onClick(async () => {
 							await navigator.clipboard.writeText(expandedTags);
-							new Notice("Copied");
+							new Notice(tr("Copied"));
 						})
 				);
 			}
 			menu.addItem((item) =>
 				item
-					.setTitle(`New note ${targetTag ? "in here" : "as like this"}`)
+					.setTitle(tr(targetTag ? "New note in here" : "New note as like this"))
 					.setIcon("create-new")
 					.onClick(async () => {
 						await this.plugin.createNewNote(trail);
@@ -215,7 +216,7 @@ export abstract class TagFolderViewBase extends ItemView {
 			if (renameTargetTag && tagWrangler) {
 				menu.addItem((item) =>
 					item
-						.setTitle(`Rename #${renameTargetTag}`)
+						.setTitle(tr("Rename #{tag}", { tag: renameTargetTag }))
 						.setIcon("pencil")
 						.onClick(async () => {
 							await tagWrangler.rename(renameTargetTag);
@@ -228,7 +229,7 @@ export abstract class TagFolderViewBase extends ItemView {
 
 					if (tag in this.plugin.tagInfo && "key" in this.plugin.tagInfo[tag]) {
 						menu.addItem((item) =>
-							item.setTitle(`Unpin`)
+							item.setTitle(tr("Unpin"))
 								.setIcon("pin")
 								.onClick(async () => {
 									this.plugin.tagInfo[tag] = toggleObjectProp(this.plugin.tagInfo[tag], "key", false);
@@ -239,7 +240,7 @@ export abstract class TagFolderViewBase extends ItemView {
 
 					} else {
 						menu.addItem((item) => {
-							item.setTitle(`Pin`)
+							item.setTitle(tr("Pin"))
 								.setIcon("pin")
 								.onClick(async () => {
 									this.plugin.tagInfo[tag] = toggleObjectProp(this.plugin.tagInfo[tag], "key", "");
@@ -249,7 +250,7 @@ export abstract class TagFolderViewBase extends ItemView {
 						})
 					}
 					menu.addItem((item) => {
-						item.setTitle(`Set an alternative label`)
+						item.setTitle(tr("Set an alternative label"))
 							.setIcon("pencil")
 							.onClick(async () => {
 								const oldAlt = tag in this.plugin.tagInfo ? (this.plugin.tagInfo[tag].alt ?? "") : "";
@@ -261,7 +262,7 @@ export abstract class TagFolderViewBase extends ItemView {
 							})
 					});
 					menu.addItem((item) => {
-						item.setTitle(`Change the mark`)
+						item.setTitle(tr("Change the mark"))
 							.setIcon("pencil")
 							.onClick(async () => {
 								const oldMark = tag in this.plugin.tagInfo ? (this.plugin.tagInfo[tag].mark ?? "") : "";
@@ -273,7 +274,7 @@ export abstract class TagFolderViewBase extends ItemView {
 							})
 					});
 					menu.addItem((item) => {
-						item.setTitle(`Redirect this tag to ...`)
+						item.setTitle(tr("Redirect this tag to ..."))
 							.setIcon("pencil")
 							.onClick(async () => {
 								const oldRedirect = tag in this.plugin.tagInfo ? (this.plugin.tagInfo[tag].redirect ?? "") : "";
@@ -286,7 +287,7 @@ export abstract class TagFolderViewBase extends ItemView {
 					});
 					if (targetItems) {
 						menu.addItem(item => {
-							item.setTitle(`Open scroll view`)
+							item.setTitle(tr("Open scroll view"))
 								.setIcon("sheets-in-box")
 								.onClick(async () => {
 									const files = targetItems.map(e => e.path);
@@ -294,7 +295,7 @@ export abstract class TagFolderViewBase extends ItemView {
 								})
 						})
 						menu.addItem(item => {
-							item.setTitle(`Open list`)
+							item.setTitle(tr("Open list"))
 								.setIcon("sheets-in-box")
 								.onClick(() => {
 									selectedTags.set(
@@ -319,7 +320,7 @@ export abstract class TagFolderViewBase extends ItemView {
 			menu.addSeparator();
 			menu.addItem((item) =>
 				item
-					.setTitle(`Open in new tab`)
+					.setTitle(tr("Open in new tab"))
 					.setSection("open")
 					.setIcon("lucide-file-plus")
 					.onClick(async () => {
@@ -328,7 +329,7 @@ export abstract class TagFolderViewBase extends ItemView {
 			);
 			menu.addItem((item) =>
 				item
-					.setTitle(`Open to the right`)
+					.setTitle(tr("Open to the right"))
 					.setSection("open")
 					.setIcon("lucide-separator-vertical")
 					.onClick(async () => {
@@ -348,7 +349,7 @@ export abstract class TagFolderViewBase extends ItemView {
 			menu.addSeparator();
 			menu.addItem((item) =>
 				item
-					.setTitle(`Open in new tab`)
+					.setTitle(tr("Open in new tab"))
 					.setSection("open")
 					.setIcon("lucide-file-plus")
 					.onClick(async () => {
@@ -357,7 +358,7 @@ export abstract class TagFolderViewBase extends ItemView {
 			);
 			menu.addItem((item) =>
 				item
-					.setTitle(`Open to the right`)
+					.setTitle(tr("Open to the right"))
 					.setSection("open")
 					.setIcon("lucide-separator-vertical")
 					.onClick(async () => {

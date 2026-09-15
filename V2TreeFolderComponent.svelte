@@ -35,6 +35,7 @@
         tagInfo,
         v2expandedTags,
     } from "./store";
+    import { t, resolvedLocale } from "./i18n";
     import { collectTreeChildren, performSortExactFirst } from "./v2codebehind";
     import TreeItemItemComponent from "V2TreeItemComponent.svelte";
     import OnDemandRender from "OnDemandRender.svelte";
@@ -124,7 +125,7 @@
                 filePaths,
             );
         } else if (viewType == "links") {
-            openScrollView(undefined, "", `Linked to ${filename}`, filePaths);
+            openScrollView(undefined, "", $t("Linked to {filename}", { filename }), filePaths);
         }
         e.preventDefault();
     }
@@ -670,8 +671,10 @@
                     ))),
     );
 
-    const tagsDisp = $derived(
-        isSuppressibleLevel && isInDedicatedTag
+    const tagsDisp = $derived.by(() => {
+        // renderSpecialTag 非响应式：读一次 locale store 建立依赖，语言切换后重算。
+        void $resolvedLocale;
+        return isSuppressibleLevel && isInDedicatedTag
             ? [
                   [
                       ...tagNameDisp,
@@ -687,8 +690,8 @@
                         e.split("/").map((e) => renderSpecialTag(e)),
                     ),
                 ]
-              : [tagNameDisp],
-    );
+              : [tagNameDisp];
+    });
 
     const classKey = $derived(viewType == "links" ? " tf-link" : " tf-tag");
     const tagsDispHtml = $derived(

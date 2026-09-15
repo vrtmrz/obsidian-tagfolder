@@ -4,6 +4,7 @@ import type {
 	VaultTextAccess,
 } from "@vrtmrz/obsidian-plugin-kit/vault";
 import { renderTagFolderTemplateVariables } from "./new-note-template";
+import { tr } from "./i18n";
 
 export const NEW_NOTE_TEMPLATE_INTERACTION_ID = "new-note-template";
 
@@ -53,7 +54,7 @@ export async function chooseNewNoteTemplate(
 			items: templates,
 			getText: (template) => template.name,
 			getDescription: (template) => template.path,
-			placeholder: "Type to search templates...",
+			placeholder: tr("Type to search templates..."),
 		},
 		NEW_NOTE_TEMPLATE_INTERACTION_ID,
 	);
