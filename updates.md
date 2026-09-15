@@ -1,4 +1,4 @@
-## Unreleased
+## 0.18.22
 
 15th September, 2026
 
