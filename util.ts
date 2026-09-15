@@ -1,4 +1,5 @@
 import { allViewItemsByLink, tagInfo } from "store";
+import { tr } from "./i18n";
 import {
 	EPOCH_DAY,
 	EPOCH_HOUR,
@@ -73,7 +74,7 @@ tagInfo.subscribe(tagInfo => {
 
 export function renderSpecialTag(tagSrc: string) {
 	const tag = trimSlash(tagSrc);
-	return tag in tagDispAlternativeDict ? tagDispAlternativeDict[tag] : tagSrc;
+	return tag in tagDispAlternativeDict ? tr(tagDispAlternativeDict[tag]) : tagSrc;
 }
 
 export function secondsToFreshness(totalAsMSec: number) {

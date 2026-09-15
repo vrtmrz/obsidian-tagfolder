@@ -15,6 +15,7 @@
 		type TagFolderListState,
 	} from "./types";
 	import V2TreeFolderComponent from "./V2TreeFolderComponent.svelte";
+	import { t } from "./i18n";
 	import { onDestroy, onMount, tick } from "svelte";
 	import { setIcon } from "obsidian";
 	import { trimTrailingSlash } from "./util";
@@ -275,8 +276,8 @@
 	});
 	let headerTitle = $derived(
 		title == ""
-			? `${viewType == "tags" ? "Tags" : "Links"}: ${vaultName}`
-			: `Items: ${title}`,
+			? `${$t(viewType == "tags" ? "Tags" : "Links")}: ${vaultName}`
+			: $t("Items: {title}", { title }),
 	);
 	const viewItems = $derived.by(() => {
 		if (!viewItemsSrc) {
@@ -331,7 +332,7 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="clickable-icon nav-action-button"
-			aria-label="New note"
+			aria-label={$t("New note")}
 			onclick={newNote}
 		>
 			{@html newNoteIcon}
@@ -341,7 +342,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="clickable-icon nav-action-button"
-				aria-label="Change sort order"
+				aria-label={$t("Change sort order")}
 				onclick={showOrder}
 			>
 				{@html upAndDownArrowsIcon}
@@ -350,7 +351,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="clickable-icon nav-action-button"
-				aria-label="Expand limit"
+				aria-label={$t("Expand limit")}
 				onclick={showLevelSelect}
 			>
 				{@html stackedLevels}
@@ -359,7 +360,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class={`clickable-icon nav-action-button ${showSearch ? " is-active" : ""}`}
-				aria-label="Search"
+				aria-label={$t("Search")}
 				onclick={toggleSearch}
 			>
 				{@html searchIcon}
@@ -370,7 +371,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="clickable-icon nav-action-button"
-				aria-label="Switch List/Tree"
+				aria-label={$t("Switch List/Tree")}
 				onclick={doSwitch}
 			>
 				{@html switchIcon}
@@ -382,7 +383,7 @@
 			<div
 				class="clickable-icon nav-action-button"
 				class:is-active={incomingEnabled}
-				aria-label="Toggle Incoming"
+				aria-label={$t("Toggle Incoming")}
 				onclick={switchIncoming}
 			>
 				{@html incomingIcon}
@@ -392,7 +393,7 @@
 			<div
 				class="clickable-icon nav-action-button"
 				class:is-active={outgoingEnabled}
-				aria-label="Toggle Outgoing"
+				aria-label={$t("Toggle Outgoing")}
 				onclick={switchOutgoing}
 			>
 				{@html outgoingIcon}
@@ -402,7 +403,7 @@
 			<div
 				class="clickable-icon nav-action-button"
 				class:is-active={bothEnabled}
-				aria-label="Toggle Incoming&Outgoing"
+				aria-label={$t("Toggle Incoming&Outgoing")}
 				onclick={switchBoth}
 			>
 				{@html bothIcon}
@@ -412,7 +413,7 @@
 			<div
 				class="clickable-icon nav-action-button"
 				class:is-active={onlyFDREnabled}
-				aria-label="Toggle Hide indirect notes"
+				aria-label={$t("Toggle Hide indirect notes")}
 				onclick={switchOnlyFDR}
 			>
 				{@html linkIcon}
@@ -423,7 +424,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="clickable-icon nav-action-button"
-				aria-label="Collapse all"
+				aria-label={$t("Collapse all")}
 				onclick={closeAllOpenedFolders}
 			>
 				{@html closeAllIcon}
@@ -437,14 +438,14 @@
 			<input
 				type="search"
 				spellcheck="false"
-				placeholder="Type to start search..."
+				placeholder={$t("Type to start search...")}
 				bind:value={$searchString}
 			/>
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="search-input-clear-button"
-				aria-label="Clear search"
+				aria-label={$t("Clear search")}
 				style="display:{$searchString.trim() == '' ? 'none' : ''};"
 				onclick={clearSearch}
 			></div>
