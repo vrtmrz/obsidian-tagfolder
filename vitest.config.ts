@@ -1,7 +1,9 @@
+/* eslint-disable import/no-nodejs-modules -- fileURLToPath(node:url) 用于把 import.meta.url 转成系统路径（含中文/Windows 盘符），供 vitest 别名解析。 */
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import { compile } from "svelte/compiler";
 
-const root = new URL(".", import.meta.url).pathname;
+const root = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
 	plugins: [{
@@ -13,6 +15,8 @@ export default defineConfig({
 	}],
 	resolve: {
 		conditions: ["browser"],
+		// Keep source imports ahead of a previous build's main.js artefact.
+		extensions: [".ts", ".mts", ".mjs", ".js", ".tsx", ".jsx", ".json"],
 		alias: {
 			obsidian: `${root}tests/mocks/obsidian.ts`,
 			store: `${root}store.ts`,

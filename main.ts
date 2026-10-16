@@ -81,6 +81,7 @@ import {
 	type NoteLookupSource,
 } from "./note-lookup";
 import { openNoteLookup } from "./note-lookup-modal";
+import { configureAppLocale } from "./obsidian-locale";
 import {
 	applyTagTreeStyleSuggestion,
 	findTagTreeStyleSuggestion,
@@ -88,12 +89,21 @@ import {
 	TAG_TREE_STYLE_SUGGESTIONS,
 	type TagTreeStyleSuggestion,
 } from "./tag-tree-style-suggestions";
+import {
+	applyLanguagePreference,
+	LANGUAGE_OPTIONS,
+	tr,
+	type LanguagePreference,
+} from "./i18n";
 
-const HideItemsType: Record<string, string> = {
-	NONE: "Hide nothing",
-	DEDICATED_INTERMIDIATES: "Only intermediates of nested tags",
-	ALL_EXCEPT_BOTTOM: "All intermediates",
-};
+// 设置页打开时（display()）取最新 tr() 译文；键名（NONE 等）为设置存储值，保持不变。
+function HideItemsType(): Record<string, string> {
+	return {
+		NONE: tr("Hide nothing"),
+		DEDICATED_INTERMIDIATES: tr("Only intermediates of nested tags"),
+		ALL_EXCEPT_BOTTOM: tr("All intermediates"),
+	};
+}
 
 
 function dotted<T extends Record<string, unknown>>(object: T, notation: string): unknown {
@@ -203,7 +213,7 @@ async function askNewNoteTemplate(ui: UiInteractions, app: App): Promise<NewNote
 	const templates = captureNewNoteTemplates(app);
 	const selectedTemplate = await chooseNewNoteTemplate(ui, templates);
 	if (selectedTemplate === undefined) {
-		new Notice("No templates found. Add a template, then try again.");
+		new Notice(tr("No templates found. Add a template, then try again."));
 	}
 	return selectedTemplate;
 }
@@ -230,7 +240,7 @@ function getConfiguredNewNoteTemplate(app: App, templatePath: string): NewNoteTe
 		.find((file): file is TFile => file instanceof TFile && file.extension == "md");
 
 	if (file == null) {
-		new Notice(`Template not found: ${inputPath}`);
+		new Notice(tr("Template not found: {path}", { path: inputPath }));
 		return null;
 	}
 
@@ -466,28 +476,28 @@ export default class TagFolderPlugin extends Plugin {
 		});
 		this.addCommand({
 			id: "tagfolder-open",
-			name: "Show Tag Folder",
+			name: tr("Show Tag Folder"),
 			callback: () => {
 				void this.activateView();
 			},
 		});
 		this.addCommand({
 			id: "tagfolder-link-open",
-			name: "Show Link Folder",
+			name: tr("Show Link Folder"),
 			callback: () => {
 				void this.activateViewLink();
 			},
 		});
 		this.addCommand({
 			id: "tagfolder-rebuild-tree",
-			name: "Force Rebuild",
+			name: tr("Force Rebuild"),
 			callback: () => {
 				this.refreshAllTree();
 			},
 		});
 		this.addCommand({
 			id: "tagfolder-create-similar",
-			name: "Create a new note with the same tags",
+			name: tr("Create a new note with the same tags"),
 			editorCallback: async (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				const file = view?.file;
 				if (!file) return;
@@ -500,12 +510,12 @@ export default class TagFolderPlugin extends Plugin {
 		});
 		this.addCommand({
 			id: "tagfolder-open-note-by-tags",
-			name: "Open note by tags",
+			name: tr("Open note by tags"),
 			callback: () => this.openNoteLookupDialog(),
 		});
 		this.addCommand({
 			id: "tagfolder-open-note-with-similar-tags",
-			name: "Open note with similar tags",
+			name: tr("Open note with similar tags"),
 			checkCallback: (checking) => {
 				const file = this.app.workspace.getActiveFile();
 				if (!(file instanceof TFile) || file.extension != "md") return false;
@@ -1368,12 +1378,14 @@ export default class TagFolderPlugin extends Plugin {
 		allViewItemsByLink.set(this.allViewItemsByLink);
 	}
 	async loadSettings() {
+		configureAppLocale();
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
 			await this.loadData()
 		);
 		this.settings.newNoteTemplate = normalizeNewNoteTemplatePath(this.settings.newNoteTemplate);
+		applyLanguagePreference(this.settings.uiLanguage);
 		await this.loadTagInfo();
 		tagFolderSetting.set(this.settings);
 		this.compareItems = getCompareMethodItems(this.settings);
@@ -1510,10 +1522,33 @@ class TagFolderSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		const newNoteTemplates = captureNewNoteTemplates(this.app);
 
-		new Setting(containerEl).setName("Behavior").setHeading();
 		new Setting(containerEl)
-			.setName("Always Open")
-			.setDesc("Place TagFolder on the left pane and activate it at every Obsidian launch")
+			.setName(tr("Language") + " / 语言")
+			.setDesc(
+				tr(
+					"UI language. 'Auto' follows the Obsidian interface language and falls back to English when unmatched."
+				)
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(
+						Object.fromEntries(
+							LANGUAGE_OPTIONS.map((option) => [option.value, option.label])
+						)
+					)
+					.setValue(this.plugin.settings.uiLanguage)
+					.onChange(async (value) => {
+						this.plugin.settings.uiLanguage = value as LanguagePreference;
+						await this.plugin.saveSettings();
+						applyLanguagePreference(this.plugin.settings.uiLanguage);
+						this.display();
+					})
+			);
+
+		new Setting(containerEl).setName(tr("Behavior")).setHeading();
+		new Setting(containerEl)
+			.setName(tr("Always Open"))
+			.setDesc(tr("Place TagFolder on the left pane and activate it at every Obsidian launch"))
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.alwaysOpen)
@@ -1523,9 +1558,11 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Use pinning")
+			.setName(tr("Use pinning"))
 			.setDesc(
-				"When this feature is enabled, the pin information is saved in the file set in the next configuration."
+				tr(
+					"When this feature is enabled, the pin information is saved in the file set in the next configuration."
+				)
 			)
 			.addToggle((toggle) => {
 				toggle
@@ -1540,7 +1577,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		const pi = new Setting(containerEl)
-			.setName("Pin information file")
+			.setName(tr("Pin information file"))
 			.setDisabled(!this.plugin.settings.useTagInfo)
 			.addText((text) => {
 				text
@@ -1554,9 +1591,11 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Disable narrowing down")
+			.setName(tr("Disable narrowing down"))
 			.setDesc(
-				"When this feature is enabled, relevant tags will be shown with the title instead of making a sub-structure."
+				tr(
+					"When this feature is enabled, relevant tags will be shown with the title instead of making a sub-structure."
+				)
 			)
 			.addToggle((toggle) => {
 				toggle
@@ -1566,10 +1605,10 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		new Setting(containerEl).setName("Files").setHeading();
+		new Setting(containerEl).setName(tr("Files")).setHeading();
 		new Setting(containerEl)
-			.setName("Display method")
-			.setDesc("How to show a title of files")
+			.setName(tr("Display method"))
+			.setDesc(tr("How to show a title of files"))
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOptions({
@@ -1594,21 +1633,29 @@ class TagFolderSettingTab extends PluginSettingTab {
 			// this.plugin.setRoot(this.plugin.root);
 		};
 		new Setting(containerEl)
-			.setName("Order method")
-			.setDesc("how to order items")
+			.setName(tr("Order method"))
+			.setDesc(tr("how to order items"))
 			.addDropdown((dd) => {
-				dd.addOptions(OrderKeyItem)
+				dd.addOptions(
+					Object.fromEntries(
+						Object.entries(OrderKeyItem).map(([key, label]) => [key, tr(label)])
+					)
+				)
 					.setValue(this.plugin.settings.sortType.split("_")[0])
 					.onChange((key) => setOrderMethod(key, undefined));
 			})
 			.addDropdown((dd) => {
-				dd.addOptions(OrderDirection)
+				dd.addOptions(
+					Object.fromEntries(
+						Object.entries(OrderDirection).map(([key, label]) => [key, tr(label)])
+					)
+				)
 					.setValue(this.plugin.settings.sortType.split("_")[1])
 					.onChange((order) => setOrderMethod(undefined, order));
 			});
 		new Setting(containerEl)
-			.setName("Prioritize items which are not contained in sub-folder")
-			.setDesc("If this has been enabled, the items which have no more extra tags are first.")
+			.setName(tr("Prioritize items which are not contained in sub-folder"))
+			.setDesc(tr("If this has been enabled, the items which have no more extra tags are first."))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.sortExactFirst)
@@ -1618,9 +1665,9 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Use title")
+			.setName(tr("Use title"))
 			.setDesc(
-				"Use value in the frontmatter or first level one heading for `NAME`."
+				tr("Use value in the frontmatter or first level one heading for `NAME`.")
 			)
 			.addToggle((toggle) => {
 				toggle
@@ -1632,7 +1679,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		const fpath = new Setting(containerEl)
-			.setName("Frontmatter path")
+			.setName(tr("Frontmatter path"))
 			.setDisabled(!this.plugin.settings.useTitle)
 			.addText((text) => {
 				text
@@ -1643,7 +1690,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 
-		new Setting(containerEl).setName("Tags").setHeading();
+		new Setting(containerEl).setName(tr("Tags")).setHeading();
 
 		let selectedTagTreeStyle: TagTreeStyleSuggestion | undefined;
 		let applyTagTreeStyleButton: ButtonComponent | undefined;
@@ -1651,12 +1698,12 @@ class TagFolderSettingTab extends PluginSettingTab {
 			cls: "tagfolder-style-suggestion",
 		});
 		new Setting(tagTreeStyleSuggestionEl)
-			.setName("Suggested tag tree style")
-			.setDesc("Apply a suggested combination of tag tree settings.")
+			.setName(tr("Suggested tag tree style"))
+			.setDesc(tr("Apply a suggested combination of tag tree settings."))
 			.addDropdown((dropdown) => {
-				dropdown.addOption("", "Select a style");
+				dropdown.addOption("", tr("Select a style"));
 				for (const suggestion of TAG_TREE_STYLE_SUGGESTIONS) {
-					dropdown.addOption(suggestion.id, suggestion.name);
+					dropdown.addOption(suggestion.id, tr(suggestion.name));
 				}
 				dropdown.setValue("").onChange((value) => {
 					selectedTagTreeStyle = findTagTreeStyleSuggestion(value);
@@ -1667,7 +1714,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 			.addButton((button) => {
 				applyTagTreeStyleButton = button;
 				button
-					.setButtonText("Apply")
+					.setButtonText(tr("Apply"))
 					.setDisabled(true)
 					.onClick(async () => {
 						if (!selectedTagTreeStyle) return;
@@ -1678,7 +1725,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						);
 						await this.plugin.saveSettings();
 						this.display();
-						new Notice(`Applied '${appliedStyleName}' settings.`);
+						new Notice(tr("Applied '{name}' settings.", { name: appliedStyleName }));
 					});
 			});
 		const tagTreeStylePreviewEl = tagTreeStyleSuggestionEl.createDiv({
@@ -1696,22 +1743,30 @@ class TagFolderSettingTab extends PluginSettingTab {
 			// this.plugin.setRoot(this.plugin.root);
 		};
 		new Setting(containerEl)
-			.setName("Order method")
-			.setDesc("how to order tags")
+			.setName(tr("Order method"))
+			.setDesc(tr("how to order tags"))
 			.addDropdown((dd) => {
-				dd.addOptions(OrderKeyTag)
+				dd.addOptions(
+					Object.fromEntries(
+						Object.entries(OrderKeyTag).map(([key, label]) => [key, tr(label)])
+					)
+				)
 					.setValue(this.plugin.settings.sortTypeTag.split("_")[0])
 					.onChange((key) => setOrderMethodTag(key, undefined));
 			})
 			.addDropdown((dd) => {
-				dd.addOptions(OrderDirection)
+				dd.addOptions(
+					Object.fromEntries(
+						Object.entries(OrderDirection).map(([key, label]) => [key, tr(label)])
+					)
+				)
 					.setValue(this.plugin.settings.sortTypeTag.split("_")[1])
 					.onChange((order) => setOrderMethodTag(undefined, order));
 			});
 
 
 		new Setting(containerEl)
-			.setName("Use virtual tags")
+			.setName(tr("Use virtual tags"))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.useVirtualTag)
@@ -1721,7 +1776,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Display folder as tag")
+			.setName(tr("Display folder as tag"))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.displayFolderAsTag)
@@ -1731,8 +1786,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Store tags in frontmatter for new notes")
-			.setDesc("When enabled, tags are written to the note Properties. If no new-note template is selected, TagFolder still creates the note and stores tags here instead of as #hashtags.")
+			.setName(tr("Store tags in frontmatter for new notes"))
+			.setDesc(tr("When enabled, tags are written to the note Properties. If no new-note template is selected, TagFolder still creates the note and stores tags here instead of as #hashtags."))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.useFrontmatterTagsForNewNotes)
@@ -1742,8 +1797,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Template for new notes")
-			.setDesc("When set to a valid markdown file path, new notes use this template without opening the template picker. The .md extension is optional.")
+			.setName(tr("Template for new notes"))
+			.setDesc(tr("When set to a valid markdown file path, new notes use this template without opening the template picker. The .md extension is optional."))
 			.addText((text) => {
 				text
 					.setPlaceholder("Templates/New note")
@@ -1758,9 +1813,9 @@ class TagFolderSettingTab extends PluginSettingTab {
 				});
 			});
 
-		new Setting(containerEl).setName("Actions").setHeading();
+		new Setting(containerEl).setName(tr("Actions")).setHeading();
 		new Setting(containerEl)
-			.setName("Search tags inside TagFolder when clicking tags")
+			.setName(tr("Search tags inside TagFolder when clicking tags"))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.overrideTagClicking)
@@ -1770,7 +1825,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("List files in a separated pane")
+			.setName(tr("List files in a separated pane"))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.useMultiPaneList)
@@ -1780,24 +1835,28 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Show list in")
-			.setDesc("This option applies to the newly opened list")
+			.setName(tr("Show list in"))
+			.setDesc(tr("This option applies to the newly opened list"))
 			.addDropdown((dropdown) => {
 				dropdown
-					.addOptions(enumShowListIn)
+					.addOptions(
+						Object.fromEntries(
+							Object.entries(enumShowListIn).map(([key, label]) => [key, tr(label)])
+						)
+					)
 					.setValue(this.plugin.settings.showListIn)
 					.onChange(async (value) => {
 						this.plugin.settings.showListIn = value as keyof typeof enumShowListIn;
 						await this.plugin.saveSettings();
 					});
 			});
-		new Setting(containerEl).setName("Arrangements").setHeading();
+		new Setting(containerEl).setName(tr("Arrangements")).setHeading();
 
 		new Setting(containerEl)
-			.setName("Hide Items")
-			.setDesc("Hide items on the landing or nested tags")
+			.setName(tr("Hide Items"))
+			.setDesc(tr("Hide items on the landing or nested tags"))
 			.addDropdown((dd) => {
-				dd.addOptions(HideItemsType)
+				dd.addOptions(HideItemsType())
 					.setValue(this.plugin.settings.hideItems)
 					.onChange(async (key) => {
 						if (
@@ -1811,9 +1870,11 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Merge redundant combinations")
+			.setName(tr("Merge redundant combinations"))
 			.setDesc(
-				"When this feature is enabled, a/b and b/a are merged into a/b if there is no intermediates."
+				tr(
+					"When this feature is enabled, a/b and b/a are merged into a/b if there is no intermediates."
+				)
 			)
 			.addToggle((toggle) => {
 				toggle
@@ -1824,9 +1885,9 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Do not simplify empty folders")
+			.setName(tr("Do not simplify empty folders"))
 			.setDesc(
-				"Keep empty folders, even if they can be simplified."
+				tr("Keep empty folders, even if they can be simplified.")
 			)
 			.addToggle((toggle) => {
 				toggle
@@ -1838,8 +1899,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
-			.setName("Do not treat nested tags as dedicated levels")
-			.setDesc("Treat nested tags as normal tags")
+			.setName(tr("Do not treat nested tags as dedicated levels"))
+			.setDesc(tr("Treat nested tags as normal tags"))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.disableNestedTags)
@@ -1849,8 +1910,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Reduce duplicated parents in nested tags")
-			.setDesc("If enabled, #web/css, #web/javascript will merged into web -> css -> javascript")
+			.setName(tr("Reduce duplicated parents in nested tags"))
+			.setDesc(tr("If enabled, #web/css, #web/javascript will merged into web -> css -> javascript"))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.reduceNestedParent)
@@ -1861,7 +1922,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
-			.setName("Keep untagged items on the root")
+			.setName(tr("Keep untagged items on the root"))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.expandUntaggedToRoot)
@@ -1871,9 +1932,9 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 
-		new Setting(containerEl).setName("Link Folder").setHeading();
+		new Setting(containerEl).setName(tr("Link Folder")).setHeading();
 		new Setting(containerEl)
-			.setName("Use Incoming")
+			.setName(tr("Use Incoming"))
 			.setDesc("")
 			.addToggle((toggle) =>
 				toggle
@@ -1884,7 +1945,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Use Outgoing")
+			.setName(tr("Use Outgoing"))
 			.setDesc("")
 			.addToggle((toggle) =>
 				toggle
@@ -1895,7 +1956,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Hide indirectly linked notes")
+			.setName(tr("Hide indirectly linked notes"))
 			.setDesc("")
 			.addToggle((toggle) =>
 				toggle
@@ -1906,7 +1967,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Connect linked tree")
+			.setName(tr("Connect linked tree"))
 			.setDesc("")
 			.addToggle((toggle) =>
 				toggle
@@ -1917,10 +1978,10 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl).setName("Filters").setHeading();
+		new Setting(containerEl).setName(tr("Filters")).setHeading();
 		new Setting(containerEl)
-			.setName("Target Folders")
-			.setDesc("If configured, the plugin will only target files in it.")
+			.setName(tr("Target Folders"))
+			.setDesc(tr("If configured, the plugin will only target files in it."))
 			.addTextArea((text) =>
 				text
 					.setValue(this.plugin.settings.targetFolders)
@@ -1931,8 +1992,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Ignore Folders")
-			.setDesc("Ignore documents in specific folders.")
+			.setName(tr("Ignore Folders"))
+			.setDesc(tr("Ignore documents in specific folders."))
 			.addTextArea((text) =>
 				text
 					.setValue(this.plugin.settings.ignoreFolders)
@@ -1943,9 +2004,11 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Ignore note Tag")
+			.setName(tr("Ignore note Tag"))
 			.setDesc(
-				"If the note has a matching tag listed below, the note would be treated as there was not. Use * for glob matching."
+				tr(
+					"If the note has a matching tag listed below, the note would be treated as there was not. Use * for glob matching."
+				)
 			)
 			.addTextArea((text) =>
 				text
@@ -1957,8 +2020,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Ignore Tag")
-			.setDesc("Matching tags in the list would be treated as there were not. Use * for glob matching.")
+			.setName(tr("Ignore Tag"))
+			.setDesc(tr("Matching tags in the list would be treated as there were not. Use * for glob matching."))
 			.addTextArea((text) =>
 				text
 					.setValue(this.plugin.settings.ignoreTags)
@@ -1969,8 +2032,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 		new Setting(containerEl)
-			.setName("Archive tags")
-			.setDesc("If configured, notes with matching tags will be moved under the tag. Use * for glob matching.")
+			.setName(tr("Archive tags"))
+			.setDesc(tr("If configured, notes with matching tags will be moved under the tag. Use * for glob matching."))
 			.addTextArea((text) =>
 				text
 					.setValue(this.plugin.settings.archiveTags)
@@ -1981,12 +2044,14 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl).setName("Misc").setHeading();
+		new Setting(containerEl).setName(tr("Misc")).setHeading();
 
 		new Setting(containerEl)
-			.setName("Tag scanning delay")
+			.setName(tr("Tag scanning delay"))
 			.setDesc(
-				"Sets the delay for reflecting metadata changes to the tag tree. (Plugin reload is required.)"
+				tr(
+					"Sets the delay for reflecting metadata changes to the tag tree. (Plugin reload is required.)"
+				)
 			)
 			.addText((text) => {
 				text = text
@@ -2004,8 +2069,8 @@ class TagFolderSettingTab extends PluginSettingTab {
 				return text;
 			});
 		new Setting(containerEl)
-			.setName("Disable dragging tags")
-			.setDesc("The `Dragging tags` is using internal APIs. If something happens, please disable this once and try again.")
+			.setName(tr("Disable dragging tags"))
+			.setDesc(tr("The `Dragging tags` is using internal APIs. If something happens, please disable this once and try again."))
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.disableDragging)
@@ -2014,26 +2079,28 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		new Setting(containerEl).setName("Utilities").setHeading();
+		new Setting(containerEl).setName(tr("Utilities")).setHeading();
 
 		new Setting(containerEl)
-			.setName("Dumping tags for reporting bugs")
+			.setName(tr("Dumping tags for reporting bugs"))
 			.setDesc(
-				"If you want to open an issue to the GitHub, this information can be useful. and, also if you want to keep secrets about names of tags, you can use `disguised`."
+				tr(
+					"If you want to open an issue to the GitHub, this information can be useful. and, also if you want to keep secrets about names of tags, you can use `disguised`."
+				)
 			)
 			.addButton((button) =>
 				button
-					.setButtonText("Copy tags")
+					.setButtonText(tr("Copy tags"))
 					.setDisabled(false)
 					.onClick(async () => {
 						const itemsAll = await this.plugin.getItemsList("tag");
 						const items = itemsAll.map(e => e.tags.filter(e => e != "_untagged")).filter(e => e.length);
 						await navigator.clipboard.writeText(items.map(e => e.map(e => `#${e}`).join(", ")).join("\n"));
-						new Notice("Copied to clipboard");
+						new Notice(tr("Copied to clipboard"));
 					}))
 			.addButton((button) =>
 				button
-					.setButtonText("Copy disguised tags")
+					.setButtonText(tr("Copy disguised tags"))
 					.setDisabled(false)
 					.onClick(async () => {
 						const x = new Map<string, string>();
@@ -2043,7 +2110,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 							e.split("/").map(e => e.startsWith("_VIRTUAL") ? e : x.has(e) ? x.get(e) : (x.set(e, `tag${i++}`), i)).join("/")).filter(e => e.length));
 
 						await navigator.clipboard.writeText(items.map(e => e.map(e => `#${e}`).join(", ")).join("\n"));
-						new Notice("Copied to clipboard");
+						new Notice(tr("Copied to clipboard"));
 					})
 			);
 	}

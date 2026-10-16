@@ -8,6 +8,7 @@ import TagFolderPlugin from "./main";
 import { TagFolderViewBase } from "./TagFolderViewBase";
 import { mount, unmount } from "svelte";
 import { writable } from "svelte/store";
+import { tr } from "./i18n";
 
 export class TagFolderList extends TagFolderViewBase {
 
@@ -19,7 +20,7 @@ export class TagFolderList extends TagFolderViewBase {
 		super.onPaneMenu(menu, source);
 		menu.addItem(item => {
 			item.setIcon("pin")
-				.setTitle("Pin")
+				.setTitle(tr("Pin"))
 				.onClick(() => {
 					this.leaf.togglePinned();
 				})
@@ -67,7 +68,7 @@ export class TagFolderList extends TagFolderViewBase {
 	}
 
 	getDisplayText() {
-		return `Files with ${this.state.title}`;
+		return tr("Files with {title}", { title: this.state.title });
 	}
 
 	async onOpen() {

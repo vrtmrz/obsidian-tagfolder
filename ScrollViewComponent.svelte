@@ -3,6 +3,7 @@
 
 	import { type ScrollViewFile, type ScrollViewState } from "types";
 	import { renderSpecialTag, trimTrailingSlash } from "./util";
+	import { t, resolvedLocale } from "./i18n";
 
 	import ScrollViewMarkdown from "ScrollViewMarkdownComponent.svelte";
 	import { onDestroy } from "svelte";
@@ -26,8 +27,10 @@
 
 	const _state: ScrollViewState = $derived($store);
 	let files = $derived(_state.files);
-	const tagPath = $derived(
-		_state.tagPath
+	const tagPath = $derived.by(() => {
+		// renderSpecialTag 非响应式：读一次 locale store 建立依赖，语言切换后重算。
+		void $resolvedLocale;
+		return _state.tagPath
 			.split(", ")
 			.map(
 				(e) =>
@@ -37,8 +40,8 @@
 						.map((e) => renderSpecialTag(e.trim()))
 						.join("/"),
 			)
-			.join(", "),
-	);
+			.join(", ");
+	});
 	function handleOpenFile(e: MouseEvent, file: ScrollViewFile) {
 		openfile(file.path, false);
 		e.preventDefault();
@@ -73,7 +76,7 @@
 
 <div class="x">
 	<div class="header">
-		Files with {tagPath}
+		{$t("Files with {tagPath}", { tagPath })}
 	</div>
 	<hr />
 	{#each files as file}

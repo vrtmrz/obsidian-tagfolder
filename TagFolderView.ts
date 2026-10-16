@@ -4,6 +4,7 @@ import { VIEW_TYPE_TAGFOLDER, type TREE_TYPE, VIEW_TYPE_TAGFOLDER_LINK } from ".
 import TagFolderPlugin from "./main";
 import { TagFolderViewBase } from "./TagFolderViewBase";
 import { mount, unmount } from 'svelte'
+import { tr } from "./i18n";
 
 // export interface TagFolderViewState extends ViewState {
 // 	treeViewType: TREE_TYPE
@@ -38,7 +39,7 @@ export class TagFolderView extends TagFolderViewBase {
 	}
 
 	getDisplayText() {
-		return this.treeViewType == "tags" ? "Tag Folder" : "Link Folder";
+		return this.treeViewType == "tags" ? tr("Tag Folder") : tr("Link Folder");
 	}
 
 	async onOpen() {

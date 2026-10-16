@@ -2,6 +2,7 @@ import { Modal, type App } from "obsidian";
 import { mount, unmount } from "svelte";
 import NoteLookupModalComponent from "./NoteLookupModal.svelte";
 import type { LookupTagCondition, NoteLookupItem } from "./note-lookup";
+import { tr } from "./i18n";
 
 export interface OpenNoteLookupOptions {
 	readonly notes: readonly NoteLookupItem[];
@@ -18,7 +19,7 @@ export class NoteLookupModal extends Modal {
 	}
 
 	onOpen() {
-		this.setTitle("Note lookup");
+		this.setTitle(tr("Note lookup"));
 		this.modalEl.addClass("tagfolder-note-lookup-modal");
 		this.contentEl.empty();
 		this.component = mount(NoteLookupModalComponent, {

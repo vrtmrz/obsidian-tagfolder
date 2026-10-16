@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { applyLanguagePreference } from "../i18n";
 import type { WorkspaceLeaf } from "obsidian";
 import { TagFolderViewBase } from "../TagFolderViewBase";
 import {
@@ -131,6 +132,21 @@ class TestView extends TagFolderViewBase {
 describe("TagFolderViewBase.showOrder", () => {
 	beforeEach(() => {
 		menuInstances.length = 0;
+	});
+
+	afterEach(() => applyLanguagePreference("en"));
+
+	it("translates the flattened list menu while preserving its saved setting values", async () => {
+		applyLanguagePreference("zh-CN");
+		const plugin = createPlugin("NAME_ASC");
+		new TestView(VIEW_TYPE_TAGFOLDER_LIST, plugin).showOrder(new MouseEvent("contextmenu"));
+		const menu = menuInstances[0];
+		expect(menu.items.map((item) => item.title)).toContain("文件名 升序");
+		const descending = menu.items.find((item) => item.title === "文件名 降序");
+		expect(descending).toBeDefined();
+		await descending!.click();
+		expect(plugin.settings.sortType).toBe("NAME_DESC");
+		expect(plugin.saveSettings).toHaveBeenCalledOnce();
 	});
 
 	it("shows every item sort option directly for list views and saves each selection", async () => {

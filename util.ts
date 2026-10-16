@@ -1,4 +1,6 @@
 import { allViewItemsByLink, tagInfo } from "store";
+import { compareStrings } from "./locale";
+import { tr } from "./i18n";
 import {
 	EPOCH_DAY,
 	EPOCH_HOUR,
@@ -59,7 +61,7 @@ export function isSpecialTag(tagSrc: string) {
 
 let tagDispAlternativeDict: { [key: string]: string } = {};
 tagInfo.subscribe(tagInfo => {
-	tagDispAlternativeDict = { ...tagDispDict };
+	tagDispAlternativeDict = {};
 	if (tagInfo == null) {
 		return;
 	}
@@ -73,7 +75,8 @@ tagInfo.subscribe(tagInfo => {
 
 export function renderSpecialTag(tagSrc: string) {
 	const tag = trimSlash(tagSrc);
-	return tag in tagDispAlternativeDict ? tagDispAlternativeDict[tag] : tagSrc;
+	if (tag in tagDispAlternativeDict) return tagDispAlternativeDict[tag];
+	return tag in tagDispDict ? tr(tagDispDict[tag]) : tagSrc;
 }
 
 export function secondsToFreshness(totalAsMSec: number) {
@@ -142,7 +145,7 @@ export const doEvents = () => {
 
 
 export function compare(x: string, y: string) {
-	return `${x || ""}`.localeCompare(y, undefined, { numeric: true })
+	return compareStrings(`${x || ""}`, y);
 }
 
 

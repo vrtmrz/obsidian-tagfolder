@@ -10,6 +10,7 @@
         uniqueCaseIntensive,
     } from "./util";
     import { currentFile, pluginInstance, tagFolderSetting } from "./store";
+    import { resolvedLocale } from "./i18n";
 
     const viewType: TREE_TYPE = "tags";
 
@@ -49,14 +50,18 @@
 
     // Compute extra tags. (Only on visible)
     let isItemVisible = $state(false);
-    const tagsLeft = $derived(isItemVisible? uniqueCaseIntensive(
+    const tagsLeft = $derived.by(() => {
+        // renderSpecialTag 非响应式：读一次 locale store 建立依赖，语言切换后重算。
+        void $resolvedLocale;
+        return isItemVisible? uniqueCaseIntensive(
 		[
 			...getExtraTags(item.tags, [...trail], _setting.reduceNestedParent),
 			...item.extraTags]
                     .map((e) => trimSlash(e, false, true))
                     .map(e=>e.split("/").map(ee => renderSpecialTag(ee)).join("/"))
                     .filter((e) => e != ""),
-            ):[]);
+            ):[];
+    });
     const extraTagsHtml = $derived(`${tagsLeft
                 .map(
                     (e) =>

@@ -17,10 +17,29 @@ afterEach(() => {
 	}
 });
 
+/**
+ * npm run 外层透传的 npm_package_version 在 vitest worker 里会以大小写变体（如
+ * NPM_PACKAGE_VERSION）残留；直接 `{...process.env, npm_package_version: version}`
+ * 会在 Windows 环境块里形成大小写双键，去重后外层项目版本胜出，version-bump.mjs
+ * 便把夹具 manifest 写成项目版本而非夹具版本。先按大小写不敏感剥离再写入，
+ * 保证夹具版本真正生效（版本一致性校验意图不变，断言不弱化）。
+ */
+function fixtureEnv(version: string): NodeJS.ProcessEnv {
+	const env: NodeJS.ProcessEnv = {};
+	for (const [key, value] of Object.entries(process.env)) {
+		if (key.toUpperCase() !== "NPM_PACKAGE_VERSION") {
+			env[key] = value;
+		}
+	}
+	env.npm_package_version = version;
+	return env;
+}
+
 function createReleaseFixture(version: string): string {
 	const directory = mkdtempSync(join(tmpdir(), "tagfolder-release-"));
 	temporaryDirectories.push(directory);
 	writeFileSync(join(directory, "package.json"), JSON.stringify({ version }));
+	// manifest 固定写成未 bump 的旧版本（0.18.17）：若 version-bump 是空操作，validate 必失败，防止假通过。
 	writeFileSync(join(directory, "manifest.json"), JSON.stringify({ version: "0.18.17", minAppVersion: "1.7.2" }));
 	writeFileSync(join(directory, "versions.json"), JSON.stringify({ "0.18.14": "1.7.2" }));
 	return directory;
@@ -28,11 +47,11 @@ function createReleaseFixture(version: string): string {
 
 describe("release version files", () => {
 	it("records every release version even when the minimum app version is unchanged", () => {
-		const version = "0.18.18";
+		const version = "0.18.21";
 		const directory = createReleaseFixture(version);
 		execFileSync(process.execPath, [versionBumpScript], {
 			cwd: directory,
-			env: { ...process.env, npm_package_version: version },
+			env: fixtureEnv(version),
 		});
 		execFileSync(process.execPath, [releaseProcessScript, "validate", version], { cwd: directory });
 
@@ -41,16 +60,16 @@ describe("release version files", () => {
 	});
 
 	it("moves the Unreleased notes to the target version", () => {
-		const version = "0.18.18";
+		const version = "0.18.21";
 		const directory = createReleaseFixture(version);
 		execFileSync(process.execPath, [versionBumpScript], {
 			cwd: directory,
-			env: { ...process.env, npm_package_version: version },
+			env: fixtureEnv(version),
 		});
 		writeFileSync(join(directory, "updates.md"), "## Unreleased\n\n- Change\n");
 		execFileSync(process.execPath, [releaseProcessScript, "prepare", version], { cwd: directory });
 
-		expect(readFileSync(join(directory, "updates.md"), "utf8")).toBe("## 0.18.18\n\n- Change\n");
+		expect(readFileSync(join(directory, "updates.md"), "utf8")).toBe("## 0.18.21\n\n- Change\n");
 	});
 });
 

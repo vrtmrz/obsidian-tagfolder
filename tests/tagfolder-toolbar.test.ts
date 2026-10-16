@@ -4,6 +4,7 @@ import { writable } from "svelte/store";
 import TagFolderViewComponent from "../TagFolderViewComponent.svelte";
 import { searchString, tagFolderSetting } from "../store";
 import { DEFAULT_SETTINGS, type TagFolderListState } from "../types";
+import { applyLanguagePreference } from "../i18n";
 
 vi.mock("../V2TreeFolderComponent.svelte", () => ({ default: () => ({}) }));
 
@@ -38,6 +39,7 @@ afterEach(async () => {
 	component = undefined;
 	target.remove();
 	vi.unstubAllGlobals();
+	applyLanguagePreference("en");
 });
 
 async function renderToolbar(overrides: Partial<ViewProps> = {}) {
@@ -70,6 +72,15 @@ function sortButton() {
 }
 
 describe("sort toolbar", () => {
+	it("updates the list sort button when the interface language changes", async () => {
+		await renderToolbar({ tags: ["project"] });
+		sortButton();
+		applyLanguagePreference("zh-CN");
+		await tick();
+		expect(target.querySelector('[aria-label="更改排序方式"]')).not.toBeNull();
+		expect(target.querySelector('[aria-label="Change sort order"]')).toBeNull();
+	});
+
 	it.each([["project"], ["project/client"]])(
 		"shows an initialised sort button on a list filtered by %s",
 		async (tag) => {

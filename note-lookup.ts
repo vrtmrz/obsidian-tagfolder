@@ -1,3 +1,4 @@
+import { compareStrings } from "./locale";
 import { parseTagFilterPatterns, tagMatchesFilterPatterns } from "./tag-filters";
 
 export interface NoteLookupSource {
@@ -160,7 +161,7 @@ export function getTagCompletions(
 			const rightPrefix = right.tag.toLowerCase().startsWith(queryLower) ? 1 : 0;
 			if (leftPrefix != rightPrefix) return rightPrefix - leftPrefix;
 			if (left.paths.size != right.paths.size) return right.paths.size - left.paths.size;
-			return left.tag.localeCompare(right.tag, undefined, { numeric: true, sensitivity: "base" });
+			return compareStrings(left.tag, right.tag, { sensitivity: "base" });
 		})
 		.map(({ tag, paths }) => ({ tag, excluded, noteCount: paths.size }));
 }
@@ -239,6 +240,6 @@ export function rankNoteLookupItems(
 		if (left.matchCount != right.matchCount) return right.matchCount - left.matchCount;
 		if (left.queryScore != right.queryScore) return right.queryScore - left.queryScore;
 		if (left.mtime != right.mtime) return right.mtime - left.mtime;
-		return left.path.localeCompare(right.path, undefined, { numeric: true, sensitivity: "base" });
+		return compareStrings(left.path, right.path, { sensitivity: "base" });
 	});
 }

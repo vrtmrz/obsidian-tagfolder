@@ -1,4 +1,5 @@
 import type { TagFolderSettings } from "./types";
+import { tr } from "./i18n";
 
 export type TagTreeStyleSuggestionId = "simple-list" | "drill-down" | "full-tree";
 
@@ -184,12 +185,12 @@ export function renderTagTreeStylePreview(
 	const document = container.ownerDocument;
 	const descriptionEl = document.createElement("div");
 	descriptionEl.className = "tagfolder-style-preview-description";
-	descriptionEl.textContent = suggestion.description;
+	descriptionEl.textContent = tr(suggestion.description);
 	container.append(descriptionEl);
 
 	const sampleLabelEl = document.createElement("div");
 	sampleLabelEl.className = "tagfolder-style-preview-label";
-	sampleLabelEl.textContent = "Sample notes";
+	sampleLabelEl.textContent = tr("Sample notes");
 	container.append(sampleLabelEl);
 
 	const sampleEl = document.createElement("div");
@@ -215,7 +216,7 @@ export function renderTagTreeStylePreview(
 
 	const treeLabelEl = document.createElement("div");
 	treeLabelEl.className = "tagfolder-style-preview-label";
-	treeLabelEl.textContent = "Rendered project branch";
+	treeLabelEl.textContent = tr("Rendered project branch");
 	container.append(treeLabelEl);
 
 	const treeEl = document.createElement("div");

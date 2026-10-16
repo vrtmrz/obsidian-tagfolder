@@ -9,6 +9,7 @@
 		type RankedNoteLookupItem,
 		type TagCompletion,
 	} from "./note-lookup";
+	import { t } from "./i18n";
 
 	interface Props {
 		notes: readonly NoteLookupItem[];
@@ -116,7 +117,9 @@
 		activeCompletionIndex = 0;
 		activeNoteIndex = 0;
 		activeChipIndex = -1;
-		announcement = `${completion.excluded ? "Excluded" : "Added"} tag ${completion.tag}`;
+		announcement = completion.excluded
+			? $t("Excluded tag {tag}", { tag: completion.tag })
+			: $t("Added tag {tag}", { tag: completion.tag });
 		tagInputEl?.focus();
 	}
 
@@ -130,7 +133,7 @@
 		} else if (activeChipIndex >= 0) {
 			activeChipIndex = Math.min(index, conditions.length - 1);
 		}
-		announcement = `Removed tag ${removed.tag}`;
+		announcement = $t("Removed tag {tag}", { tag: removed.tag });
 		tagInputEl?.focus();
 	}
 
@@ -274,7 +277,7 @@
 
 <div class="note-lookup">
 	<div class="tag-field">
-		<label for="tagfolder-note-lookup-tag-input">Tags</label>
+		<label for="tagfolder-note-lookup-tag-input">{$t("Tags")}</label>
 		<div class="tag-input-shell">
 			<div class="tag-chips" id="tagfolder-note-lookup-selected-tags">
 				{#each conditions as condition, index (`${condition.excluded ? "-" : "+"}${condition.tag}`)}
@@ -285,7 +288,9 @@
 						class:active={activeChipIndex == index}
 						class="tag-chip multi-select-pill"
 						tabindex="-1"
-						aria-label={`Remove ${condition.excluded ? "excluded " : ""}tag ${condition.tag}`}
+						aria-label={condition.excluded
+							? $t("Remove excluded tag {tag}", { tag: condition.tag })
+							: $t("Remove tag {tag}", { tag: condition.tag })}
 						onclick={() => removeCondition(index)}
 					>
 						<span class="multi-select-pill-content">{condition.excluded ? "- " : ""}#{condition.tag}</span>
@@ -300,8 +305,8 @@
 					role="combobox"
 					spellcheck="false"
 					autocomplete="off"
-					placeholder={conditions.length == 0 ? "Type a tag…" : "Add a tag…"}
-					aria-label="Tag conditions"
+					placeholder={conditions.length == 0 ? $t("Type a tag…") : $t("Add a tag…")}
+					aria-label={$t("Tag conditions")}
 					aria-controls="tagfolder-note-lookup-completions tagfolder-note-lookup-notes tagfolder-note-lookup-selected-tags"
 					aria-expanded={showCompletions}
 					aria-activedescendant={tagActiveDescendant}
@@ -318,7 +323,7 @@
 
 		{#if showCompletions}
 			<div class="completions suggestion-container">
-				<div class="suggestion" id="tagfolder-note-lookup-completions" role="listbox" aria-label="Tag completions">
+				<div class="suggestion" id="tagfolder-note-lookup-completions" role="listbox" aria-label={$t("Tag completions")}>
 					{#each completions as completion, index (completion.tag)}
 						<button
 							type="button"
@@ -333,7 +338,7 @@
 							onclick={() => addCompletion(completion)}
 						>
 							<span>{completion.excluded ? "-" : ""}#{completion.tag}</span>
-							<span class="count">{completion.noteCount} {completion.noteCount == 1 ? "note" : "notes"}</span>
+							<span class="count">{completion.noteCount == 1 ? $t("{count} note", { count: completion.noteCount }) : $t("{count} notes", { count: completion.noteCount })}</span>
 						</button>
 					{/each}
 				</div>
@@ -341,7 +346,7 @@
 		{/if}
 	</div>
 
-	<label for="tagfolder-note-lookup-note-input">Note</label>
+	<label for="tagfolder-note-lookup-note-input">{$t("Note")}</label>
 	<input
 		id="tagfolder-note-lookup-note-input"
 		bind:this={noteInputEl}
@@ -351,8 +356,8 @@
 		role="combobox"
 		spellcheck="false"
 		autocomplete="off"
-		placeholder="Type a file name or path…"
-		aria-label="Note name or path"
+		placeholder={$t("Type a file name or path…")}
+		aria-label={$t("Note name or path")}
 		aria-controls="tagfolder-note-lookup-notes"
 		aria-expanded="true"
 		aria-activedescendant={noteActiveDescendant}
@@ -361,11 +366,11 @@
 	/>
 
 	<div class="result-summary" aria-hidden="true">
-		<span>{rankedNotes.length} {rankedNotes.length == 1 ? "note" : "notes"}</span>
-		<span>Tab: switch field · ↑↓: select · Enter: open</span>
+		<span>{rankedNotes.length == 1 ? $t("{count} note", { count: rankedNotes.length }) : $t("{count} notes", { count: rankedNotes.length })}</span>
+		<span>{$t("Tab: switch field · ↑↓: select · Enter: open")}</span>
 	</div>
 
-	<div class="notes prompt-results" id="tagfolder-note-lookup-notes" role="listbox" aria-label="Matching notes">
+	<div class="notes prompt-results" id="tagfolder-note-lookup-notes" role="listbox" aria-label={$t("Matching notes")}>
 		{#each visibleNotes as item, index (item.path)}
 			<button
 				type="button"
@@ -403,7 +408,7 @@
 			</button>
 		{/each}
 		{#if visibleNotes.length == 0}
-			<div class="empty-result">No matching notes</div>
+			<div class="empty-result">{$t("No matching notes")}</div>
 		{/if}
 	</div>
 
