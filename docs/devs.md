@@ -20,6 +20,8 @@ The App-free Vitest suite includes TagFolder tree utilities and the new-note app
 
 The `eslint-plugin-obsidianmd` override follows the root `obsidian` dependency so tooling uses one SDK with patched transitive dependencies. Reassess the override when the lint package updates its pinned SDK. The SDK type version is independent of `manifest.json`'s minimum app version; guard newer runtime APIs with `requireApiVersion()`.
 
+CI installs dependencies with npm 10.9.9 to check compatibility with its lockfile resolver. For dependency changes, also verify a clean installation with the current npm version before committing the lockfile.
+
 ## Language and string ordering
 
 `obsidian-locale.ts` reads the application language through `getLanguage()`, guarded by `requireApiVersion('1.8.7')`. If the API is unavailable or returns an empty or invalid language code, language detection uses English. The minimum supported application version remains 1.7.2.
