@@ -26,11 +26,11 @@ async function seedTemplate(vaultPath: string): Promise<void> {
 	);
 }
 
-export async function startTagFolderTestSession(): Promise<TagFolderTestSession> {
+export async function startTagFolderTestSession(prefix = "tagfolder-e2e-"): Promise<TagFolderTestSession> {
 	const cli = discoverObsidianCli();
 	if (!cli.binary) throw new Error(`Could not find obsidian-cli. Checked: ${cli.checked.join(", ")}`);
 	const vault = await createTemporaryVault({
-		prefix: "tagfolder-e2e-",
+		prefix,
 		pluginIds: [TAGFOLDER_PLUGIN_ID],
 		idPrefix: "tagfolder-e2e",
 	});
