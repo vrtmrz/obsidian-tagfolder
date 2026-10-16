@@ -61,4 +61,8 @@ export function parseYaml() {
 	return {};
 }
 
+export function requireApiVersion(_version: string) {
+	return true;
+}
+
 export const Platform = {};

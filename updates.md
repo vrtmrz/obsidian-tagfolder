@@ -8,7 +8,7 @@
 
 ### Improved
 
--   Sort names and tags using the Obsidian interface language independently of the TagFolder display language.
+-   Sort names and tags using the Obsidian interface language independently of the TagFolder display language. Use English when the application language cannot be read, including on Obsidian versions before 1.8.7.
 -   Fall back to English for untranslated interfaces, including Traditional Chinese, and preserve user-defined tag labels.
 
 ### Digging the weeds

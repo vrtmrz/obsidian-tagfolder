@@ -5,34 +5,30 @@ import { compare, renderSpecialTag } from "../util";
 import { detectAppLanguage, getAppLanguage, setAppLanguage } from "../locale";
 
 beforeEach(() => {
-	window.localStorage.clear();
 	setAppLanguage("en");
 	applyLanguagePreference("en");
 	tagInfo.set({});
 });
 
 afterEach(() => {
-	window.localStorage.clear();
 	setAppLanguage("en");
 	applyLanguagePreference("en");
 	tagInfo.set({});
 });
 
-function followStoredLanguage(language: string) {
-	window.localStorage.setItem("language", language);
-	// eslint-disable-next-line obsidianmd/prefer-get-language -- Retain regression coverage for the legacy stored-language input.
-	setAppLanguage(detectAppLanguage({ getStoredLanguage: () => window.localStorage.getItem("language") }));
+function followAppLanguage(language: string) {
+	setAppLanguage(detectAppLanguage({ getLanguage: () => language }));
 	applyLanguagePreference("auto");
 }
 
 describe("interface translations", () => {
 	it.each(["zh-TW", "zh-Hant", "zh-HK"])("falls back to English for the untranslated %s interface", (language) => {
-		followStoredLanguage(language);
+		followAppLanguage(language);
 		expect(tr("Tags")).toBe("Tags");
 	});
 
 	it("follows Simplified Chinese and permits an explicit English override", () => {
-		followStoredLanguage("zh");
+		followAppLanguage("zh");
 		expect(tr("Tags")).toBe("标签");
 		applyLanguagePreference("en");
 		expect(tr("Tags")).toBe("Tags");
