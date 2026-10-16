@@ -5,10 +5,11 @@
 -   Nested tags can be excluded or archived as a group with `*` patterns (PR #138). Exact entries keep their previous meaning; use `tag,tag/*` to include a parent and its descendants. Thank you @boabab for the contribution.
 -   Note lookup and similar-note lookup apply the same ignored-note and ignored-tag patterns as the tag tree.
 -   Added a Simplified Chinese interface and a `Language` setting (PR #162).
+-   Added `Tag grouping` item ordering, using the written tag sequence to keep each branch and its descendants together (PR #163).
 
 ### Improved
 
--   Sort names and tags using the Obsidian interface language independently of the TagFolder display language. Use English when the application language cannot be read, including on Obsidian versions before 1.8.7.
+-   Sort names and tags using the Obsidian interface language with natural numeric ordering, independently of the TagFolder display language. Use English when the application language cannot be read, including on Obsidian versions before 1.8.7.
 -   Fall back to English for untranslated interfaces, including Traditional Chinese, and preserve user-defined tag labels.
 
 ### Digging the weeds
