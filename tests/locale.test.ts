@@ -1,27 +1,24 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { compareStrings, createStringComparator, detectAppLanguage, getAppLanguage, setAppLanguage } from "../locale";
 
 afterEach(() => setAppLanguage("en"));
 
 describe("application language selection", () => {
-	it("prefers the official API without consulting legacy sources", () => {
-		const getStoredLanguage = vi.fn(() => "en");
-		const getMomentLocale = vi.fn(() => "en");
-		expect(detectAppLanguage({ getLanguage: () => "ja", getStoredLanguage, getMomentLocale })).toBe("ja");
-		expect(getStoredLanguage).not.toHaveBeenCalled();
-		expect(getMomentLocale).not.toHaveBeenCalled();
+	it("uses the language reported by the official API", () => {
+		expect(detectAppLanguage({ getLanguage: () => "ja" })).toBe("ja");
 	});
 
-	it("uses the existing stored language on older Obsidian versions", () => {
-		expect(detectAppLanguage({ getStoredLanguage: () => "zh_tw", getMomentLocale: () => "en" })).toBe("zh-TW");
+	it("normalises legacy language codes", () => {
+		expect(detectAppLanguage({ getLanguage: () => "zh_tw" })).toBe("zh-TW");
 	});
 
-	it("uses Moment when the other sources are missing, invalid, or inaccessible", () => {
+	it("uses English when the language is missing, invalid, or inaccessible", () => {
 		expect(detectAppLanguage({
 			getLanguage: () => "not a locale",
-			getStoredLanguage: () => { throw new Error("Storage unavailable"); },
-			getMomentLocale: () => "zh-cn",
-		})).toBe("zh-CN");
+		})).toBe("en");
+		expect(detectAppLanguage({
+			getLanguage: () => { throw new Error("Language unavailable"); },
+		})).toBe("en");
 		expect(detectAppLanguage({})).toBe("en");
 	});
 

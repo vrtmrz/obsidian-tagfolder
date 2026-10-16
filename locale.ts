@@ -1,7 +1,5 @@
 interface LanguageSources {
 	getLanguage?: () => unknown;
-	getStoredLanguage?: () => unknown;
-	getMomentLocale?: () => unknown;
 }
 
 let appLanguage = "en";
@@ -18,15 +16,11 @@ function normaliseLanguage(value: unknown): string | undefined {
 }
 
 export function detectAppLanguage(sources: LanguageSources): string {
-	for (const read of [sources.getLanguage, sources.getStoredLanguage, sources.getMomentLocale]) {
-		try {
-			const language = normaliseLanguage(read?.());
-			if (language) return language;
-		} catch {
-			// Older Obsidian versions or unavailable storage may lack a source.
-		}
+	try {
+		return normaliseLanguage(sources.getLanguage?.()) ?? "en";
+	} catch {
+		return "en";
 	}
-	return "en";
 }
 
 export function setAppLanguage(language: string): void {

@@ -6,42 +6,75 @@ import { buildNoteLookupItems, getTagCompletions, rankNoteLookupItems } from "..
 
 const sources = vi.hoisted(() => ({
 	getLanguage: undefined as (() => string) | undefined,
-	getMomentLocale: (): string => "en",
+	supportsGetLanguage: true,
 }));
 
 vi.mock("obsidian", () => ({
 	get getLanguage() { return sources.getLanguage; },
-	moment: { locale: () => sources.getMomentLocale() },
+	requireApiVersion: (version: string) => version === "1.8.7" && sources.supportsGetLanguage,
 }));
 
 beforeEach(() => {
 	window.localStorage.clear();
 	sources.getLanguage = undefined;
-	sources.getMomentLocale = () => "en";
+	sources.supportsGetLanguage = true;
 });
 
 afterEach(() => {
+	vi.restoreAllMocks();
 	window.localStorage.clear();
 	setAppLanguage("en");
 });
 
 describe("Obsidian locale integration", () => {
+	it("uses English on older Obsidian without reading shared or vault-local language keys", () => {
+		sources.supportsGetLanguage = false;
+		window.localStorage.setItem("language", "zh_tw");
+		window.localStorage.setItem("vault-a-language", JSON.stringify("zh-CN"));
+		window.localStorage.setItem("vault-b-language", JSON.stringify("en"));
+		const readStorage = vi.spyOn(Storage.prototype, "getItem");
+		configureAppLocale();
+		expect(getAppLanguage()).toBe("en");
+		expect(readStorage).not.toHaveBeenCalled();
+	});
+
 	it("uses the official API ahead of an old stored language", () => {
 		sources.getLanguage = () => "ja";
 		window.localStorage.setItem("language", "en");
+		const readStorage = vi.spyOn(Storage.prototype, "getItem");
 		configureAppLocale();
 		expect(getAppLanguage()).toBe("ja");
+		expect(readStorage).not.toHaveBeenCalled();
 		expect(compare("政治", "英语")).toBeGreaterThan(0);
 	});
 
-	it("retains the stored-language and Moment fallbacks without the new API", () => {
+	it("uses English when the official API is unavailable", () => {
 		window.localStorage.setItem("language", "zh_tw");
 		configureAppLocale();
-		expect(getAppLanguage()).toBe("zh-TW");
-		window.localStorage.clear();
-		sources.getMomentLocale = () => "ja";
+		expect(getAppLanguage()).toBe("en");
+	});
+
+	it("does not call the new API on an older Obsidian version", () => {
+		sources.supportsGetLanguage = false;
+		const readLanguage = vi.fn(() => "ja");
+		sources.getLanguage = readLanguage;
 		configureAppLocale();
-		expect(getAppLanguage()).toBe("ja");
+		expect(getAppLanguage()).toBe("en");
+		expect(readLanguage).not.toHaveBeenCalled();
+	});
+
+	it.each(["", "not a locale"])("uses English for an empty or invalid API result: %j", (language) => {
+		sources.getLanguage = () => language;
+		window.localStorage.setItem("language", "zh_tw");
+		configureAppLocale();
+		expect(getAppLanguage()).toBe("en");
+	});
+
+	it("uses English if the official API throws", () => {
+		sources.getLanguage = () => { throw new Error("Language unavailable"); };
+		window.localStorage.setItem("language", "zh_tw");
+		configureAppLocale();
+		expect(getAppLanguage()).toBe("en");
 	});
 
 	it("uses the same Japanese collation for file names, completions, and tied lookup results", () => {
