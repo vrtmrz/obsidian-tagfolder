@@ -297,6 +297,22 @@ describe("collectTreeChildren", () => {
 			["project", ["active.md"]],
 		]);
 	});
+
+	it("routes wildcard archives using matched tags instead of possible branch matches", async () => {
+		const active = viewItem("active.md", ["project"]);
+		const archived = viewItem("archived.md", ["archive/done", "project"]);
+
+		const result = await collectTagTree({
+			tags: ["archive/", "project"],
+			items: [active, archived],
+			setting: { archiveTags: "*/done" },
+		});
+
+		expect(treeSummary(result.children)).toEqual([
+			["archive/", ["archived.md"]],
+			["project", ["active.md"]],
+		]);
+	});
 });
 
 describe("performSortExactFirst", () => {

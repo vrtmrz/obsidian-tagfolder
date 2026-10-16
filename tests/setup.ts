@@ -1,6 +1,7 @@
 declare global {
 	interface Array<T> {
 		contains(searchElement: T, fromIndex?: number): boolean;
+		first(): T | undefined;
 	}
 
 	interface String {
@@ -12,6 +13,14 @@ if (!Array.prototype.contains) {
 	Object.defineProperty(Array.prototype, "contains", {
 		value: function contains<T>(this: T[], searchElement: T, fromIndex?: number) {
 			return this.includes(searchElement, fromIndex);
+		},
+	});
+}
+
+if (!Array.prototype.first) {
+	Object.defineProperty(Array.prototype, "first", {
+		value: function first<T>(this: T[]) {
+			return this[0];
 		},
 	});
 }

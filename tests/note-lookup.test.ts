@@ -59,6 +59,31 @@ describe("note lookup sources", () => {
 			splitNestedTags: true,
 		})).toEqual(["Project", "Client", "area", "home"]);
 	});
+
+	it("excludes notes matching a document glob while keeping the parent tag", () => {
+		const items = buildNoteLookupItems([
+			note("parent.md", ["#private", "#project"]),
+			note("nested.md", ["#private/client/draft", "#project"]),
+		], {
+			...policy,
+			ignoreDocumentTags: ["#private/*"],
+		});
+
+		expect(items.map((item) => item.path)).toEqual(["parent.md"]);
+	});
+
+	it("hides glob-matched tags without excluding their notes or hiding exact-match descendants", () => {
+		const items = buildNoteLookupItems([
+			note("visible.md", ["#Hidden/Client", "#project", "#exact/child"]),
+		], {
+			...policy,
+			ignoreTags: ["#hidden/*", "exact"],
+		});
+
+		expect(items.map((item) => [item.path, item.tags])).toEqual([
+			["visible.md", ["project", "exact/child"]],
+		]);
+	});
 });
 
 describe("tag conditions", () => {

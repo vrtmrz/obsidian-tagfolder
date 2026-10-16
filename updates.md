@@ -1,3 +1,14 @@
+## Unreleased
+
+### New features
+
+-   Nested tags can be excluded or archived as a group with `*` patterns (PR #138). Exact entries keep their previous meaning; use `tag,tag/*` to include a parent and its descendants. Thank you @boabab for the contribution.
+-   Note lookup and similar-note lookup apply the same ignored-note and ignored-tag patterns as the tag tree.
+
+### Digging the weeds
+
+-   Added regression coverage for wildcard archive routing, exact matching, and note lookup filtering.
+
 ## 0.18.22
 
 15th September, 2026
