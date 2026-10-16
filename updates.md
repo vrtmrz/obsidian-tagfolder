@@ -3,10 +3,11 @@
 ### New features
 
 -   Added a Simplified Chinese interface and a `Language` setting (PR #162).
+-   Added `Tag grouping` item ordering, using the written tag sequence to keep each branch and its descendants together (PR #163).
 
 ### Improved
 
--   Sort names and tags using the Obsidian interface language independently of the TagFolder display language.
+-   Sort names and tags using the Obsidian interface language with natural numeric ordering, independently of the TagFolder display language.
 -   Fall back to English for untranslated interfaces, including Traditional Chinese, and preserve user-defined tag labels.
 
 ## 0.18.22

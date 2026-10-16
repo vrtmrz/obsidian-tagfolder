@@ -24,6 +24,8 @@ The App-free Vitest suite includes TagFolder tree utilities and the new-note app
 
 Tests which assert a language-specific order select that language explicitly and reset it afterwards.
 
+Tag grouping keys preserve the full written tag sequence. Each item comparator owns its grouping-key cache and collation function; language changes create a new comparator instead of reusing an earlier sorting context.
+
 ## UI and Vault boundaries
 
 The plug-in owns one `UiInteractions` capability, one `VaultTextAccess` capability, and one `VaultFrontmatterAccess` capability for its lifetime:

@@ -61,6 +61,8 @@ export interface TagFolderSettings {
 	"DISPNAME_DESC" |
 	"NAME_ASC" |
 	"NAME_DESC" |
+	"TAGGROUP_ASC" |
+	"TAGGROUP_DESC" |
 	"MTIME_ASC" |
 	"MTIME_DESC" |
 	"CTIME_ASC" |
@@ -198,6 +200,7 @@ export const OrderDirection: Record<string, string> = {
 export const OrderKeyItem: Record<string, string> = {
 	DISPNAME: "Displaying name",
 	NAME: "File name",
+	TAGGROUP: "Tag grouping",
 	MTIME: "Modified time",
 	CTIME: "Created time",
 	FULLPATH: "Fullpath of the file",

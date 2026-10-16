@@ -81,6 +81,8 @@ const itemSortOptions: Array<{
 	{ title: "Displaying name Descending", value: "DISPNAME_DESC" },
 	{ title: "File name Ascending", value: "NAME_ASC" },
 	{ title: "File name Descending", value: "NAME_DESC" },
+	{ title: "Tag grouping Ascending", value: "TAGGROUP_ASC" },
+	{ title: "Tag grouping Descending", value: "TAGGROUP_DESC" },
 	{ title: "Modified time Ascending", value: "MTIME_ASC" },
 	{ title: "Modified time Descending", value: "MTIME_DESC" },
 	{ title: "Created time Ascending", value: "CTIME_ASC" },
@@ -219,7 +221,7 @@ describe("TagFolderViewBase.showOrder", () => {
 				"Fullpath of the file Ascending",
 			]);
 
-			await itemMenu.items[9].click(event);
+			await itemMenu.items[itemSortOptions.findIndex((option) => option.value === "FULLPATH_DESC")].click(event);
 			expect(plugin.settings.sortType).toBe("FULLPATH_DESC");
 			expect(plugin.settings.sortTypeTag).toBe("NAME_ASC");
 			expect(plugin.saveSettings).toHaveBeenCalledTimes(2);

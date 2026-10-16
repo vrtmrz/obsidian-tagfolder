@@ -1,5 +1,5 @@
 import { allViewItemsByLink, tagInfo } from "store";
-import { compareStrings } from "./locale";
+import { compareStrings, createStringComparator } from "./locale";
 import { tr } from "./i18n";
 import {
 	EPOCH_DAY,
@@ -289,6 +289,68 @@ export function selectCompareMethodTags(settings: TagFolderSettings, tagInfo: Ta
 				return compare(aPrefix + aName, bPrefix + bName) * invert;
 			}
 	}
+}
+
+/**
+ * Keep remaining real tags in their stored order. Virtual tags with path
+ * suffixes are excluded by checking their first path segment as well.
+ */
+function getEffectiveTags(item: ViewItem, trail: string[], reduceNestedParent: boolean): string[] {
+	return uniqueCaseIntensive(
+		[
+			...getExtraTags(item.tags, [...trail], reduceNestedParent),
+			...item.extraTags,
+		]
+			.map((e) => trimSlash(trimSlash(e, true, false), false, true))
+			.filter((e) => e != "" && !isSpecialTag(e) && !isSpecialTag(e.split("/")[0])),
+	);
+}
+
+/**
+ * The tags of an item, as a stable grouping key.
+ *
+ * Each written tag selects the next branch. Reordering tags therefore changes
+ * the key, even when the note carries the same set of tags.
+ */
+export function getTagGroups(
+	item: ViewItem,
+	trail: string[],
+	reduceNestedParent: boolean,
+): string[] {
+	return getEffectiveTags(item, trail, reduceNestedParent);
+}
+
+/**
+ * Selects the compare method for items under the tag-grouping order.
+ *
+ * The tags of an item are treated as the branches of a tree, so that items
+ * sharing an ordered tag sequence stay together:
+ *   1. the first written tag decides the branch (natural order between branches),
+ *   2. subsequent tags select successive branches in their written order,
+ *   3. a parent comes before its descendants, keeping each branch together.
+ * Items without tags behave like the root itself and come first.
+ */
+export function selectCompareMethodItemsByTagGroup(settings: TagFolderSettings) {
+	const invert = settings.sortType.contains("_DESC") ? -1 : 1;
+	const compareTags = createStringComparator();
+	const cache = new WeakMap<ViewItem, string[]>();
+	const groups = (item: ViewItem) => {
+		let key = cache.get(item);
+		if (!key) {
+			key = getTagGroups(item, [], settings.reduceNestedParent);
+			cache.set(item, key);
+		}
+		return key;
+	};
+	return (a: ViewItem, b: ViewItem) => {
+		const aGroups = groups(a);
+		const bGroups = groups(b);
+		for (let i = 0; i < Math.min(aGroups.length, bGroups.length); i++) {
+			const byTag = compareTags(aGroups[i], bGroups[i]) * invert;
+			if (byTag != 0) return byTag;
+		}
+		return (aGroups.length - bGroups.length) * invert;
+	};
 }
 
 /**
