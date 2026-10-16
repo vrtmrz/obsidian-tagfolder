@@ -19,6 +19,7 @@
 	import { onDestroy, onMount, tick } from "svelte";
 	import { setIcon } from "obsidian";
 	import { trimTrailingSlash } from "./util";
+	import { isVisibleInArchiveBranch, parseTagFilterPatterns } from "./tag-filters";
 	import { setContext } from "svelte";
 	import type { Writable } from "svelte/store";
 
@@ -298,20 +299,9 @@
 		const firstLevel = trimTrailingSlash(tags.first() ?? "").toLowerCase();
 
 		// Processing archive tags
-		const archiveTags = _setting.archiveTags
-			.toLowerCase()
-			.replace(/[\n ]/g, "")
-			.split(",");
+		const archiveTags = parseTagFilterPatterns(_setting.archiveTags);
 
-		if (!archiveTags.contains(firstLevel)) {
-			items = items.filter(
-				(item) =>
-					!item.tags.some((e) =>
-						archiveTags.contains(e.toLowerCase()),
-					),
-			);
-		}
-		return items;
+		return items.filter((item) => isVisibleInArchiveBranch(item.tags, firstLevel, archiveTags));
 	});
 
 	const componentHash = `${Math.random()}`;

@@ -1,6 +1,7 @@
 
 import type { TREE_TYPE, TagFolderSettings, TagInfoDict, ViewItem } from "./types";
-import { V2FI_IDX_CHILDREN, type V2FolderItem, trimTrailingSlash, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame } from "./util";
+import { V2FI_IDX_CHILDREN, type V2FolderItem, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame } from "./util";
+import { isVisibleInArchiveBranch, parseTagFilterPatterns } from "./tag-filters";
 
 export function performSortExactFirst(_items: ViewItem[], children: V2FolderItem[], leftOverItems: ViewItem[]) {
 
@@ -158,31 +159,16 @@ export async function collectTreeChildren(
             if (isMainTree && isRoot) {
                 // Remove all items which have been already archived except is on the root.
 
-                const archiveTags = _setting.archiveTags
-                    .toLowerCase()
-                    .replace(/[\n ]/g, "")
-                    .split(",");
+                const archiveTags = parseTagFilterPatterns(_setting.archiveTags);
                 wChildren = wChildren
-                    .map((e) => {
-                        const childTagPath = `${trimTrailingSlash(e[V2FI_IDX_TAG].toLowerCase())}/`;
-                        return archiveTags.some((aTag) =>
-                            `${trimTrailingSlash(aTag)}/`.startsWith(childTagPath)
-                        )
-                            ? e
-                            : ([
-                                e[V2FI_IDX_TAG],
-                                e[V2FI_IDX_TAGNAME],
-                                e[V2FI_IDX_TAGDISP],
-                                e[V2FI_IDX_CHILDREN].filter(
-                                    (items) =>
-                                        !items.tags.some((e) =>
-                                            archiveTags.contains(
-                                                e.toLowerCase()
-                                            )
-                                        )
-                                ),
-                            ] as V2FolderItem)
-                    })
+                    .map((e) => [
+                        e[V2FI_IDX_TAG],
+                        e[V2FI_IDX_TAGNAME],
+                        e[V2FI_IDX_TAGDISP],
+                        e[V2FI_IDX_CHILDREN].filter((item) =>
+                            isVisibleInArchiveBranch(item.tags, e[V2FI_IDX_TAG], archiveTags)
+                        ),
+                    ] as V2FolderItem)
                     .filter(
                         (child) => child[V2FI_IDX_CHILDREN].length != 0
                     );

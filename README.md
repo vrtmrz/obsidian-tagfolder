@@ -314,6 +314,22 @@ topic
 
 #### Filters
 
+Tag filter settings accept comma-separated tag names. A leading `#` is optional, so `tag1` and `#tag1` are treated the same.
+
+By default, entries match exact tags only. Use `*` for glob matching:
+
+```
+tag1
+#tag1/*
+project/*/done
+```
+
+- `tag1` matches only `#tag1`.
+- `#tag1/*` matches nested tags such as `#tag1/tag2` and `#tag1/tag3`.
+- `tag1,tag1/*` matches both the parent tag and its descendants.
+- `project/*/done` matches nested tags with any single or multi-level text between `project/` and `/done`.
+
+Note lookup and similar-note lookup use the same ignored-note and ignored-tag patterns as the tag tree.
 
 ##### Target Folders
 If we set this, the plugin will only target files in it.
@@ -327,12 +343,17 @@ Ignore documents in specific folders.
 ##### Ignore note Tag
 
 If the note has the tag that is set in here, the note would be treated as there was not.
+Glob entries can ignore a whole nested tag group, for example `#tag1/*`.
 
 ##### Ignore Tag
 
 Tags that were set here would be treated as there were not.
+Glob entries can hide matching nested tags while leaving non-matching tags visible.
 
 ##### Archive tags
+
+If configured, notes with matching tags are shown under those tags instead of unrelated top-level tag folders.
+Glob entries can archive a whole nested tag group, for example `#archive/*`.
 
 ## Development
 
