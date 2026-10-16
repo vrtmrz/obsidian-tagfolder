@@ -15,6 +15,8 @@ export default defineConfig({
 	}],
 	resolve: {
 		conditions: ["browser"],
+		// Keep source imports ahead of a previous build's main.js artefact.
+		extensions: [".ts", ".mts", ".mjs", ".js", ".tsx", ".jsx", ".json"],
 		alias: {
 			obsidian: `${root}tests/mocks/obsidian.ts`,
 			store: `${root}store.ts`,
