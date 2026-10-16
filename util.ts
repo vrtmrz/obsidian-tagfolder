@@ -1,4 +1,5 @@
 import { allViewItemsByLink, tagInfo } from "store";
+import { compareStrings, createStringComparator } from "./locale";
 import {
 	EPOCH_DAY,
 	EPOCH_HOUR,
@@ -142,7 +143,7 @@ export const doEvents = () => {
 
 
 export function compare(x: string, y: string) {
-	return `${x || ""}`.localeCompare(y, undefined, { numeric: true })
+	return compareStrings(`${x || ""}`, y);
 }
 
 
@@ -289,22 +290,8 @@ export function selectCompareMethodTags(settings: TagFolderSettings, tagInfo: Ta
 }
 
 /**
- * The branch tag of an item: the first tag as the note lists it.
- * Plug-ins and the file cache keep the written order, so `#随记 #政治` branches
- * on `随记` rather than on whichever tag happens to sort first.
- */
-function getBranchTag(tags: string[]): string {
-	return tags[0];
-}
-
-/**
- * Tags which the user still sees on the row, with special tags removed.
- * Special tags (`_untagged`, `_VIRTUAL_TAG_*`, canvas and folder tags) must not
- * join the grouping, otherwise every item would look different from every other.
- * `isSpecialTag` only knows the bare names, while some of them are emitted with
- * a suffix (`_VIRTUAL_TAG_FRESHNESS/FRESHNESS_01`), so the first piece decides.
- * The `reduceNestedParent` flag only decides *how much* of a trail tag is
- * stripped: the remaining tag list is the same either way, so we can pass `true`.
+ * Keep remaining real tags in their stored order. Virtual tags with path
+ * suffixes are excluded by checking their first path segment as well.
  */
 function getEffectiveTags(item: ViewItem, trail: string[], reduceNestedParent: boolean): string[] {
 	return uniqueCaseIntensive(
@@ -318,59 +305,52 @@ function getEffectiveTags(item: ViewItem, trail: string[], reduceNestedParent: b
 }
 
 /**
- * Memoised grouping keys, to avoid recomputing the tags of an item on every
- * comparison. `ViewItem`s are rebuilt rather than mutated, so this stays small.
- */
-const tagGroupCache = new WeakMap<ViewItem, string[]>();
-
-/**
  * The tags of an item, as a stable grouping key.
  *
- * The first written tag stays in front, because it is the branch this item
- * hangs from; the remaining ones are sorted so that two notes carrying the same
- * tags always produce the same key, whatever order they were written in.
+ * Each written tag selects the next branch. Reordering tags therefore changes
+ * the key, even when the note carries the same set of tags.
  */
-export function getTagGroups(item: ViewItem, trail: string[], reduceNestedParent: boolean): string[] {
-	const cached = tagGroupCache.get(item);
-	if (cached) return cached;
-	const tags = getEffectiveTags(item, trail, reduceNestedParent);
-	const groups = tags.length < 2 ? tags : [getBranchTag(tags), ...tags.slice(1).sort(compare)];
-	tagGroupCache.set(item, groups);
-	return groups;
+export function getTagGroups(
+	item: ViewItem,
+	trail: string[],
+	reduceNestedParent: boolean,
+): string[] {
+	return getEffectiveTags(item, trail, reduceNestedParent);
 }
 
 /**
  * Selects the compare method for items under the tag-grouping order.
  *
  * The tags of an item are treated as the branches of a tree, so that items
- * sharing a tag combination stay together:
+ * sharing an ordered tag sequence stay together:
  *   1. the first written tag decides the branch (natural order between branches),
- *   2. items with a single tag (a leaf file) come before items branching further,
- *   3. otherwise the tag lists are compared tag by tag.
+ *   2. subsequent tags select successive branches in their written order,
+ *   3. a parent comes before its descendants, keeping each branch together.
  * Items without tags behave like the root itself and come first.
  * @param settings 
  * @returns 
  */
 export function selectCompareMethodItemsByTagGroup(settings: TagFolderSettings) {
 	const invert = settings.sortType.contains("_DESC") ? -1 : 1;
-	return (a: ViewItem, b: ViewItem) => {
-		const aGroups = getTagGroups(a, [], settings.reduceNestedParent);
-		const bGroups = getTagGroups(b, [], settings.reduceNestedParent);
-		if (aGroups.length == 0 || bGroups.length == 0) {
-			// Untagged items are the root itself; they are not a branch.
-			if (aGroups.length == bGroups.length) return 0;
-			return (aGroups.length == 0 ? -1 : 1) * invert;
+	const compareTags = createStringComparator();
+	const cache = new WeakMap<ViewItem, string[]>();
+	const groups = (item: ViewItem) => {
+		let key = cache.get(item);
+		if (!key) {
+			key = getTagGroups(item, [], settings.reduceNestedParent);
+			cache.set(item, key);
 		}
-		const byFirstTag = compare(aGroups[0], bGroups[0]) * invert;
-		if (byFirstTag != 0) return byFirstTag;
-		if (aGroups.length != bGroups.length)
-			return (aGroups.length - bGroups.length) * invert;
-		for (let i = 1; i < aGroups.length; i++) {
-			const byTag = compare(aGroups[i], bGroups[i]) * invert;
+		return key;
+	};
+	return (a: ViewItem, b: ViewItem) => {
+		const aGroups = groups(a);
+		const bGroups = groups(b);
+		for (let i = 0; i < Math.min(aGroups.length, bGroups.length); i++) {
+			const byTag = compareTags(aGroups[i], bGroups[i]) * invert;
 			if (byTag != 0) return byTag;
 		}
-		return 0;
-	}
+		return (aGroups.length - bGroups.length) * invert;
+	};
 }
 
 /**

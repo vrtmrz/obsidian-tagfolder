@@ -1,3 +1,13 @@
+## Unreleased
+
+### New features
+
+-   Added `Tag grouping` item ordering, using the written tag sequence to keep each branch and its descendants together (PR #163).
+
+### Improved
+
+-   Sort names and tags using the Obsidian interface language, with natural numeric ordering.
+
 ## 0.18.22
 
 15th September, 2026

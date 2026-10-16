@@ -92,10 +92,16 @@ You can configure how the entry shows.
 ##### Order method
 
 You can order items by:
+
 - Displaying name
 - Filename
+- Tag grouping
 - Modified time
 - Fullpath of the file
+
+`Tag grouping` treats tags in their written order as a sequence of branches. In ascending order, `#project #client` comes before `#project #client #report`, keeping that branch together before moving to the next branch. Notes with the same tags in a different order belong to different branches. Untagged notes come first, and virtual tags are excluded from grouping. Descending order reverses this sequence.
+
+Names and tags are compared using the Obsidian interface language, with natural numeric ordering.
 
 ##### Use title
 
