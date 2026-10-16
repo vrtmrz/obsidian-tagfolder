@@ -17,6 +17,7 @@ interface TagFolderE2EPlugin {
 	settings: {
 		uiLanguage: LanguagePreference;
 		sortType: string;
+		useMultiPaneList: boolean;
 	};
 	allViewItems: Array<{ path: string; tags: string[]; extraTags: string[] }>;
 	loadFileInfoAsync(): Promise<void>;
@@ -36,6 +37,7 @@ interface ObsidianE2EApp {
 	metadataCache: {
 		getFileCache(file: unknown): { tags?: unknown[]; frontmatter?: { tags?: string[] } } | null;
 	};
+	workspace: { getLeavesOfType(type: string): Array<{ detach(): void }> };
 }
 
 declare global {
@@ -69,6 +71,8 @@ const artifactDirectory = resolve(
 );
 const listSelector = '.workspace-leaf-content[data-type="tagfolder-view-list"]';
 const rowSelector = `${listSelector} .nav-file-title[data-path]`;
+const treeSelector = '.workspace-split.mod-left-split .workspace-leaf-content:has(.tagfolder-buttons-container):not([data-type="tagfolder-view-list"])';
+const treeRowSelector = `${treeSelector} .nav-folder:not(.mod-root):not(.is-collapsed) > .tree-item-children > .nav-file .nav-file-title[data-path]`;
 
 async function openSettings(page: Page, id = TAGFOLDER_PLUGIN_ID): Promise<void> {
 	await page.evaluate((tabId) => {
@@ -148,26 +152,67 @@ async function openProjectList(page: Page): Promise<void> {
 	await page.locator(listSelector).waitFor({ state: "visible" });
 }
 
-async function assertOrder(page: Page, language: AppLanguage, descending = false): Promise<string[]> {
+async function assertOrder(page: Page, language: AppLanguage, descending = false, selector = rowSelector): Promise<string[]> {
 	const expected = ascendingIndexes[language].map((index) => fixtures[index].path);
 	if (descending) expected.reverse();
 	try {
 		await page.waitForFunction(({ selector, expected }) => {
 			const actual = Array.from(document.querySelectorAll<HTMLElement>(selector), (row) => row.dataset.path);
 			return JSON.stringify(actual) === JSON.stringify(expected);
-		}, { selector: rowSelector, expected }, { timeout: 10_000 });
+		}, { selector, expected }, { timeout: 10_000 });
 	} catch {
-		const actual = await page.locator(rowSelector).evaluateAll((rows) => rows.map((row) => row.getAttribute("data-path")));
+		const actual = await page.locator(selector).evaluateAll((rows) => rows.map((row) => row.getAttribute("data-path")));
 		assert.deepEqual(actual, expected, `Visible ${language} ${descending ? "descending" : "ascending"} order`);
 	}
-	await page.locator(`${rowSelector} .nav-file-title-content`).filter({ hasText: "12 Branch A" }).waitFor();
+	await page.locator(`${selector} .nav-file-title-content`).filter({ hasText: "12 Branch A" }).waitFor();
 	return expected;
 }
 
-async function selectGroupingInMenu(page: Page, descending: boolean, chinese: boolean): Promise<void> {
-	await page.locator(listSelector).getByLabel(chinese ? "更改排序方式" : "Change sort order", { exact: true }).click();
+async function selectGroupingInMenu(page: Page, descending: boolean, chinese: boolean, scope = listSelector): Promise<void> {
+	await page.locator(scope).getByLabel(chinese ? "更改排序方式" : "Change sort order", { exact: true }).click();
+	if (scope === treeSelector) {
+		await page.locator(".menu-item").filter({ hasText: /^Items$/ }).click();
+	}
 	const direction = chinese ? (descending ? "降序" : "升序") : (descending ? "Descending" : "Ascending");
 	await page.locator(".menu-item").filter({ hasText: new RegExp(`^Tag grouping ${direction}$`) }).click();
+}
+
+function projectTag(page: Page): Locator {
+	return page.locator(`${treeSelector} .tagfolder-titletagname`).filter({ hasText: /^project$/ });
+}
+
+async function prepareLeftPane(page: Page): Promise<void> {
+	await selectAppLanguage(page, "ja");
+	await selectInterfaceLanguage(page, "auto");
+	await assertInterfaceLanguage(page, false);
+	await page.locator('.vertical-tab-content select').filter({
+		has: page.locator('option[value="CURRENT_PANE"]'),
+	}).selectOption("");
+	await closeSettings(page);
+	await page.evaluate(async (id) => {
+		const app = globalThis.app;
+		for (const leaf of app.workspace.getLeavesOfType("tagfolder-view-list")) leaf.detach();
+		await app.plugins.plugins[id].activateView();
+	}, TAGFOLDER_PLUGIN_ID);
+	await page.locator(treeSelector).getByLabel("Collapse all", { exact: true }).click();
+	await projectTag(page).scrollIntoViewIfNeeded();
+	await projectTag(page).click();
+}
+
+async function openDefaultSidebarList(page: Page): Promise<void> {
+	await openSettings(page);
+	const setting = page.locator('.vertical-tab-content .setting-item').filter({
+		has: page.locator('.setting-item-name').filter({ hasText: /^List files in a separated pane$/ }),
+	});
+	await setting.locator(".checkbox-container").click();
+	await page.waitForFunction((id) => globalThis.app.plugins.plugins[id].settings.useMultiPaneList,
+		TAGFOLDER_PLUGIN_ID);
+	await closeSettings(page);
+	await projectTag(page).click();
+	await page.locator(listSelector).waitFor({ state: "visible" });
+	assert.equal(await page.locator(listSelector).evaluate((element) => (
+		element.closest(".workspace-split.mod-left-split") != null
+	)), true, "The default separated list belongs to the left sidebar");
 }
 
 async function seedNotes(page: Page): Promise<void> {
@@ -215,7 +260,7 @@ async function main(): Promise<void> {
 		action: (
 			page: Page,
 			capture: (name: string) => Promise<void>,
-			check: (name: string, language: AppLanguage, descending?: boolean) => Promise<void>,
+			check: (name: string, language: AppLanguage, descending?: boolean, selector?: string) => Promise<void>,
 		) => Promise<void>,
 	): Promise<void> => {
 		assert.ok(testSession);
@@ -227,9 +272,9 @@ async function main(): Promise<void> {
 				await page.screenshot({ path });
 				screenshots.push(path);
 			};
-			const check = async (name: string, language: AppLanguage, descending = false): Promise<void> => {
+			const check = async (name: string, language: AppLanguage, descending = false, selector = rowSelector): Promise<void> => {
 				stage = name;
-				checks.push({ stage, paths: await assertOrder(page, language, descending) });
+				checks.push({ stage, paths: await assertOrder(page, language, descending, selector) });
 			};
 			try {
 				await action(page, capture, check);
@@ -309,6 +354,17 @@ async function main(): Promise<void> {
 			await openProjectList(page);
 			await check("Traditional Chinese auto ascending", "zh-TW");
 			await capture("09-traditional-chinese-auto-ascending");
+
+			await prepareLeftPane(page);
+			await selectGroupingInMenu(page, false, false, treeSelector);
+			await check("Japanese ascending inside the left tag tree", "ja", false, treeRowSelector);
+			await capture("10-left-tag-tree-ascending");
+			await selectGroupingInMenu(page, true, false, treeSelector);
+			await check("Japanese descending inside the left tag tree", "ja", true, treeRowSelector);
+			await capture("11-left-tag-tree-descending");
+			await openDefaultSidebarList(page);
+			await check("Japanese descending in the default separated sidebar list", "ja", true);
+			await capture("12-default-left-sidebar-list");
 		});
 		assert.deepEqual(pageErrors, [], "Uncaught errors in the Obsidian renderer");
 		await writeFile(join(artifactDirectory, "report.json"), JSON.stringify({ status: "passed", fixtures, checks, screenshots, pageErrors }, null, 2));
