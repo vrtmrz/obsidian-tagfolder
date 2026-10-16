@@ -8,6 +8,7 @@
 		"dev": "node --env-file=.env esbuild.config.mjs",
 		"build": "node esbuild.config.mjs production",
 		"lint": "eslint .",
+		"lint:community": "eslint --config eslint.community.config.mjs .",
 		"test": "vitest run",
 		"coverage": "vitest run --coverage",
 		"svelte-check": "svelte-check --tsconfig ./tsconfig.json",
@@ -19,7 +20,7 @@
 		"test:e2e:obsidian:tag-tree-style": "npm run build && npm run prepare:e2e:obsidian && tsx test/e2e-obsidian/tag-tree-style.mts",
 		"test:e2e:obsidian:locale-tag-order": "npm run build && npm run prepare:e2e:obsidian && tsx test/e2e-obsidian/locale-tag-order.mts",
 		"test:e2e:obsidian:tag-filters": "npm run build && npm run prepare:e2e:obsidian && tsx test/e2e-obsidian/tag-filters.mts",
-		"check": "npm run lint && npm run test && npm run svelte-check && npm run tsc-check",
+		"check": "npm run lint && npm run lint:community && npm run test && npm run svelte-check && npm run tsc-check",
 		"version": "node version-bump.mjs"
 	},
 	"keywords": [],
@@ -32,16 +33,16 @@
 		"@tsconfig/svelte": "^5.0.4",
 		"@types/node": "^22.20.1",
 		"@typescript-eslint/parser": "^8.48.1",
-		"@vitest/coverage-v8": "^4.1.9",
+		"@vitest/coverage-v8": "^4.1.12",
 		"@vrtmrz/obsidian-test-session": "0.2.0",
 		"esbuild": "^0.28.1",
 		"esbuild-svelte": "^0.9.3",
 		"eslint": "^9.39.1",
-		"eslint-plugin-obsidianmd": "^0.3.0",
+		"eslint-plugin-obsidianmd": "^0.4.2",
 		"eslint-plugin-svelte": "^3.13.0",
 		"globals": "^14.0.0",
 		"jsdom": "^29.1.1",
-		"obsidian": "^1.10.3",
+		"obsidian": "^1.14.4",
 		"playwright": "^1.61.1",
 		"svelte": "^5.45.5",
 		"svelte-check": "^4.3.4",
@@ -50,10 +51,15 @@
 		"terser": "^5.44.1",
 		"tsx": "^4.23.0",
 		"typescript": "^5.9.3",
-		"vitest": "^4.1.9"
+		"vitest": "^4.1.12"
 	},
 	"dependencies": {
 		"@vrtmrz/obsidian-plugin-kit": "0.1.1",
 		"@vrtmrz/ui-interactions": "0.1.0"
+	},
+	"overrides": {
+		"eslint-plugin-obsidianmd": {
+			"obsidian": "$obsidian"
+		}
 	}
 }

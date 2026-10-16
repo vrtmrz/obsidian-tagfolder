@@ -15,6 +15,8 @@
 ### Digging the weeds
 
 -   Added regression coverage for wildcard archive routing, exact matching, and note lookup filtering.
+-   Updated development dependencies to address dependency audit findings.
+-   Added Community Review checks for source code, and used Obsidian's DOM helpers for tag-tree previews.
 
 ## 0.18.22
 

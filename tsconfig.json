@@ -2,6 +2,7 @@
 	"extends": "@tsconfig/svelte/tsconfig.json",
     "inlineSourceMap": true,
 	"compilerOptions": {
+		"noEmit": true,
 		"baseUrl": ".",
 		"module": "ESNext",
         "target": "ES2018",
@@ -21,6 +22,6 @@
             "es2019.array"
         ]
 	},
-	"include": ["**/*.ts", "**/*.svelte"],
+	"include": ["**/*.ts", "**/*.svelte", "svelte.config.js"],
 	"exclude": ["utilsdeno"]
 }

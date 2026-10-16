@@ -16,6 +16,10 @@ npm run build
 
 The App-free Vitest suite includes TagFolder tree utilities and the new-note application workflow.
 
+`npm run check` also runs `lint:community` for source review. The checks run sequentially. The Community Review configuration follows the file exclusions and enforcement levels in the [published Obsidian scanner](https://github.com/obsidianmd/obsidian-workflows/blob/8167caed39664214d82c86fdfa32e06d8d55f61d/src/lint.ts); the remote Community Review remains authoritative.
+
+The `eslint-plugin-obsidianmd` override follows the root `obsidian` dependency so tooling uses one SDK with patched transitive dependencies. Reassess the override when the lint package updates its pinned SDK. The SDK type version is independent of `manifest.json`'s minimum app version; guard newer runtime APIs with `requireApiVersion()`.
+
 ## Language and string ordering
 
 `obsidian-locale.ts` reads the application language through `getLanguage()`, guarded by `requireApiVersion('1.8.7')`. If the API is unavailable or returns an empty or invalid language code, language detection uses English. The minimum supported application version remains 1.7.2.
