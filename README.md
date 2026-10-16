@@ -106,6 +106,14 @@ Dotted path to retrieve title from frontmatter.
 
 #### Tags
 
+##### Suggested tag tree styles
+
+Select a suggested style to see a small example beneath the setting, then choose `Apply` to update the related tag-tree settings together. The applied settings remain individually editable.
+
+- `Simple list` shows notes directly beneath each tag and displays their other tags as labels.
+- `Drill-down` uses other tags as additional folders and shows notes at the deepest matching level.
+- `Full tree` also shows notes at intermediate levels.
+
 ##### Order method
 
 You can order tags by:
@@ -131,7 +139,40 @@ When we enable this feature, the folder will be shown as a tag.
 
 This setting changes how tags are stored in new notes created by TagFolder. When disabled, tags are stored as #hashtags at the top of new notes. When enabled, tags are stored in the frontmatter and displayed in the note's Properties.
 
+##### Template for new notes
+
+When this setting is set to a valid markdown template path, TagFolder uses that template immediately when creating a new note from the tag tree. The `.md` extension is optional. If a non-empty path is invalid, TagFolder opens a template picker. If the setting is empty, TagFolder creates the note without a template and uses the configured Properties or hashtag behaviour.
+
+Settings suggestions are captured when the settings tab opens; reopen the tab to refresh them. The new-note template selection dialog captures a fresh list each time it opens.
+
+Templates can include these placeholders, which are replaced with the tags from the clicked location:
+
+| Placeholder        | Replacement                         |
+| ------------------ | ----------------------------------- |
+| `{{expandedTags}}` or `{{tags}}` | Tags as hashtags, e.g. `#tag1 #tag2` |
+| `{{tagList}}`      | Tags as comma-separated text, e.g. `tag1, tag2` |
+| `{{tagPath}}`      | Tags as a slash-separated path, e.g. `tag1/tag2` |
+| `{{tagName}}`      | The last tag in the clicked context |
+| `{{tagsJson}}`     | Tags as a JSON array                |
+| `{{tagsYaml}}`     | Tags as YAML list lines             |
+
 #### Actions
+
+##### Open notes by tags
+
+Run `Open note by tags` from the command palette to find and open a note by incrementally adding tag conditions. Positive tags use OR matching and results with more matching tags appear first. Prefix a tag with `-` to exclude matching notes completely. A separate note input fuzzily filters titles and Vault-relative paths.
+
+Run `Open note with similar tags` while a Markdown note is active to start with that note's tags selected. The active note itself is omitted from the results.
+
+The dialogue is keyboard-operable:
+
+- Type a tag, then press `Space` or `Enter` to accept a completion.
+- Press `Backspace` in an empty tag input to remove the last tag, or press `ArrowLeft` to select a tag chip and remove it with `Backspace` or `Delete`.
+- Press `Tab` or `Shift+Tab` to switch between the tag and note inputs.
+- Press `ArrowUp` or `ArrowDown` to select a completion or note.
+- Press `Enter` to open the selected note, or `Ctrl+Enter`/`Cmd+Enter` to open it in a new tab.
+
+See the [complete interaction design](docs/note-lookup-design.md) for focus, nested-tag matching, accessibility, and IME behaviour.
 
 ##### Search tags inside TagFolder when clicking tags
 We can search tags inside TagFolder when clicking tags instead of opening the default search pane.
@@ -162,64 +203,64 @@ This setting affects as like below.
 
 ```
 daily
-    → 2021
-        → 11
-            status
-                → jot
-                    2021-11-03
-                → summarized
-                    2021-11-01
-                    2021-11-02
-                2021-11-01
-                2021-11-02
-                2021-11-03
-            2021-11-01
-            2021-11-02
-            2021-11-03
-        2021-11-01
-        2021-11-02
-        2021-11-03
-        2021-12-01
-        → 12
-            :
-    2021-11-01
-    2021-11-02
-    2021-11-03
-    2021-12-01
+	→ 2021
+		→ 11
+			status
+				→ jot
+					2021-11-03
+				→ summarized
+					2021-11-01
+					2021-11-02
+				2021-11-01
+				2021-11-02
+				2021-11-03
+			2021-11-01
+			2021-11-02
+			2021-11-03
+		2021-11-01
+		2021-11-02
+		2021-11-03
+		2021-12-01
+		→ 12
+			:
+	2021-11-01
+	2021-11-02
+	2021-11-03
+	2021-12-01
 ```
 
 - Only intermediates of nested tags
 Hide only intermediates of nested tags, so show items only on the last or break of the nested tags.
 ```
 daily
-    → 2021
-        → 11
-            status
-                → jot
-                    2021-11-03
-                → summarized
-                    2021-11-01
-                    2021-11-02
-            2021-11-01
-            2021-11-02
-            2021-11-03
-        → 12
-            :
+	→ 2021
+		→ 11
+			status
+				→ jot
+					2021-11-03
+				→ summarized
+					2021-11-01
+					2021-11-02
+			2021-11-01
+			2021-11-02
+			2021-11-03
+		→ 12
+			:
 ```
 - All intermediates
 Hide all intermediates, so show items only deepest.
 ```
 daily
-    → 2021
-        → 11
-            status
-                → jot
-                    2021-11-03
-                → summarized
-                    2021-11-01
-                    2021-11-02
-        → 12
-            :
+	→ 2021
+		→ 11
+			status
+				→ jot
+					2021-11-03
+				→ summarized
+					2021-11-01
+					2021-11-02
+		→ 12
+			:
 ```
 
 ##### Merge redundant combinations
@@ -241,19 +282,19 @@ If we have the doc (e.g., `example note`) with nested tags which have the same p
 - Disabled
 ```
 topic
-     - > calculus
-         topic
-               - > electromagnetics
-                   example note
-         example note 
+	 - > calculus
+		 topic
+			   - > electromagnetics
+				   example note
+		 example note 
 ```
 - Enabled
 ```
 topic
-     - > calculus
-          - > electromagnetics
-              example note
-         example note 
+	 - > calculus
+		  - > electromagnetics
+			  example note
+		 example note 
 ```
 
 #### Filters
@@ -295,3 +336,7 @@ Glob entries can hide matching nested tags while leaving non-matching tags visib
 
 If configured, notes with matching tags will be moved under the archive tag.
 Glob entries can archive a whole nested tag group, for example `#archive/*`.
+
+## Development
+
+Contributor setup, tests, and UI/Vault workflow architecture are documented in [the developer guide](docs/devs.md).

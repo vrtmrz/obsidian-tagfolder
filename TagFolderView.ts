@@ -1,13 +1,13 @@
-import { WorkspaceLeaf, type ViewState } from "obsidian";
+import { WorkspaceLeaf } from "obsidian";
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 import { VIEW_TYPE_TAGFOLDER, type TREE_TYPE, VIEW_TYPE_TAGFOLDER_LINK } from "./types";
 import TagFolderPlugin from "./main";
 import { TagFolderViewBase } from "./TagFolderViewBase";
 import { mount, unmount } from 'svelte'
 
-export interface TagFolderViewState extends ViewState {
-	treeViewType: TREE_TYPE
-}
+// export interface TagFolderViewState extends ViewState {
+// 	treeViewType: TREE_TYPE
+// }
 export class TagFolderView extends TagFolderViewBase {
 	icon = "stacked-levels";
 	treeViewType?: TREE_TYPE;
@@ -47,16 +47,16 @@ export class TagFolderView extends TagFolderViewBase {
 			{
 				target: this.containerEl,
 				props: {
-					openFile: this.plugin.focusFile,
+					openFile: this.plugin.focusFile.bind(this.plugin),
 					hoverPreview: (a: MouseEvent, b: string) => this.plugin.hoverPreview(a, b),
 					vaultName: this.app.vault.getName(),
-					showMenu: this.showMenu,
-					showLevelSelect: this.showLevelSelect,
-					showOrder: this.showOrder,
-					newNote: this.newNote,
-					openScrollView: this.plugin.openScrollView,
+					showMenu: this.showMenu.bind(this),
+					showLevelSelect: this.showLevelSelect.bind(this),
+					showOrder: this.showOrder.bind(this),
+					newNote: this.newNote.bind(this),
+					openScrollView: this.plugin.openScrollView.bind(this.plugin),
 					isViewSwitchable: this.plugin.settings.useMultiPaneList,
-					switchView: this.switchView,
+					switchView: this.switchView.bind(this),
 					viewType: this.treeViewType,
 					saveSettings: this.saveSettings.bind(this),
 				},

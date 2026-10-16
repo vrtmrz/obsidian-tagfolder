@@ -115,6 +115,11 @@
 		onlyFDREnabled = _setting.linkShowOnlyFDR;
 	});
 	let showSearch = $state(false);
+	$effect(() => {
+		if ($searchString.trim() !== "") {
+			showSearch = true;
+		}
+	});
 	function toggleSearch() {
 		showSearch = !showSearch;
 		if (!showSearch) {
@@ -221,7 +226,7 @@
 					const tg = observingElements.get(v.target);
 					if (tg && tg.lastState !== v.isIntersecting) {
 						tg.lastState = v.isIntersecting;
-						setTimeout(() => tg.callback(v.isIntersecting), 10);
+						window.setTimeout(() => tg.callback(v.isIntersecting), 10);
 					}
 				}
 			}
@@ -232,9 +237,9 @@
 			folderIcon = `${iconDivEl.innerHTML}`;
 			setIcon(iconDivEl, "lucide-edit");
 			newNoteIcon = `${iconDivEl.innerHTML}`;
+			setIcon(iconDivEl, "lucide-sort-asc");
+			upAndDownArrowsIcon = iconDivEl.innerHTML;
 			if (isMainTree) {
-				setIcon(iconDivEl, "lucide-sort-asc");
-				upAndDownArrowsIcon = iconDivEl.innerHTML;
 				setIcon(iconDivEl, "stacked-levels");
 				stackedLevels = iconDivEl.innerHTML;
 				setIcon(iconDivEl, "search");
@@ -257,12 +262,12 @@
 			setIcon(iconDivEl, "lucide-chevrons-down-up");
 			closeAllIcon = iconDivEl.innerHTML;
 		}
-		const int = setInterval(() => {
+		const int = window.setInterval(() => {
 			performHide.set(Date.now());
 		}, 5000);
 
 		return () => {
-			clearInterval(int);
+			window.clearInterval(int);
 		};
 	});
 	onDestroy(() => {
@@ -328,16 +333,16 @@
 		>
 			{@html newNoteIcon}
 		</div>
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="clickable-icon nav-action-button"
+			aria-label="Change sort order"
+			onclick={showOrder}
+		>
+			{@html upAndDownArrowsIcon}
+		</div>
 		{#if isMainTree}
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="clickable-icon nav-action-button"
-				aria-label="Change sort order"
-				onclick={showOrder}
-			>
-				{@html upAndDownArrowsIcon}
-			</div>
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div

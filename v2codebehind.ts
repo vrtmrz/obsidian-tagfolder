@@ -1,6 +1,6 @@
 
 import type { TREE_TYPE, TagFolderSettings, TagInfoDict, ViewItem } from "./types";
-import { V2FI_IDX_CHILDREN, type V2FolderItem, trimPrefix, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame, parseTagFilterPatterns, tagMatchesFilterPatterns, tagOrDescendantMayMatchFilterPatterns } from "./util";
+import { V2FI_IDX_CHILDREN, type V2FolderItem, parseTagName, pathMatch, getExtraTags, getViewItemFromPath, V2FI_IDX_TAG, V2FI_IDX_TAGNAME, V2FI_IDX_TAGDISP, waitForRequestAnimationFrame, parseTagFilterPatterns, tagMatchesFilterPatterns, tagOrDescendantMayMatchFilterPatterns } from "./util";
 
 export function performSortExactFirst(_items: ViewItem[], children: V2FolderItem[], leftOverItems: ViewItem[]) {
 
@@ -27,10 +27,10 @@ export function performSortExactFirst(_items: ViewItem[], children: V2FolderItem
     return [...wk2];
 }
 function delay() {
-    return new Promise<void>(res => setTimeout(() => res(), 5));
+    return new Promise<void>(res => window.setTimeout(() => res(), 5));
 }
 function nextTick() {
-    return new Promise<void>(res => setTimeout(() => res(), 0));
+    return new Promise<void>(res => window.setTimeout(() => res(), 0));
 }
 const delays = [nextTick, delay, nextTick, waitForRequestAnimationFrame];
 let delayIdx = 0;
@@ -50,12 +50,14 @@ export async function collectChildren(previousTrail: string, tags: string[], _ta
     }
     for (const tag of tags) {
         const tagLC = tag.toLowerCase();
-        const tagNestedLC = trimPrefix(tagLC, previousTrailLC);
+        const tagNestedLC = previousTrailLC && !tagLC.startsWith(previousTrailLC)
+            ? previousTrailLC + tagLC
+            : "";
         const items: ViewItem[] = [];
         for (const [itemTag, tempItems] of tagPerItem) {
             if (pathMatch(itemTag, tagLC)) {
                 items.push(...tempItems);
-            } else if (pathMatch(itemTag, tagNestedLC)) {
+            } else if (tagNestedLC && pathMatch(itemTag, tagNestedLC)) {
                 items.push(...tempItems);
             }
         }

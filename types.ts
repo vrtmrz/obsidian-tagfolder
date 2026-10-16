@@ -1,5 +1,10 @@
 import type { TFile } from "obsidian";
-import { type DISPLAY_METHOD, type HIDE_ITEMS_TYPE } from "./main";
+
+export type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
+
+// The `Intermidiate` is spelt incorrectly, but it is already used as the key of the configuration.
+// Leave it to the future.
+export type HIDE_ITEMS_TYPE = "NONE" | "DEDICATED_INTERMIDIATES" | "ALL_EXCEPT_BOTTOM";
 
 export interface ViewItem {
 	/**
@@ -19,6 +24,7 @@ export interface TagInfoDict {
 	[key: string]: TagInfo;
 }
 export interface TagInfo {
+	[key: string]: unknown;
 	key?: string;
 	mark?: string;
 	alt?: string;
@@ -75,6 +81,7 @@ export interface TagFolderSettings {
 	mergeRedundantCombination: boolean;
 	useVirtualTag: boolean;
 	useFrontmatterTagsForNewNotes: boolean,
+	newNoteTemplate: string;
 	doNotSimplifyTags: boolean;
 	overrideTagClicking: boolean;
 	useMultiPaneList: boolean;
@@ -112,6 +119,7 @@ export const DEFAULT_SETTINGS: TagFolderSettings = {
 	mergeRedundantCombination: false,
 	useVirtualTag: false,
 	useFrontmatterTagsForNewNotes: false,
+	newNoteTemplate: "",
 	doNotSimplifyTags: false,
 	overrideTagClicking: false,
 	useMultiPaneList: false,

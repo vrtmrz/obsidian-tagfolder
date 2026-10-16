@@ -1,6 +1,7 @@
 /// <reference types="svelte" />
 
 import {
+	AbstractInputSuggest,
 	App,
 	debounce,
 	Editor,
@@ -16,17 +17,22 @@ import {
 	TFile,
 	WorkspaceLeaf,
 	TAbstractFile,
+	type ButtonComponent,
 	type MarkdownFileInfo,
 } from "obsidian";
+import { createObsidianUi, type UiInteractions } from "@vrtmrz/obsidian-plugin-kit/ui";
+import {
+	createObsidianVaultFrontmatterAccess,
+	createObsidianVaultTextAccess,
+	type VaultFrontmatterAccess,
+	type VaultTextAccess,
+} from "@vrtmrz/obsidian-plugin-kit/vault";
 
 import {
 	DEFAULT_SETTINGS,
 	OrderDirection,
 	OrderKeyItem,
 	OrderKeyTag,
-	type ScrollViewFile,
-	type ScrollViewState,
-	type TagFolderListState,
 	type TagFolderSettings,
 	type TagInfoDict,
 	VIEW_TYPE_SCROLL,
@@ -35,7 +41,8 @@ import {
 	type ViewItem,
 	VIEW_TYPE_TAGFOLDER_LINK,
 	type FileCache,
-	enumShowListIn
+	enumShowListIn,
+	type DISPLAY_METHOD
 } from "types";
 import { allViewItems, allViewItemsByLink, appliedFiles, currentFile, maxDepth, pluginInstance, searchString, selectedTags, tagFolderSetting, tagInfo } from "store";
 import {
@@ -58,15 +65,30 @@ import {
 	parseTagFilterPatterns,
 	tagMatchesFilterPatterns
 } from "./util";
+import {
+	chooseNewNoteTemplate,
+	filterNewNoteTemplateChoices,
+	populateNewNote,
+	type NewNoteTemplateChoice,
+} from "./new-note-workflow";
 import { ScrollView } from "./ScrollView";
 import { TagFolderView } from "./TagFolderView";
 import { TagFolderList } from "./TagFolderList";
-
-export type DISPLAY_METHOD = "PATH/NAME" | "NAME" | "NAME : PATH";
-
-// The `Intermidiate` is spelt incorrectly, but it is already used as the key of the configuration.
-// Leave it to the future.
-export type HIDE_ITEMS_TYPE = "NONE" | "DEDICATED_INTERMIDIATES" | "ALL_EXCEPT_BOTTOM";
+import {
+	buildNoteLookupItems,
+	normaliseLookupTags,
+	type LookupTagCondition,
+	type NoteLookupPolicy,
+	type NoteLookupSource,
+} from "./note-lookup";
+import { openNoteLookup } from "./note-lookup-modal";
+import {
+	applyTagTreeStyleSuggestion,
+	findTagTreeStyleSuggestion,
+	renderTagTreeStylePreview,
+	TAG_TREE_STYLE_SUGGESTIONS,
+	type TagTreeStyleSuggestion,
+} from "./tag-tree-style-suggestions";
 
 const HideItemsType: Record<string, string> = {
 	NONE: "Hide nothing",
@@ -75,8 +97,8 @@ const HideItemsType: Record<string, string> = {
 };
 
 
-function dotted<T extends Record<string, any>>(object: T, notation: string) {
-	return notation.split('.').reduce((a, b) => (a && (b in a)) ? a[b] : null, object);
+function dotted<T extends Record<string, unknown>>(object: T, notation: string): unknown {
+	return notation.split('.').reduce<unknown>((a, b) => (a && typeof a === "object" && b in a) ? (a as Record<string, unknown>)[b] : null, object);
 }
 
 function getCompareMethodItems(settings: TagFolderSettings) {
@@ -107,6 +129,129 @@ function getCompareMethodItems(settings: TagFolderSettings) {
 	}
 }
 
+function getCoreTemplatesFolder(app: App): string | null {
+	const internalPlugins = (app as App & {
+		internalPlugins?: {
+			getPluginById?: (id: string) => {
+				instance?: {
+					options?: {
+						folder?: string;
+						templateFolder?: string;
+					};
+				};
+			};
+		};
+	}).internalPlugins;
+	const templatesPlugin = internalPlugins?.getPluginById?.("templates");
+	const folder = templatesPlugin?.instance?.options?.folder ?? templatesPlugin?.instance?.options?.templateFolder;
+	if (!folder) return null;
+	const normalizedFolder = normalizePath(folder);
+	return normalizedFolder == "/" ? "" : normalizedFolder;
+}
+
+function getTemplateFiles(app: App) {
+	const templateFolder = getCoreTemplatesFolder(app);
+	const markdownFiles = app.vault.getMarkdownFiles();
+	const templates = templateFolder == null || templateFolder == ""
+		? markdownFiles
+		: markdownFiles.filter((file) => {
+			const path = normalizePath(file.path);
+			return path == templateFolder || path.startsWith(`${templateFolder}/`);
+		});
+
+	return templates.sort((a, b) => compare(a.path, b.path));
+}
+
+function captureNewNoteTemplates(app: App): NewNoteTemplateChoice[] {
+	return getTemplateFiles(app).map((file) => ({
+		path: file.path,
+		name: file.basename,
+	}));
+}
+
+class NewNoteTemplateInputSuggest extends AbstractInputSuggest<NewNoteTemplateChoice> {
+	private readonly templates: readonly NewNoteTemplateChoice[];
+	private callback: (template: NewNoteTemplateChoice) => void;
+
+	constructor(
+		app: App,
+		inputEl: HTMLInputElement,
+		templates: readonly NewNoteTemplateChoice[],
+		callback: (template: NewNoteTemplateChoice) => void,
+	) {
+		super(app, inputEl);
+		this.templates = templates;
+		this.callback = callback;
+	}
+
+	getSuggestions(query: string): NewNoteTemplateChoice[] {
+		return filterNewNoteTemplateChoices(this.templates, query);
+	}
+
+	renderSuggestion(template: NewNoteTemplateChoice, el: HTMLElement) {
+		el.createDiv({ text: template.name });
+		el.createDiv({ text: template.path, cls: "suggestion-note" });
+	}
+
+	selectSuggestion(template: NewNoteTemplateChoice) {
+		this.setValue(template.path);
+		this.callback(template);
+		this.close();
+	}
+}
+
+async function askNewNoteTemplate(ui: UiInteractions, app: App): Promise<NewNoteTemplateChoice | null | undefined> {
+	const templates = captureNewNoteTemplates(app);
+	const selectedTemplate = await chooseNewNoteTemplate(ui, templates);
+	if (selectedTemplate === undefined) {
+		new Notice("No templates found. Add a template, then try again.");
+	}
+	return selectedTemplate;
+}
+
+function getConfiguredNewNoteTemplate(app: App, templatePath: string): NewNoteTemplateChoice | null {
+	const inputPath = normalizeNewNoteTemplatePath(templatePath);
+	if (inputPath == "") return null;
+
+	const templateFolder = getCoreTemplatesFolder(app);
+	const candidatePaths = [
+		inputPath,
+		inputPath.endsWith(".md") ? inputPath : `${inputPath}.md`,
+	];
+
+	if (templateFolder != null && templateFolder != "" && !inputPath.startsWith(`${templateFolder}/`)) {
+		candidatePaths.push(
+			`${templateFolder}/${inputPath}`,
+			inputPath.endsWith(".md") ? `${templateFolder}/${inputPath}` : `${templateFolder}/${inputPath}.md`
+		);
+	}
+
+	const file = unique(candidatePaths)
+		.map((path) => app.vault.getAbstractFileByPath(path))
+		.find((file): file is TFile => file instanceof TFile && file.extension == "md");
+
+	if (file == null) {
+		new Notice(`Template not found: ${inputPath}`);
+		return null;
+	}
+
+	return { path: file.path, name: file.basename };
+}
+
+function normalizeNewNoteTemplatePath(templatePath: string) {
+	const inputPath = templatePath.trim().replace(/^\[\[/, "").replace(/\]\]$/, "");
+	if (inputPath == "") return "";
+	const normalizedPath = normalizePath(inputPath);
+	return normalizedPath == "/" ? "" : normalizedPath;
+}
+
+function splitSettingList(value: string) {
+	return value
+		.split(/[\n,]/)
+		.map((entry) => entry.trim())
+		.filter((entry) => entry != "");
+}
+
 // Thank you @pjeby!
 function onElement<T extends HTMLElement | Document>(el: T, event: string, selector: string, callback: CallableFunction, options: EventListenerOptions) {
 	//@ts-ignore
@@ -117,6 +262,9 @@ function onElement<T extends HTMLElement | Document>(el: T, event: string, selec
 
 export default class TagFolderPlugin extends Plugin {
 	settings: TagFolderSettings = { ...DEFAULT_SETTINGS };
+	ui!: UiInteractions;
+	vaultText!: VaultTextAccess;
+	vaultFrontmatter!: VaultFrontmatterAccess;
 
 	// Folder opening status.
 	expandedFolders: string[] = ["root"];
@@ -192,7 +340,8 @@ export default class TagFolderPlugin extends Plugin {
 		const metadata = this.app.metadataCache.getCache(file.path);
 		if (metadata?.frontmatter && (this.settings.frontmatterKey)) {
 			const d = dotted(metadata.frontmatter, this.settings.frontmatterKey);
-			if (d) return `${d}`;
+			if (typeof d === "string") return d;
+			if (typeof d === "number" || typeof d === "boolean") return String(d);
 		}
 		if (metadata?.headings) {
 			const h1 = metadata.headings.find((e) => e.level == 1);
@@ -221,8 +370,67 @@ export default class TagFolderPlugin extends Plugin {
 		return filename;
 	}
 
+	getNoteLookupPolicy(): NoteLookupPolicy {
+		const redirects: Record<string, string> = {};
+		if (this.settings.useTagInfo && this.tagInfo) {
+			for (const [tag, info] of Object.entries(this.tagInfo)) {
+				if (info.redirect) redirects[tag] = info.redirect;
+			}
+		}
+		return {
+			targetFolders: splitSettingList(this.settings.targetFolders),
+			ignoreFolders: splitSettingList(this.settings.ignoreFolders),
+			ignoreDocumentTags: splitSettingList(this.settings.ignoreDocTags),
+			ignoreTags: splitSettingList(this.settings.ignoreTags),
+			redirects,
+			splitNestedTags: this.settings.disableNestedTags,
+		};
+	}
+
+	captureNoteLookupItems(policy: NoteLookupPolicy) {
+		const sources: NoteLookupSource[] = [];
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			const metadata = this.app.metadataCache.getFileCache(file);
+			if (!metadata) continue;
+			sources.push({
+				path: file.path,
+				title: this.getFileTitle(file),
+				tags: getAllTags(metadata) ?? [],
+				mtime: file.stat.mtime,
+			});
+		}
+		return buildNoteLookupItems(sources, policy);
+	}
+
+	openNoteLookupDialog(sourceFile?: TFile) {
+		const policy = this.getNoteLookupPolicy();
+		const notes = this.captureNoteLookupItems(policy);
+		let initialConditions: LookupTagCondition[] = [];
+		if (sourceFile) {
+			const metadata = this.app.metadataCache.getFileCache(sourceFile);
+			const ignoredTags = new Set(
+				[...policy.ignoreTags, ...policy.ignoreDocumentTags]
+					.map((tag) => tag.trim().replace(/^#/, "").toLowerCase()),
+			);
+			const sourceTags = metadata ? (getAllTags(metadata) ?? []) : [];
+			initialConditions = normaliseLookupTags(sourceTags, policy)
+				.filter((tag) => !ignoredTags.has(tag.toLowerCase()))
+				.map((tag) => ({ tag, excluded: false }));
+		}
+
+		openNoteLookup(this.app, {
+			notes,
+			initialConditions,
+			excludedPath: sourceFile?.path,
+			openNote: (path, newTab) => this.focusFile(path, newTab),
+		});
+	}
+
 	async onload() {
 		await this.loadSettings();
+		this.ui = createObsidianUi(this.app);
+		this.vaultText = createObsidianVaultTextAccess(this.app.vault);
+		this.vaultFrontmatter = createObsidianVaultFrontmatterAccess(this.app);
 		this.hoverPreview = this.hoverPreview.bind(this);
 		this.modifyFile = this.modifyFile.bind(this);
 		this.setSearchString = this.setSearchString.bind(this);
@@ -294,29 +502,44 @@ export default class TagFolderPlugin extends Plugin {
 				await this.createNewNote(tagsWithoutPrefix);
 			},
 		});
+		this.addCommand({
+			id: "tagfolder-open-note-by-tags",
+			name: "Open note by tags",
+			callback: () => this.openNoteLookupDialog(),
+		});
+		this.addCommand({
+			id: "tagfolder-open-note-with-similar-tags",
+			name: "Open note with similar tags",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!(file instanceof TFile) || file.extension != "md") return false;
+				if (!checking) this.openNoteLookupDialog(file);
+				return true;
+			},
+		});
 		this.metadataCacheChanged = this.metadataCacheChanged.bind(this);
 		this.watchWorkspaceOpen = this.watchWorkspaceOpen.bind(this);
 		this.metadataCacheResolve = this.metadataCacheResolve.bind(this);
 		this.metadataCacheResolved = this.metadataCacheResolved.bind(this);
 		this.loadFileInfo = this.loadFileInfo.bind(this);
 		this.registerEvent(
-			this.app.metadataCache.on("changed", this.metadataCacheChanged)
+			this.app.metadataCache.on("changed", (file) => this.metadataCacheChanged(file))
 		);
 		this.registerEvent(
-			this.app.metadataCache.on("resolve", this.metadataCacheResolve)
+			this.app.metadataCache.on("resolve", (file) => this.metadataCacheResolve(file))
 		);
 		this.registerEvent(
-			this.app.metadataCache.on("resolved", this.metadataCacheResolved)
+			this.app.metadataCache.on("resolved", () => this.metadataCacheResolved())
 		);
 
 		this.refreshAllTree = this.refreshAllTree.bind(this);
 		this.refreshTree = this.refreshTree.bind(this);
-		this.registerEvent(this.app.vault.on("rename", this.refreshTree));
-		this.registerEvent(this.app.vault.on("delete", this.refreshTree));
-		this.registerEvent(this.app.vault.on("modify", this.modifyFile));
+		this.registerEvent(this.app.vault.on("rename", (...args) => this.refreshTree(...args)));
+		this.registerEvent(this.app.vault.on("delete", (...args) => this.refreshTree(...args)));
+		this.registerEvent(this.app.vault.on("modify", (...args) => this.modifyFile(...args)));
 
 		this.registerEvent(
-			this.app.workspace.on("file-open", this.watchWorkspaceOpen)
+			this.app.workspace.on("file-open", (...args) => this.watchWorkspaceOpen(...args))
 		);
 		this.watchWorkspaceOpen(this.app.workspace.getActiveFile());
 
@@ -366,7 +589,7 @@ export default class TagFolderPlugin extends Plugin {
 
 		// Handle the label clicks in the attribute list (with the highest priority, registered first)
 		this.register(
-			onElement(document, "click", selectorMetadataTag, (event: MouseEvent, targetEl: HTMLElement) => {
+			onElement(activeDocument, "click", selectorMetadataTag, (event: MouseEvent, targetEl: HTMLElement) => {
 				if (!this.settings.overrideTagClicking) return;
 
 				// If the clicked button is the delete button or one of its sub-elements, the search function will not be triggered.
@@ -425,7 +648,7 @@ export default class TagFolderPlugin extends Plugin {
 		
 		// Handle the label links in other places (excluding those in the attribute list, as they have already been handled above)
 		this.register(
-			onElement(document, "click", selectorHashTagLink, (event: MouseEvent, targetEl: HTMLElement) => {
+			onElement(activeDocument, "click", selectorHashTagLink, (event: MouseEvent, targetEl: HTMLElement) => {
 				if (!this.settings.overrideTagClicking) return;
 								
 				// Check if it is in the attribute list. If so, skip it (as it has already been handled above)
@@ -444,7 +667,7 @@ export default class TagFolderPlugin extends Plugin {
 			}, { capture: true })
 		);
 		this.register(
-			onElement(document, "click", selectorHashTagSpan, (event: MouseEvent, targetEl: HTMLElement) => {
+			onElement(activeDocument, "click", selectorHashTagSpan, (event: MouseEvent, targetEl: HTMLElement) => {
 				if (!this.settings.overrideTagClicking) return;
 				let enumTags: Element | null = targetEl;
 				let tagString = "";
@@ -462,7 +685,7 @@ export default class TagFolderPlugin extends Plugin {
 				}
 
 				do {
-					if (enumTags instanceof HTMLElement) {
+					if (enumTags.instanceOf(HTMLElement)) {
 						tagString += enumTags.innerText;
 						if (enumTags.classList.contains("cm-hashtag-end")) {
 							break;
@@ -823,7 +1046,7 @@ export default class TagFolderPlugin extends Plugin {
 		return isSearchStringModified || isSettingChanged;
 	}
 	loadFileQueue = [] as TFile[];
-	loadFileTimer?: ReturnType<typeof setTimeout> = undefined;
+	loadFileTimer?: number = undefined;
 	async loadFileInfos(diffs: TFile[]) {
 		if (this.processingFileInfo) {
 			diffs.forEach(e => void this.loadFileInfoAsync(e));
@@ -867,7 +1090,7 @@ export default class TagFolderPlugin extends Plugin {
 		if (!diff) {
 			this.loadFileQueue = [];
 			if (this.loadFileTimer) {
-				clearTimeout(this.loadFileTimer);
+				window.clearTimeout(this.loadFileTimer);
 				this.loadFileTimer = undefined;
 			}
 			await this.loadFileInfos([]);
@@ -880,9 +1103,9 @@ export default class TagFolderPlugin extends Plugin {
 			//console.log(`LoadFileInfo queued:${diff.path}`);
 		}
 		if (this.loadFileTimer) {
-			clearTimeout(this.loadFileTimer);
+			window.clearTimeout(this.loadFileTimer);
 		}
-		this.loadFileTimer = setTimeout(() => {
+		this.loadFileTimer = window.setTimeout(() => {
 			if (this.loadFileQueue.length === 0) {
 				// console.log(`No need to LoadFile`);
 			} else {
@@ -905,7 +1128,7 @@ export default class TagFolderPlugin extends Plugin {
 		await leaf.setViewState({
 			type: VIEW_TYPE_SCROLL,
 			active: true,
-			state: { files: files.map(e => ({ path: e })), title: title, tagPath: tagPath } as ScrollViewState
+			state: { files: files.map(e => ({ path: e })), title: title, tagPath: tagPath }
 		});
 
 		void this.app.workspace.revealLeaf(
@@ -931,7 +1154,7 @@ export default class TagFolderPlugin extends Plugin {
 							...viewStat.state,
 							files: viewStat.state.files.map(e => e.path == file.path ? ({
 								path: file.path
-							} as ScrollViewFile) : e)
+							}) : e)
 
 						}
 					}
@@ -974,7 +1197,7 @@ export default class TagFolderPlugin extends Plugin {
 							if (old) return old;
 							return {
 								path: path
-							} as ScrollViewFile;
+							};
 
 
 						})
@@ -1154,6 +1377,7 @@ export default class TagFolderPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			await this.loadData()
 		);
+		this.settings.newNoteTemplate = normalizeNewNoteTemplatePath(this.settings.newNoteTemplate);
 		await this.loadTagInfo();
 		tagFolderSetting.set(this.settings);
 		this.compareItems = getCompareMethodItems(this.settings);
@@ -1222,7 +1446,7 @@ export default class TagFolderPlugin extends Plugin {
 		await theLeaf.setViewState({
 			type: VIEW_TYPE_TAGFOLDER_LIST,
 			active: true,
-			state: { tags: tags, title: title } as TagFolderListState
+			state: { tags: tags, title: title }
 		});
 
 		await this.app.workspace.revealLeaf(
@@ -1244,20 +1468,32 @@ export default class TagFolderPlugin extends Plugin {
 			.join(" ")
 			.trim();
 
+		const configuredTemplatePath = normalizeNewNoteTemplatePath(this.settings.newNoteTemplate);
+		let selectedTemplate: NewNoteTemplateChoice | null = null;
+		if (configuredTemplatePath != "") {
+			const configuredTemplate = getConfiguredNewNoteTemplate(this.app, configuredTemplatePath);
+			if (configuredTemplate != null) {
+				selectedTemplate = configuredTemplate;
+			} else {
+				const promptedTemplate = await askNewNoteTemplate(this.ui, this.app);
+				if (promptedTemplate === undefined) return;
+				selectedTemplate = promptedTemplate;
+			}
+		}
+
 		//@ts-ignore
-		const ww = await this.app.fileManager.createAndOpenMarkdownFile() as TFile;
-		if (this.settings.useFrontmatterTagsForNewNotes) {
-			await this.app.fileManager.processFrontMatter(ww, (matter) => {
-				matter.tags = matter.tags ?? [];
-				matter.tags = expandedTagsAll
-					.filter(e => !isSpecialTag(e))
-					.filter(e => matter.tags.indexOf(e) < 0)
-					.concat(matter.tags);
-			});
-		}
-		else {
-			await this.app.vault.append(ww, expandedTags);
-		}
+		const ww = await this.app.fileManager.createAndOpenMarkdownFile();
+		if (!(ww instanceof TFile)) return;
+		await populateNewNote({
+			vault: this.vaultText,
+			frontmatter: this.vaultFrontmatter,
+			notePath: ww.path,
+			template: selectedTemplate,
+			expandedTagsAll,
+			expandedTags,
+			frontmatterTags: expandedTagsAll.filter(e => !isSpecialTag(e)),
+			useFrontmatterTags: this.settings.useFrontmatterTagsForNewNotes,
+		});
 	}
 }
 
@@ -1276,8 +1512,9 @@ class TagFolderSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+		const newNoteTemplates = captureNewNoteTemplates(this.app);
 
-		containerEl.createEl("h2", { text: "Behavior" });
+		new Setting(containerEl).setName("Behavior").setHeading();
 		new Setting(containerEl)
 			.setName("Always Open")
 			.setDesc("Place TagFolder on the left pane and activate it at every Obsidian launch")
@@ -1333,7 +1570,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		containerEl.createEl("h2", { text: "Files" });
+		new Setting(containerEl).setName("Files").setHeading();
 		new Setting(containerEl)
 			.setName("Display method")
 			.setDesc("How to show a title of files")
@@ -1410,7 +1647,48 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 
-		containerEl.createEl("h2", { text: "Tags" });
+		new Setting(containerEl).setName("Tags").setHeading();
+
+		let selectedTagTreeStyle: TagTreeStyleSuggestion | undefined;
+		let applyTagTreeStyleButton: ButtonComponent | undefined;
+		const tagTreeStyleSuggestionEl = containerEl.createDiv({
+			cls: "tagfolder-style-suggestion",
+		});
+		new Setting(tagTreeStyleSuggestionEl)
+			.setName("Suggested tag tree style")
+			.setDesc("Apply a suggested combination of tag tree settings.")
+			.addDropdown((dropdown) => {
+				dropdown.addOption("", "Select a style");
+				for (const suggestion of TAG_TREE_STYLE_SUGGESTIONS) {
+					dropdown.addOption(suggestion.id, suggestion.name);
+				}
+				dropdown.setValue("").onChange((value) => {
+					selectedTagTreeStyle = findTagTreeStyleSuggestion(value);
+					applyTagTreeStyleButton?.setDisabled(!selectedTagTreeStyle);
+					renderTagTreeStylePreview(tagTreeStylePreviewEl, selectedTagTreeStyle);
+				});
+			})
+			.addButton((button) => {
+				applyTagTreeStyleButton = button;
+				button
+					.setButtonText("Apply")
+					.setDisabled(true)
+					.onClick(async () => {
+						if (!selectedTagTreeStyle) return;
+						const appliedStyleName = selectedTagTreeStyle.name;
+						this.plugin.settings = applyTagTreeStyleSuggestion(
+							this.plugin.settings,
+							selectedTagTreeStyle,
+						);
+						await this.plugin.saveSettings();
+						this.display();
+						new Notice(`Applied '${appliedStyleName}' settings.`);
+					});
+			});
+		const tagTreeStylePreviewEl = tagTreeStyleSuggestionEl.createDiv({
+			cls: "tagfolder-style-preview",
+		});
+		renderTagTreeStylePreview(tagTreeStylePreviewEl);
 
 		const setOrderMethodTag = async (key?: string, order?: string) => {
 			const oldSetting = this.plugin.settings.sortTypeTag.split("_");
@@ -1458,7 +1736,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 			});
 		new Setting(containerEl)
 			.setName("Store tags in frontmatter for new notes")
-			.setDesc("Otherwise, tags are stored with #hashtags at the top of the note")
+			.setDesc("When enabled, tags are written to the note Properties. If no new-note template is selected, TagFolder still creates the note and stores tags here instead of as #hashtags.")
 			.addToggle((toggle) => {
 				toggle
 					.setValue(this.plugin.settings.useFrontmatterTagsForNewNotes)
@@ -1467,8 +1745,24 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
+		new Setting(containerEl)
+			.setName("Template for new notes")
+			.setDesc("When set to a valid markdown file path, new notes use this template without opening the template picker. The .md extension is optional.")
+			.addText((text) => {
+				text
+					.setPlaceholder("Templates/New note")
+					.setValue(this.plugin.settings.newNoteTemplate)
+					.onChange(async (value) => {
+						this.plugin.settings.newNoteTemplate = normalizeNewNoteTemplatePath(value);
+						await this.plugin.saveSettings();
+					});
+				new NewNoteTemplateInputSuggest(this.app, text.inputEl, newNoteTemplates, (template) => {
+					this.plugin.settings.newNoteTemplate = template.path;
+					void this.plugin.saveSettings();
+				});
+			});
 
-		containerEl.createEl("h2", { text: "Actions" });
+		new Setting(containerEl).setName("Actions").setHeading();
 		new Setting(containerEl)
 			.setName("Search tags inside TagFolder when clicking tags")
 			.addToggle((toggle) => {
@@ -1501,7 +1795,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		containerEl.createEl("h2", { text: "Arrangements" });
+		new Setting(containerEl).setName("Arrangements").setHeading();
 
 		new Setting(containerEl)
 			.setName("Hide Items")
@@ -1581,7 +1875,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					});
 			});
 
-		containerEl.createEl("h2", { text: "Link Folder" });
+		new Setting(containerEl).setName("Link Folder").setHeading();
 		new Setting(containerEl)
 			.setName("Use Incoming")
 			.setDesc("")
@@ -1627,7 +1921,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 
-		containerEl.createEl("h2", { text: "Filters" });
+		new Setting(containerEl).setName("Filters").setHeading();
 		new Setting(containerEl)
 			.setName("Target Folders")
 			.setDesc("If configured, the plugin will only target files in it.")
@@ -1691,7 +1985,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 					})
 			);
 
-		containerEl.createEl("h2", { text: "Misc" });
+		new Setting(containerEl).setName("Misc").setHeading();
 
 		new Setting(containerEl)
 			.setName("Tag scanning delay")
@@ -1724,7 +2018,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
-		containerEl.createEl("h2", { text: "Utilities" });
+		new Setting(containerEl).setName("Utilities").setHeading();
 
 		new Setting(containerEl)
 			.setName("Dumping tags for reporting bugs")
