@@ -1,3 +1,26 @@
+## Unreleased
+
+### New features
+
+-   Added a Simplified Chinese interface and a `Language` setting (PR #162).
+
+### Improved
+
+-   Sort names and tags using the Obsidian interface language independently of the TagFolder display language.
+-   Fall back to English for untranslated interfaces, including Traditional Chinese, and preserve user-defined tag labels.
+
+## 0.18.22
+
+15th September, 2026
+
+### Improved
+
+-   Added a sort order button to the file list pane, with sorting options available directly in the menu (PR #161). Thank you @DDDDZJQ for the contribution.
+
+### Digging the weeds
+
+-   Added regression tests for the file list sort button and menu, and for the existing tag and link tree controls.
+
 ## 0.18.21
 
 14th August, 2026
@@ -137,10 +160,3 @@ Since 0.18.11, I have written this changelog as same as the Self-hosted LiveSync
 
 -   Many dependencies are updated to the latest version. And also the Svelte compiler is updated to the latest version.
 -   Now `npm run check` implemented in the package.json. Runs tsc, eslint, svelte-check at once.
-
-## Unreleased
-
-### New features
-
--   Added full Simplified Chinese localization.
--   Added a `Language` setting (Auto follows the Obsidian interface language, falling back to English when unmatched).

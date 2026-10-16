@@ -238,9 +238,9 @@
 			folderIcon = `${iconDivEl.innerHTML}`;
 			setIcon(iconDivEl, "lucide-edit");
 			newNoteIcon = `${iconDivEl.innerHTML}`;
+			setIcon(iconDivEl, "lucide-sort-asc");
+			upAndDownArrowsIcon = iconDivEl.innerHTML;
 			if (isMainTree) {
-				setIcon(iconDivEl, "lucide-sort-asc");
-				upAndDownArrowsIcon = iconDivEl.innerHTML;
 				setIcon(iconDivEl, "stacked-levels");
 				stackedLevels = iconDivEl.innerHTML;
 				setIcon(iconDivEl, "search");
@@ -337,16 +337,16 @@
 		>
 			{@html newNoteIcon}
 		</div>
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="clickable-icon nav-action-button"
+			aria-label={$t("Change sort order")}
+			onclick={showOrder}
+		>
+			{@html upAndDownArrowsIcon}
+		</div>
 		{#if isMainTree}
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="clickable-icon nav-action-button"
-				aria-label={$t("Change sort order")}
-				onclick={showOrder}
-			>
-				{@html upAndDownArrowsIcon}
-			</div>
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div

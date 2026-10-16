@@ -16,6 +16,14 @@ npm run build
 
 The App-free Vitest suite includes TagFolder tree utilities and the new-note application workflow.
 
+## Language and string ordering
+
+`obsidian-locale.ts` reads the application language through `getLanguage()` when available. Obsidian versions before 1.8.7 use the existing stored-language and Moment fallbacks, preserving the minimum supported application version.
+
+`locale.ts` handles language normalisation and string comparison without importing Obsidian. Comparisons use the application language with natural numeric ordering; lookup completion and ranking retain their case-insensitive comparison. Unsupported collation locales fall back to English. Translation selection is independent of this comparison language.
+
+Tests which assert a language-specific order select that language explicitly and reset it afterwards.
+
 ## UI and Vault boundaries
 
 The plug-in owns one `UiInteractions` capability, one `VaultTextAccess` capability, and one `VaultFrontmatterAccess` capability for its lifetime:

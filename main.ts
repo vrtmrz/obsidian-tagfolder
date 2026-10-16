@@ -80,6 +80,7 @@ import {
 	type NoteLookupSource,
 } from "./note-lookup";
 import { openNoteLookup } from "./note-lookup-modal";
+import { configureAppLocale } from "./obsidian-locale";
 import {
 	applyTagTreeStyleSuggestion,
 	findTagTreeStyleSuggestion,
@@ -1388,6 +1389,7 @@ export default class TagFolderPlugin extends Plugin {
 		allViewItemsByLink.set(this.allViewItemsByLink);
 	}
 	async loadSettings() {
+		configureAppLocale();
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
