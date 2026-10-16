@@ -61,10 +61,9 @@ import {
 	trimTrailingSlash,
 	isSpecialTag,
 	trimPrefix,
-	uniqueCaseIntensive,
-	parseTagFilterPatterns,
-	tagMatchesFilterPatterns
+	uniqueCaseIntensive
 } from "./util";
+import { parseTagFilterPatterns, tagMatchesFilterPatterns } from "./tag-filters";
 import {
 	chooseNewNoteTemplate,
 	filterNewNoteTemplateChoices,
@@ -380,8 +379,8 @@ export default class TagFolderPlugin extends Plugin {
 		return {
 			targetFolders: splitSettingList(this.settings.targetFolders),
 			ignoreFolders: splitSettingList(this.settings.ignoreFolders),
-			ignoreDocumentTags: splitSettingList(this.settings.ignoreDocTags),
-			ignoreTags: splitSettingList(this.settings.ignoreTags),
+			ignoreDocumentTags: parseTagFilterPatterns(this.settings.ignoreDocTags).map((filter) => filter.pattern),
+			ignoreTags: parseTagFilterPatterns(this.settings.ignoreTags).map((filter) => filter.pattern),
 			redirects,
 			splitNestedTags: this.settings.disableNestedTags,
 		};
@@ -408,13 +407,10 @@ export default class TagFolderPlugin extends Plugin {
 		let initialConditions: LookupTagCondition[] = [];
 		if (sourceFile) {
 			const metadata = this.app.metadataCache.getFileCache(sourceFile);
-			const ignoredTags = new Set(
-				[...policy.ignoreTags, ...policy.ignoreDocumentTags]
-					.map((tag) => tag.trim().replace(/^#/, "").toLowerCase()),
-			);
+			const ignoredTags = parseTagFilterPatterns([...policy.ignoreTags, ...policy.ignoreDocumentTags].join(","));
 			const sourceTags = metadata ? (getAllTags(metadata) ?? []) : [];
 			initialConditions = normaliseLookupTags(sourceTags, policy)
-				.filter((tag) => !ignoredTags.has(tag.toLowerCase()))
+				.filter((tag) => !tagMatchesFilterPatterns(tag, ignoredTags))
 				.map((tag) => ({ tag, excluded: false }));
 		}
 

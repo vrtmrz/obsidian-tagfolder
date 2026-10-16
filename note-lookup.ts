@@ -1,3 +1,5 @@
+import { parseTagFilterPatterns, tagMatchesFilterPatterns } from "./tag-filters";
+
 export interface NoteLookupSource {
 	readonly path: string;
 	readonly title: string;
@@ -63,10 +65,6 @@ function folderMatches(path: string, folder: string) {
 	return pathLower == folderLower || pathLower.startsWith(`${folderLower}/`);
 }
 
-function normalisePolicyTags(tags: readonly string[]) {
-	return new Set(tags.map(normaliseTag).filter(Boolean).map((tag) => tag.toLowerCase()));
-}
-
 export function normaliseLookupTags(rawTags: readonly string[], policy: NoteLookupPolicy) {
 	const redirects = new Map(
 		Object.entries(policy.redirects)
@@ -89,8 +87,8 @@ export function buildNoteLookupItems(
 	sources: readonly NoteLookupSource[],
 	policy: NoteLookupPolicy,
 ): NoteLookupItem[] {
-	const ignoredDocumentTags = normalisePolicyTags(policy.ignoreDocumentTags);
-	const ignoredTags = normalisePolicyTags(policy.ignoreTags);
+	const ignoredDocumentTags = parseTagFilterPatterns(policy.ignoreDocumentTags.join(","));
+	const ignoredTags = parseTagFilterPatterns(policy.ignoreTags.join(","));
 
 	return sources.flatMap((source) => {
 		if (policy.targetFolders.length > 0
@@ -102,14 +100,14 @@ export function buildNoteLookupItems(
 		}
 
 		const tags = normaliseLookupTags(source.tags, policy);
-		if (tags.some((tag) => ignoredDocumentTags.has(tag.toLowerCase()))) {
+		if (tags.some((tag) => tagMatchesFilterPatterns(tag, ignoredDocumentTags))) {
 			return [];
 		}
 
 		return [{
 			path: source.path,
 			title: source.title,
-			tags: tags.filter((tag) => !ignoredTags.has(tag.toLowerCase())),
+			tags: tags.filter((tag) => !tagMatchesFilterPatterns(tag, ignoredTags)),
 			mtime: source.mtime,
 		}];
 	});

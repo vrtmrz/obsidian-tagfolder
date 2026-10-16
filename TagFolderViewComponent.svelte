@@ -17,7 +17,8 @@
 	import V2TreeFolderComponent from "./V2TreeFolderComponent.svelte";
 	import { onDestroy, onMount, tick } from "svelte";
 	import { setIcon } from "obsidian";
-	import { parseTagFilterPatterns, tagMatchesFilterPatterns, tagOrDescendantMayMatchFilterPatterns, trimTrailingSlash } from "./util";
+	import { trimTrailingSlash } from "./util";
+	import { isVisibleInArchiveBranch, parseTagFilterPatterns } from "./tag-filters";
 	import { setContext } from "svelte";
 	import type { Writable } from "svelte/store";
 
@@ -299,15 +300,7 @@
 		// Processing archive tags
 		const archiveTags = parseTagFilterPatterns(_setting.archiveTags);
 
-		if (!tagOrDescendantMayMatchFilterPatterns(firstLevel, archiveTags)) {
-			items = items.filter(
-				(item) =>
-					!item.tags.some((e) =>
-						tagMatchesFilterPatterns(e, archiveTags),
-					),
-			);
-		}
-		return items;
+		return items.filter((item) => isVisibleInArchiveBranch(item.tags, firstLevel, archiveTags));
 	});
 
 	const componentHash = `${Math.random()}`;
