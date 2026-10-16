@@ -67,7 +67,33 @@ export abstract class TagFolderViewBase extends ItemView {
 	showOrder(evt: MouseEvent) {
 		const menu = new Menu();
 
-		menu.addItem((item) => {
+		const addItemOrders = (targetMenu: Menu) => {
+			for (const key in OrderKeyItem) {
+				for (const direction in OrderDirection) {
+					targetMenu.addItem((item) => {
+						const newSetting = `${key}_${direction}`;
+						item.setTitle(
+							OrderKeyItem[key] +
+							" " +
+							OrderDirection[direction]
+						).onClick(async () => {
+							//@ts-ignore
+							this.plugin.settings.sortType = newSetting;
+							await this.plugin.saveSettings();
+						});
+						if (
+							newSetting == this.plugin.settings.sortType
+						) {
+							item.setIcon("checkmark");
+						}
+						return item;
+					});
+				}
+			}
+		};
+
+		const isListView = this.getViewType() == VIEW_TYPE_TAGFOLDER_LIST;
+		if (!isListView) menu.addItem((item) => {
 			item.setTitle("Tags")
 				.setIcon("hashtag")
 				.onClick((evt2) => {
@@ -100,37 +126,20 @@ export abstract class TagFolderViewBase extends ItemView {
 				});
 			return item;
 		});
-		menu.addItem((item) => {
-			item.setTitle("Items")
-				.setIcon("document")
-				.onClick((evt2) => {
-					const menu2 = new Menu();
-					for (const key in OrderKeyItem) {
-						for (const direction in OrderDirection) {
-							menu2.addItem((item) => {
-								const newSetting = `${key}_${direction}`;
-								item.setTitle(
-									OrderKeyItem[key] +
-									" " +
-									OrderDirection[direction]
-								).onClick(async () => {
-									//@ts-ignore
-									this.plugin.settings.sortType = newSetting;
-									await this.plugin.saveSettings();
-								});
-								if (
-									newSetting == this.plugin.settings.sortType
-								) {
-									item.setIcon("checkmark");
-								}
-								return item;
-							});
-						}
-					}
-					menu2.showAtPosition({ x: evt.x, y: evt.y });
-				});
-			return item;
-		});
+		if (isListView) {
+			addItemOrders(menu);
+		} else {
+			menu.addItem((item) => {
+				item.setTitle("Items")
+					.setIcon("document")
+					.onClick((evt2) => {
+						const menu2 = new Menu();
+						addItemOrders(menu2);
+						menu2.showAtPosition({ x: evt.x, y: evt.y });
+					});
+				return item;
+			});
+		}
 		menu.showAtMouseEvent(evt);
 	}
 
