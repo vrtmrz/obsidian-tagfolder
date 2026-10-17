@@ -1,3 +1,14 @@
+## Unreleased
+
+### Improved
+
+-   Reorganised the README around getting started, browsing tags, finding notes, and creating notes. Language options are now part of the settings reference.
+
+### Digging the weeds
+
+-   Updated GitHub Actions to versions which use Node.js 24.
+-   Releases provide `main.js`, `manifest.json`, and `styles.css` individually, without a separate ZIP archive.
+
 ## 0.18.23
 
 17th October, 2026

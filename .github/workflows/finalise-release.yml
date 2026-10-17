@@ -43,7 +43,7 @@ jobs:
           git check-ref-format --branch "${BRANCH}"
           echo "name=${BRANCH}" >> "${GITHUB_OUTPUT}"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.branch.outputs.name }}
           fetch-depth: 0
