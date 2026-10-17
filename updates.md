@@ -1,20 +1,22 @@
-## Unreleased
+## 0.18.23
+
+17th October, 2026
 
 ### New features
 
 -   Nested tags can be excluded or archived as a group with `*` patterns (PR #138). Exact entries keep their previous meaning; use `tag,tag/*` to include a parent and its descendants. Thank you @boabab for the contribution.
--   Note lookup and similar-note lookup apply the same ignored-note and ignored-tag patterns as the tag tree.
 -   Added a Simplified Chinese interface and a `Language` setting (PR #162).
--   Added `Tag grouping` item ordering, using the written tag sequence to keep each branch and its descendants together (PR #163).
+-   Added `Tag grouping` item ordering, using the written tag sequence to keep each branch and its descendants together (PR #163). Thank you @DDDDZJQ for both contributions.
 
 ### Improved
 
--   Sort names and tags using the Obsidian interface language with natural numeric ordering, independently of the TagFolder display language. Use English when the application language cannot be read, including on Obsidian versions before 1.8.7.
--   Fall back to English for untranslated interfaces, including Traditional Chinese, and preserve user-defined tag labels.
+-   Note lookup and similar-note lookup apply the same ignored-note and ignored-tag patterns as the tag tree.
+-   Names and tags follow the Obsidian interface language with natural numeric ordering, independently of the TagFolder display language. English ordering is used when the application language cannot be read, including on Obsidian versions before 1.8.7.
+-   The TagFolder interface falls back to English for untranslated languages, including Traditional Chinese, and preserves user-defined tag labels.
 
 ### Digging the weeds
 
--   Added regression coverage for wildcard archive routing, exact matching, and note lookup filtering.
+-   Expanded regression and local Obsidian coverage for wildcard filters, archive routing, note lookup, language selection, and tag ordering.
 -   Updated development dependencies to address dependency audit findings.
 -   Kept the dependency lockfile compatible with npm 10 clean installations, and pinned CI installation to npm 10.
 -   Added Community Review checks for source code, and used Obsidian's DOM helpers for tag-tree previews.
