@@ -6,6 +6,7 @@ Browse your Obsidian notes through their tags as if they were folders. Notes wit
 
 - [Get started](#get-started)
 - [Browse by tags](#browse-by-tags)
+- [Choose what appears](#choose-what-appears)
 - [Find notes](#find-notes)
 - [Create notes](#create-notes)
 - [Settings](#settings)
@@ -23,7 +24,17 @@ TagFolder opens in the left sidebar. To open it automatically when Obsidian star
 
 ## Browse by tags
 
-Tags used together can form additional branches to narrow the matching notes. [Suggested tag tree styles](#suggested-tag-tree-styles) control whether related tags appear as folders or labels.
+Tags used together can form additional branches to narrow the matching notes.
+
+### Choose a tree style
+
+Open **Settings → TagFolder → Tags → Suggested tag tree styles** to preview a style, then choose `Apply`:
+
+- `Simple list` shows notes directly beneath each tag and displays their other tags as labels.
+- `Drill-down` uses other tags as additional folders and shows notes at the deepest matching level.
+- `Full tree` also shows notes at intermediate levels.
+
+The related settings remain individually editable after applying a style.
 
 ### Simple case
 
@@ -55,6 +66,30 @@ Old Note: #dev #readme #2021/12/10 #status/abandoned
 
 ![Nested date tags in TagFolder](images/respect-nestedtag-2.png)
 
+### Sort notes and tags
+
+Use the `Change sort order` button in the toolbar. In the tag tree, choose `Items` to sort notes or `Tags` to sort tag folders. In a separate file list pane, the note-order options appear directly in the menu.
+
+Choose `Tag grouping Ascending` or `Tag grouping Descending` to keep notes together by their written tag sequence. For example, `#project #client` and `#project #client #report` share the same leading tags and stay together. See [Files](#files) for the full ordering rules.
+
+## Choose what appears
+
+Open **Settings → TagFolder → Filters** to control which notes and tags appear. These settings change TagFolder's views while keeping files in their existing Vault locations.
+
+| Goal | Setting | Example value |
+| --- | --- | --- |
+| Show only notes from selected folders | `Target Folders` | `Projects/,Reference/` |
+| Exclude notes in a folder | `Ignore Folders` | `Templates/` |
+| Exclude an entire note when it has a matching tag | `Ignore note Tag` | `#private,#private/*` |
+| Hide matching tags while keeping notes available under other tags | `Ignore Tag` | `#status,#status/*` |
+| Keep archived notes under their archive tags in the tree | `Archive tags` | `#archive,#archive/*` |
+
+For a note tagged `#project #private/client`, setting `Ignore note Tag` to `#private/*` removes the note from both the tag tree and note lookup. The same value in `Ignore Tag` hides `#private/client` while leaving the note available under `#project`.
+
+Tag filters match exact tags by default: `#private` matches that tag alone, and `#private/*` matches its descendants. Use `#private,#private/*` to match both. A leading `#` is optional, and matching ignores letter case. See [Filters](#filters) for more pattern examples.
+
+Ignored-note and ignored-tag patterns also apply to `Open note by tags` and `Open note with similar tags`. `Archive tags` changes the note's location in the tree; archived notes remain available to those lookup commands. For a query without changing saved settings, use [Find notes](#find-notes).
+
 ## Find notes
 
 ### Search the tag tree
@@ -67,11 +102,15 @@ sweet -red | food -sweet
 
 This shows `Pear` (sweet but not red) and `Tuna` (food but not sweet).
 
+With [Search tags inside TagFolder when clicking tags](#search-tags-inside-tagfolder-when-clicking-tags) enabled, clicking a tag in a note updates the search field to show the current conditions. Clear the field to remove the search query.
+
 ### Open notes by tags
 
 Run `Open note by tags` from the command palette to find and open a note by incrementally adding tag conditions. Positive tags use OR matching and results with more matching tags appear first. Prefix a tag with `-` to exclude matching notes completely. A separate note input fuzzily filters titles and Vault-relative paths.
 
 Run `Open note with similar tags` while a Markdown note is active to start with that note's tags selected. The active note itself is omitted from the results.
+
+Selecting a parent tag such as `#project` also finds notes with nested tags such as `#project/client`.
 
 The dialogue is keyboard-operable:
 
@@ -169,11 +208,7 @@ Set the dotted path used to retrieve the title from frontmatter.
 
 #### Suggested tag tree styles
 
-Select a suggested style to see a small example beneath the setting, then choose `Apply` to update the related tag-tree settings together. The applied settings remain individually editable.
-
-- `Simple list` shows notes directly beneath each tag and displays their other tags as labels.
-- `Drill-down` uses other tags as additional folders and shows notes at the deepest matching level.
-- `Full tree` also shows notes at intermediate levels.
+Preview and apply a style as described in [Choose a tree style](#choose-a-tree-style). Each style updates the related tag-tree settings together.
 
 #### Order method
 
@@ -338,6 +373,10 @@ topic
 ```
 
 ### Filters
+
+For examples of which setting to use, see [Choose what appears](#choose-what-appears).
+
+Folder settings accept comma-separated Vault-relative paths. Use a trailing slash for a folder's contents, such as `Templates/` in `Ignore Folders`. Wildcards apply to the tag settings below.
 
 Tag filter settings accept comma-separated tag names. A leading `#` is optional, so `tag1` and `#tag1` are treated the same.
 

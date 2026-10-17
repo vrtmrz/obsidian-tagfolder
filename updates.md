@@ -3,6 +3,7 @@
 ### Improved
 
 -   Reorganised the README around getting started, browsing tags, finding notes, and creating notes. Language options are now part of the settings reference.
+-   Added practical guidance for excluding notes, hiding tags, archiving tag groups, choosing a tree style, and using the sort controls.
 
 ### Digging the weeds
 
