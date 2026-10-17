@@ -29,13 +29,13 @@ jobs:
       id-token: write
       attestations: write
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
         submodules: recursive
         ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
     - name: Use Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '24.x'
     - name: Get Version
@@ -67,19 +67,14 @@ jobs:
               main.js
               manifest.json
               styles.css
-    - name: Package
-      run: |
-        mkdir ${{ github.event.repository.name }}
-        cp main.js manifest.json styles.css README.md ${{ github.event.repository.name }}
-        zip -r ${{ github.event.repository.name }}-${{ steps.version.outputs.tag }}.zip ${{ github.event.repository.name }}
     - name: Create Release and Upload Assets
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: |
-          ${{ github.event.repository.name }}-${{ steps.version.outputs.tag }}.zip
           main.js
           manifest.json
           styles.css
+        fail_on_unmatched_files: true
         name: ${{ steps.version.outputs.tag }}
         tag_name: ${{ steps.version.outputs.tag }}
         draft: ${{ steps.version.outputs.draft }}

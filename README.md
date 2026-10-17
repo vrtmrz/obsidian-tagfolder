@@ -1,44 +1,54 @@
-## TagFolder
+# TagFolder
 
-This is the plugin that shows your tags like folders.
+Browse your Obsidian notes through their tags as if they were folders. Notes with multiple tags appear in every matching branch, and nested tags keep their hierarchy.
 
-![screenshot](images/screenshot.png)
+![TagFolder showing notes in a tag tree](images/screenshot.png)
 
-### How to use
+- [Get started](#get-started)
+- [Browse by tags](#browse-by-tags)
+- [Choose what appears](#choose-what-appears)
+- [Find notes](#find-notes)
+- [Create notes](#create-notes)
+- [Settings](#settings)
+- [Development](#development)
 
-Install this plugin, press `Ctrl+p`, and choose "Show Tag Folder".
+## Get started
 
-### Localization
+Requires Obsidian 1.7.2 or later.
 
-TagFolder ships with a built-in Simplified Chinese interface.
+1. Install and enable TagFolder from Obsidian's community plugins.
+2. Open the command palette with `Ctrl+P` (`Cmd+P` on macOS) and run `Show Tag Folder`.
+3. Expand a tag folder and select a note to open it.
 
--   Go to **Settings → TagFolder → Language** and choose `Auto (follow Obsidian)`, `English`, or `简体中文`.
--   `Auto` follows the Obsidian interface language and falls back to English when the language cannot be matched.
--   The bundled Chinese translation uses Simplified Chinese. Traditional Chinese falls back to English in `Auto`; choose `简体中文` explicitly to use the Simplified Chinese interface.
--   Names and tags are sorted using the Obsidian interface language. Choosing a different TagFolder display language changes labels while preserving that sorting language.
+TagFolder opens in the left sidebar. To open it automatically when Obsidian starts, enable [Always Open](#always-open). Notes normally appear within the tag tree; [List files in a separated pane](#list-files-in-a-separated-pane) moves the file list to a separate pane.
 
-### Behavior
+## Browse by tags
 
-This plugin creates a tree by tags permutation.
+Tags used together can form additional branches to narrow the matching notes.
 
-Like this,
-### Simple case
+### Choose a tree style
 
-If you have docs,
+Open **Settings → TagFolder → Tags → Suggested tag tree style** to preview a style, then choose `Apply`:
+
+- `Simple list` shows notes directly beneath each tag and displays their other tags as labels.
+- `Drill-down` uses other tags as additional folders and shows notes at the deepest matching level.
+- `Full tree` also shows notes at intermediate levels.
+
+The related settings remain individually editable after applying a style.
+
+### Basic example
+
+For example, these notes appear under every tag branch they match:
 ```
 Apple : #food #red #sweet
 Pear  : #food #green #sweet
 Tuna  : #food #red
 ```
-![](./images/simplecase.png)
+![Notes grouped by their shared tags](images/simplecase.png)
 
-...and more are shown.
+### Nested tags
 
-### Case of respecting nested tags
-
-The nested tag works well for Tag Folder.
-
-Tag Folder respects nested tags and makes the dedicated hierarchy. The nested child doesn't leak out over the parent.
+Nested tags retain their parent hierarchy. For example, `#status/draft` appears beneath `#status`:
 
 ```
 TagFolder Readme: #dev #readme #2021/12/10 #status/draft
@@ -46,59 +56,131 @@ Technical information: #dev #note #2021/12/09 #status/draft
 SelfHosted LiveSync Readme : #dev #readme #2021/12/06 #status/proofread
 Old Note: #dev #readme #2021/12/10 #status/abandoned
 ```
-#### Tag hierarchy of status
+#### Status tag hierarchy
 
-![](./images/respect-nestedtag-1.png)
+![Nested status tags in TagFolder](images/respect-nestedtag-1.png)
 
-#### Tag hierarchy of date
+#### Date tag hierarchy
 
-![](./images/respect-nestedtag-2.png)
+![Nested date tags in TagFolder](images/respect-nestedtag-2.png)
 
+### Sort notes and tags
 
-#### Search tags
-You can search tags. like this:
+Use the `Change sort order` button in the toolbar. In the tag tree, choose `Items` to sort notes or `Tags` to sort tag folders. In a separate file list pane, the note-order options appear directly in the menu.
+
+Choose `Tag grouping Ascending` or `Tag grouping Descending` to keep notes together by their written tag sequence. For example, `#project #client` and `#project #client #report` share the same leading tags and stay together. See [Order method](#order-method) under **Files** for the full ordering rules.
+
+## Choose what appears
+
+Open **Settings → TagFolder → Filters** to control which notes and tags appear. These settings change TagFolder's views while keeping files in their existing Vault locations.
+
+| Goal | Setting | Example value |
+| --- | --- | --- |
+| Show only notes from selected folders | `Target Folders` | `Projects/,Reference/` |
+| Exclude notes in a folder | `Ignore Folders` | `Templates/` |
+| Exclude an entire note when it has a matching tag | `Ignore note Tag` | `#private,#private/*` |
+| Hide matching tags while keeping notes available under other tags | `Ignore Tag` | `#status,#status/*` |
+| Keep archived notes under their archive tags in the tree | `Archive tags` | `#archive,#archive/*` |
+
+For a note tagged `#project #private/client`, setting `Ignore note Tag` to `#private/*` removes the note from both the tag tree and note lookup. The same value in `Ignore Tag` hides `#private/client` while leaving the note available under `#project`.
+
+Tag filters match exact tag names by default: `#private` matches only `#private` itself, while `#private/*` matches its descendants. Use `#private,#private/*` to match both. A leading `#` is optional, and matching ignores letter case. See [Filters](#filters) for more pattern examples.
+
+Ignored-note and ignored-tag patterns also apply to `Open note by tags` and `Open note with similar tags`. `Archive tags` changes the note's location in the tree; archived notes remain available to those lookup commands. To filter notes temporarily without changing saved settings, see [Find notes](#find-notes).
+
+## Find notes
+
+### Search the tag tree
+
+Use the search field to combine tags, exclude tags with `-`, and separate alternatives with `|`. For the notes above:
 
 ```
 sweet -red | food -sweet
 ```
-When using this filter, this plugin shows only "Pear" (Sweet but not red) and "Tuna" (food but not sweet).
 
-### Settings
+This shows `Pear` (sweet but not red) and `Tuna` (food but not sweet).
 
-#### Behavior
+With [Search tags inside TagFolder when clicking tags](#search-tags-inside-tagfolder-when-clicking-tags) enabled, clicking a tag in a note updates the search field to show the current conditions. Clear the field to remove the search query.
 
-##### Always Open
+### Open notes by tags
+
+Run `Open note by tags` from the command palette to find and open a note by incrementally adding tag conditions. Tags without a leading `-` use OR matching, and notes matching more of them appear first. Prefix a tag with `-` to exclude matching notes completely. A separate note input fuzzily filters titles and Vault-relative paths.
+
+Run `Open note with similar tags` while a Markdown note is active to start with that note's tags selected. The active note itself is omitted from the results.
+
+Selecting a parent tag such as `#project` also finds notes with nested tags such as `#project/client`.
+
+The dialogue is keyboard-operable:
+
+- Type a tag, then press `Space` or `Enter` to accept a completion.
+- Press `Backspace` in an empty tag input to remove the last tag, or press `ArrowLeft` to select a tag chip and remove it with `Backspace` or `Delete`.
+- Press `Tab` or `Shift+Tab` to switch between the tag and note inputs.
+- Press `ArrowUp` or `ArrowDown` to select a completion or note.
+- Press `Enter` to open the selected note, or `Ctrl+Enter`/`Cmd+Enter` to open it in a new tab.
+
+## Create notes
+
+Use the `New note` button in TagFolder to create a note with the current tags. To reuse an open note's tags, run `Create a new note with the same tags` from the command palette.
+
+The following options are under **Settings → TagFolder → Tags**.
+
+### Store tags in frontmatter for new notes
+
+This setting changes how tags are stored in new notes created by TagFolder. When disabled, tags are stored as inline hashtags at the top of new notes. When enabled, tags are stored in the frontmatter and displayed in the note's Properties.
+
+### Template for new notes
+
+When this setting is set to a valid Markdown template path, TagFolder uses that template immediately when creating a new note from the tag tree. The `.md` extension is optional. If a non-empty path is invalid, TagFolder opens a template picker. If the setting is empty, TagFolder creates the note without a template and uses the configured Properties or hashtag behaviour.
+
+If templates change while the settings tab is open, reopen it to refresh the suggestions. The template picker refreshes its list each time it opens.
+
+Templates can include these placeholders, which are replaced with the tags from the clicked location:
+
+| Placeholder                    | Replacement                                  |
+| ------------------------------ | -------------------------------------------- |
+| `{{expandedTags}}` or `{{tags}}` | Tags as hashtags, e.g. `#tag1 #tag2`           |
+| `{{tagList}}`                  | Tags as comma-separated text, e.g. `tag1, tag2` |
+| `{{tagPath}}`                  | Tags as a slash-separated path, e.g. `tag1/tag2` |
+| `{{tagName}}`                  | The last tag in the clicked context           |
+| `{{tagsJson}}`                 | Tags as a JSON array                          |
+| `{{tagsYaml}}`                 | Tags as YAML list lines                       |
+
+## Settings
+
+Open **Settings → TagFolder** to customise the tree and file list. The sections below follow the setting groups; [language options](#language) are at the end of this reference.
+
+### Behavior
+
+#### Always Open
 
 Place TagFolder on the left pane and activate it at every Obsidian launch.
 
-##### Use pinning
-We can pin the tag if we enable this option.  
-When this feature is enabled, the pin information is saved in the file set in the next configuration.  
-Pinned tags are sorted according to `key` in the frontmatter of `taginfo.md`.
+#### Use pinning
 
-##### Pin information file
-We can change the name of the file in which pin information is saved.
-This can be configured also from the context-menu.
+Pin tags using the configured pin information file. Pinned tags are sorted by `key` in its frontmatter; the default file is `taginfo.md`.
 
-| Item     | Meaning of the value                                                                              |
-| -------- | ------------------------------------------------------------------------------------------------- |
-| key      | If exists, the tag is pinned.                                                                     |
-| mark     | The label which is shown instead of `📌`.                                                          |
-| alt      | The tag will be shown as this. But they will not be merged into the same one. No `#` is required. |
-| redirect | The tag will be redirected to the configured one and will be merged. No `#` is required.          |
+#### Pin information file
 
-##### Disable narrowing down
-TagFolder creates the folder structure by collecting combinations of tags that are used in the same note, to make it easier for us to find notes.
-When this feature is enabled, collected combinations are no longer structured and show as we have organized them in a manner.
+Choose the file which stores pin information. This can also be configured from the context menu.
 
+| Item       | Meaning of the value                                                      |
+| ---------- | ------------------------------------------------------------------------- |
+| `key`      | Pins the tag and determines its order.                                    |
+| `mark`     | The label shown instead of `📌`.                                          |
+| `alt`      | Displays this label without merging tags. No `#` is required.             |
+| `redirect` | Redirects and merges the tag into the configured tag. No `#` is required. |
 
-#### Files
+#### Disable narrowing down
 
-##### Display Method
+Show related tags alongside note titles instead of using them to create additional folders.
 
-You can configure how the entry shows.
+### Files
 
-##### Order method
+#### Display method
+
+Choose whether entries show their name, path, or both.
+
+#### Order method
 
 You can order items by:
 
@@ -112,32 +194,31 @@ You can order items by:
 
 Names and tags are compared using the Obsidian interface language, with natural numeric ordering.
 
-##### Use title
+#### Use title
 
-When you enable this option, the value in the frontmatter or first level one heading will be shown instead of `NAME`.
+Show the frontmatter title or first level-one heading in place of `NAME`.
 
-##### Frontmatter path
-Dotted path to retrieve title from frontmatter.
+#### Frontmatter path
 
-#### Tags
+Set the dotted path used to retrieve the title from frontmatter.
 
-##### Suggested tag tree styles
+### Tags
 
-Select a suggested style to see a small example beneath the setting, then choose `Apply` to update the related tag-tree settings together. The applied settings remain individually editable.
+#### Suggested tag tree styles
 
-- `Simple list` shows notes directly beneath each tag and displays their other tags as labels.
-- `Drill-down` uses other tags as additional folders and shows notes at the deepest matching level.
-- `Full tree` also shows notes at intermediate levels.
+Preview and apply a style as described in [Choose a tree style](#choose-a-tree-style). Each style updates the related tag-tree settings together.
 
-##### Order method
+#### Order method
 
 You can order tags by:
+
 - Filename
 - Count of items
 
-##### Use virtual tags
+#### Use virtual tags
 
-When we enable this feature, our notes will be tagged as their freshness automatically.
+Add virtual tags based on when a note was last edited:
+
 | Icon | Edited ...            |
 | ---- | --------------------- |
 | 🕐    | Within an hour        |
@@ -146,66 +227,34 @@ When we enable this feature, our notes will be tagged as their freshness automat
 | 📚    | Within 7 days         |
 | 🗄    | Older than 7 days ago |
 
-##### Display folder as tag
+#### Display folder as tag
 
-When we enable this feature, the folder will be shown as a tag.
+Show a note's folder as a tag.
 
-##### Store tags in frontmatter for new notes
+### Actions
 
-This setting changes how tags are stored in new notes created by TagFolder. When disabled, tags are stored as #hashtags at the top of new notes. When enabled, tags are stored in the frontmatter and displayed in the note's Properties.
+#### Search tags inside TagFolder when clicking tags
 
-##### Template for new notes
+Search within TagFolder when clicking a tag instead of opening the default search pane. `Ctrl+click` adds an inclusion or clears an exclusion; `Ctrl+Shift+click` removes an inclusion or adds an exclusion.
 
-When this setting is set to a valid markdown template path, TagFolder uses that template immediately when creating a new note from the tag tree. The `.md` extension is optional. If a non-empty path is invalid, TagFolder opens a template picker. If the setting is empty, TagFolder creates the note without a template and uses the configured Properties or hashtag behaviour.
+#### List files in a separated pane
 
-Settings suggestions are captured when the settings tab opens; reopen the tab to refresh them. The new-note template selection dialog captures a fresh list each time it opens.
+Show matching files in a separate pane. When disabled, files appear directly in the tag tree.
 
-Templates can include these placeholders, which are replaced with the tags from the clicked location:
+### Arrangements
 
-| Placeholder        | Replacement                         |
-| ------------------ | ----------------------------------- |
-| `{{expandedTags}}` or `{{tags}}` | Tags as hashtags, e.g. `#tag1 #tag2` |
-| `{{tagList}}`      | Tags as comma-separated text, e.g. `tag1, tag2` |
-| `{{tagPath}}`      | Tags as a slash-separated path, e.g. `tag1/tag2` |
-| `{{tagName}}`      | The last tag in the clicked context |
-| `{{tagsJson}}`     | Tags as a JSON array                |
-| `{{tagsYaml}}`     | Tags as YAML list lines             |
+#### Hide Items
 
-#### Actions
+Choose where notes appear in the tag tree.
 
-##### Open notes by tags
-
-Run `Open note by tags` from the command palette to find and open a note by incrementally adding tag conditions. Positive tags use OR matching and results with more matching tags appear first. Prefix a tag with `-` to exclude matching notes completely. A separate note input fuzzily filters titles and Vault-relative paths.
-
-Run `Open note with similar tags` while a Markdown note is active to start with that note's tags selected. The active note itself is omitted from the results.
-
-The dialogue is keyboard-operable:
-
-- Type a tag, then press `Space` or `Enter` to accept a completion.
-- Press `Backspace` in an empty tag input to remove the last tag, or press `ArrowLeft` to select a tag chip and remove it with `Backspace` or `Delete`.
-- Press `Tab` or `Shift+Tab` to switch between the tag and note inputs.
-- Press `ArrowUp` or `ArrowDown` to select a completion or note.
-- Press `Enter` to open the selected note, or `Ctrl+Enter`/`Cmd+Enter` to open it in a new tab.
-
-See the [complete interaction design](docs/note-lookup-design.md) for focus, nested-tag matching, accessibility, and IME behaviour.
-
-##### Search tags inside TagFolder when clicking tags
-We can search tags inside TagFolder when clicking tags instead of opening the default search pane.
-With control and shift keys, we can remove the tag from the search condition or add an exclusion of it to that.
-
-##### List files in a separated pane
-When enabled, files will be shown in a separated pane.
-
-#### Arrangements
-
-##### Hide Items
-
-Configure hiding items.
 - Hide nothing
 - Only intermediates of nested tags
 - All intermediates
 
-If you have these items:
+<details>
+<summary>Compare the three tree layouts</summary>
+
+For these notes:
 ```
 2021-11-01 : #daily/2021/11 #status/summarized
 2021-11-02 : #daily/2021/11 #status/summarized
@@ -213,7 +262,8 @@ If you have these items:
 2021-12-01 : #daily/2021/12 #status/jot
 ```
 
-This setting affects as like below.
+The options produce the following trees:
+
 - Hide nothing
 
 ```
@@ -245,7 +295,8 @@ daily
 ```
 
 - Only intermediates of nested tags
-Hide only intermediates of nested tags, so show items only on the last or break of the nested tags.
+
+Show notes only where a nested tag path ends or branches into another tag.
 ```
 daily
 	→ 2021
@@ -263,7 +314,8 @@ daily
 			:
 ```
 - All intermediates
-Hide all intermediates, so show items only deepest.
+
+Show notes only at the deepest levels.
 ```
 daily
 	→ 2021
@@ -278,23 +330,28 @@ daily
 			:
 ```
 
-##### Merge redundant combinations
-When this feature is enabled, a/b and b/a are merged into a/b if there are no intermediates.
+</details>
 
-##### Do not simplify empty folders
+#### Merge redundant combinations
+
+When this feature is enabled, `a/b` and `b/a` are merged into `a/b` if there are no intermediates.
+
+#### Do not simplify empty folders
+
 Keep empty folders, even if they can be simplified.
 
-##### Do not treat nested tags as dedicated levels
+#### Do not treat nested tags as dedicated levels
 
 If you enable this option, every nested tag is split into normal tags.
 
 `#dev/TagFolder` will be treated like `#dev` and `#TagFolder`.
 
-##### Reduce duplicated parents in nested tags
+#### Reduce duplicated parents in nested tags
 
-If we have the doc (e.g., `example note`) with nested tags which have the same parents, like `#topic/calculus`, `#topic/electromagnetics`:
+For a note (`example note`) with nested tags that share a parent, such as `#topic/calculus` and `#topic/electromagnetics`:
 
 - Disabled
+
 ```
 topic
 	 - > calculus
@@ -304,6 +361,7 @@ topic
 		 example note 
 ```
 - Enabled
+
 ```
 topic
 	 - > calculus
@@ -312,7 +370,11 @@ topic
 		 example note 
 ```
 
-#### Filters
+### Filters
+
+For examples of which setting to use, see [Choose what appears](#choose-what-appears).
+
+Folder settings accept comma-separated Vault-relative paths. Use a trailing slash for a folder's contents, such as `Templates/` in `Ignore Folders`. Wildcards apply to the tag settings below.
 
 Tag filter settings accept comma-separated tag names. A leading `#` is optional, so `tag1` and `#tag1` are treated the same.
 
@@ -331,29 +393,37 @@ project/*/done
 
 Note lookup and similar-note lookup use the same ignored-note and ignored-tag patterns as the tag tree.
 
-##### Target Folders
-If we set this, the plugin will only target files in it.
+#### Target Folders
 
+Limit TagFolder to files in these folders.
 
-##### Ignore Folders
+#### Ignore Folders
 
-Ignore documents in specific folders.
+Exclude notes in these folders.
 
+#### Ignore note Tag
 
-##### Ignore note Tag
-
-If the note has the tag that is set in here, the note would be treated as there was not.
+Exclude notes with matching tags.
 Glob entries can ignore a whole nested tag group, for example `#tag1/*`.
 
-##### Ignore Tag
+#### Ignore Tag
 
-Tags that were set here would be treated as there were not.
+Hide matching tags while keeping their notes available under other tags.
 Glob entries can hide matching nested tags while leaving non-matching tags visible.
 
-##### Archive tags
+#### Archive tags
 
 If configured, notes with matching tags are shown under those tags instead of unrelated top-level tag folders.
 Glob entries can archive a whole nested tag group, for example `#archive/*`.
+
+### Language
+
+The interface is available in English and Simplified Chinese.
+
+-   Go to **Settings → TagFolder → Language** and choose `Auto (follow Obsidian)`, `English`, or `简体中文`.
+-   `Auto` follows the Obsidian interface language and falls back to English when the language cannot be matched.
+-   The bundled Chinese translation uses Simplified Chinese. Traditional Chinese falls back to English in `Auto`; choose `简体中文` explicitly to use the Simplified Chinese interface.
+-   Names and tags are sorted using the Obsidian interface language. Choosing a different TagFolder display language changes labels while preserving that sorting language.
 
 ## Development
 

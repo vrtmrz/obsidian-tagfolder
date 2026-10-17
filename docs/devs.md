@@ -86,6 +86,8 @@ The preparation command explicitly downloads and extracts the official Obsidian 
 
 The repository uses three manually gated workflows. Configure the GitHub `release` environment with a required reviewer before using them.
 
+The release workflow uploads `main.js`, `manifest.json`, and `styles.css` individually and attests their build provenance. It does not create a separate ZIP archive. All three files must be present for the upload to succeed.
+
 1. Run `Prepare Release PR` with the target version. It checks out `main`, runs the locked build and test gate, updates `package.json`, `manifest.json`, `versions.json`, and the `Unreleased` section in `updates.md`, pushes `release/<version>`, opens a draft pull request, and explicitly dispatches CI for the release branch. Explicit dispatch is required because branch and pull-request events created with `GITHUB_TOKEN` do not start another workflow.
 2. Review the release changes and release notes. Keep the pull request in draft and record its full head commit SHA.
 3. Run `Finalise Release Tags` with the version and reviewed SHA, then approve its `release` environment deployment. It validates the exact branch head, creates the tag, and explicitly dispatches `Release Obsidian Plugin`. Explicit dispatch is required because a tag pushed with `GITHUB_TOKEN` does not start a tag-push workflow.
@@ -101,6 +103,6 @@ A beta from an unmerged feature branch uses an immutable semantic pre-release ve
 
 Treat tag creation and publication as separate approvals. Create the beta tag at the reviewed head, then manually dispatch `Release Obsidian Plugin` for that tag with `draft` and `prerelease` both set to `true`. Do not use `Finalise Release Tags` for this path because the stable finalisation workflow deliberately dispatches releases with `prerelease=false`.
 
-After approving the `release` environment, verify the draft release name, tag, `manifest.json` version, archive contents, individual assets, provenance, and pre-release status. Publish it as a pre-release without marking it as the latest stable release, install the repository through BRAT, and exercise the feature-specific scenario before merging the draft pull request.
+After approving the `release` environment, verify the draft release name, tag, `manifest.json` version, the three plug-in assets, provenance, and pre-release status. Publish it as a pre-release without marking it as the latest stable release, install the repository through BRAT, and exercise the feature-specific scenario before merging the draft pull request.
 
 If BRAT validation fails, leave the failed beta tag and release immutable, keep the pull request in draft, and prepare the next pre-release version, such as `0.18.19-beta.2`.
