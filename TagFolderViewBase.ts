@@ -33,6 +33,11 @@ type TagWranglerPlugin = {
 	rename: (tagName: string, toName?: string) => void | Promise<void>;
 };
 
+type NativeContextMenuEvent = {
+	nativeEvent: { locationX: number; locationY: number };
+	preventDefault(): void;
+};
+
 type AppWithCommunityPlugins = App & {
 	plugins?: {
 		plugins?: Record<string, unknown>;
@@ -178,7 +183,7 @@ export abstract class TagFolderViewBase extends ItemView {
 
 	abstract getViewType(): string;
 
-	showMenu(evt: MouseEvent, trail: string[], targetTag?: string, targetItems?: ViewItem[]) {
+	showMenu(evt: MouseEvent | NativeContextMenuEvent, trail: string[], targetTag?: string, targetItems?: ViewItem[]) {
 
 		const isTagTree = this.getViewType() == VIEW_TYPE_TAGFOLDER;
 		const menu = new Menu();
@@ -379,9 +384,7 @@ export abstract class TagFolderViewBase extends ItemView {
 			menu.showAtPosition({ x: evt.pageX, y: evt.pageY });
 		} else {
 			menu.showAtPosition({
-				// @ts-ignore
 				x: evt.nativeEvent.locationX,
-				// @ts-ignore
 				y: evt.nativeEvent.locationY,
 			});
 		}

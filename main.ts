@@ -267,10 +267,8 @@ function splitSettingList(value: string) {
 }
 
 // Thank you @pjeby!
-function onElement<T extends HTMLElement | Document>(el: T, event: string, selector: string, callback: CallableFunction, options: EventListenerOptions) {
-	//@ts-ignore
+function onElement(el: Document, event: "click", selector: string, callback: (event: MouseEvent, targetEl: HTMLElement) => void, options: EventListenerOptions) {
 	el.on(event, selector, callback, options)
-	//@ts-ignore
 	return () => el.off(event, selector, callback, options);
 }
 
@@ -690,7 +688,7 @@ export default class TagFolderPlugin extends Plugin {
 				while (!enumTags.classList.contains("cm-hashtag-begin")) {
 					enumTags = enumTags.previousElementSibling;
 					if (!enumTags) {
-						console.log("Error! start tag not found.");
+						console.debug("Error! start tag not found.");
 						return;
 					}
 				}
@@ -1345,7 +1343,7 @@ export default class TagFolderPlugin extends Plugin {
 			this.tagInfo = newTagInfo;
 			this.applyTagInfo();
 		} catch (ex) {
-			console.log(ex);
+			console.error("TagFolder: Could not load tag information.", ex);
 			// NO OP.
 		}
 
@@ -1358,7 +1356,7 @@ export default class TagFolderPlugin extends Plugin {
 		if (file == null) {
 			file = await this.app.vault.create(this.getTagInfoFilename(), "");
 		}
-		await this.app.fileManager.processFrontMatter(file, matter => {
+		await this.app.fileManager.processFrontMatter(file, (matter: Record<string, unknown>) => {
 			const ti = Object.entries(this.tagInfo);
 			for (const [key, value] of ti) {
 				if (value === undefined) {
@@ -1384,10 +1382,11 @@ export default class TagFolderPlugin extends Plugin {
 	}
 	async loadSettings() {
 		configureAppLocale();
+		const savedSettings = await this.loadData() as Partial<TagFolderSettings> | undefined;
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			await this.loadData()
+			savedSettings
 		);
 		this.settings.newNoteTemplate = normalizeNewNoteTemplatePath(this.settings.newNoteTemplate);
 		applyLanguagePreference(this.settings.uiLanguage);
@@ -1494,8 +1493,10 @@ export default class TagFolderPlugin extends Plugin {
 			}
 		}
 
-		//@ts-ignore
-		const ww = await this.app.fileManager.createAndOpenMarkdownFile();
+		const fileManager = this.app.fileManager as App["fileManager"] & {
+			createAndOpenMarkdownFile(): Promise<unknown>;
+		};
+		const ww = await fileManager.createAndOpenMarkdownFile();
 		if (!(ww instanceof TFile)) return;
 		await populateNewNote({
 			vault: this.vaultText,
@@ -1523,6 +1524,10 @@ class TagFolderSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
+		this.renderSettings();
+	}
+
+	private renderSettings(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 		const newNoteTemplates = captureNewNoteTemplates(this.app);
@@ -1546,7 +1551,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 						this.plugin.settings.uiLanguage = value as LanguagePreference;
 						await this.plugin.saveSettings();
 						applyLanguagePreference(this.plugin.settings.uiLanguage);
-						this.display();
+						this.renderSettings();
 					})
 			);
 
@@ -1729,7 +1734,7 @@ class TagFolderSettingTab extends PluginSettingTab {
 							selectedTagTreeStyle,
 						);
 						await this.plugin.saveSettings();
-						this.display();
+						this.renderSettings();
 						new Notice(tr("Applied '{name}' settings.", { name: appliedStyleName }));
 					});
 			});

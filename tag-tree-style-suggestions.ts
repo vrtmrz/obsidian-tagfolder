@@ -131,45 +131,30 @@ export function applyTagTreeStyleSuggestion(
 }
 
 function appendPreviewNodes(
-	document: Document,
 	container: HTMLElement,
 	nodes: readonly TagTreeStylePreviewNode[],
 ): void {
 	for (const node of nodes) {
-		const nodeEl = document.createElement("div");
-		nodeEl.className = `tagfolder-style-preview-node is-${node.kind}`;
+		const nodeEl = container.createDiv({ cls: `tagfolder-style-preview-node is-${node.kind}` });
 		nodeEl.setAttribute("role", "treeitem");
 
-		const rowEl = document.createElement("div");
-		rowEl.className = "tagfolder-style-preview-row";
-		const markerEl = document.createElement("span");
-		markerEl.className = "tagfolder-style-preview-marker";
+		const rowEl = nodeEl.createDiv({ cls: "tagfolder-style-preview-row" });
+		const markerEl = rowEl.createSpan({ cls: "tagfolder-style-preview-marker" });
 		markerEl.setAttribute("aria-hidden", "true");
 		markerEl.textContent = node.kind === "tag" ? "▾" : "•";
-		rowEl.append(markerEl);
 
-		const labelEl = document.createElement("span");
-		labelEl.className = "tagfolder-style-preview-node-label";
-		labelEl.textContent = node.label;
-		rowEl.append(labelEl);
+		rowEl.createSpan({ cls: "tagfolder-style-preview-node-label", text: node.label });
 
 		for (const chip of node.chips ?? []) {
-			const chipEl = document.createElement("span");
-			chipEl.className = "tagfolder-style-preview-chip";
-			chipEl.textContent = chip;
-			rowEl.append(chipEl);
+			rowEl.createSpan({ cls: "tagfolder-style-preview-chip", text: chip });
 		}
-		nodeEl.append(rowEl);
 
 		if (node.children?.length) {
 			nodeEl.setAttribute("aria-expanded", "true");
-			const childrenEl = document.createElement("div");
-			childrenEl.className = "tagfolder-style-preview-children";
+			const childrenEl = nodeEl.createDiv({ cls: "tagfolder-style-preview-children" });
 			childrenEl.setAttribute("role", "group");
-			appendPreviewNodes(document, childrenEl, node.children);
-			nodeEl.append(childrenEl);
+			appendPreviewNodes(childrenEl, node.children);
 		}
-		container.append(nodeEl);
 	}
 }
 
@@ -182,46 +167,22 @@ export function renderTagTreeStylePreview(
 	container.setAttribute("aria-live", "polite");
 	if (!suggestion) return;
 
-	const document = container.ownerDocument;
-	const descriptionEl = document.createElement("div");
-	descriptionEl.className = "tagfolder-style-preview-description";
-	descriptionEl.textContent = tr(suggestion.description);
-	container.append(descriptionEl);
+	container.createDiv({ cls: "tagfolder-style-preview-description", text: tr(suggestion.description) });
+	container.createDiv({ cls: "tagfolder-style-preview-label", text: tr("Sample notes") });
 
-	const sampleLabelEl = document.createElement("div");
-	sampleLabelEl.className = "tagfolder-style-preview-label";
-	sampleLabelEl.textContent = tr("Sample notes");
-	container.append(sampleLabelEl);
-
-	const sampleEl = document.createElement("div");
-	sampleEl.className = "tagfolder-style-preview-sample";
+	const sampleEl = container.createDiv({ cls: "tagfolder-style-preview-sample" });
 	for (const note of SAMPLE_NOTES) {
-		const noteEl = document.createElement("div");
-		noteEl.className = "tagfolder-style-preview-sample-note";
-		const nameEl = document.createElement("span");
-		nameEl.className = "tagfolder-style-preview-sample-name";
-		nameEl.textContent = note.name;
-		const tagsEl = document.createElement("span");
-		tagsEl.className = "tagfolder-style-preview-sample-tags";
+		const noteEl = sampleEl.createDiv({ cls: "tagfolder-style-preview-sample-note" });
+		noteEl.createSpan({ cls: "tagfolder-style-preview-sample-name", text: note.name });
+		const tagsEl = noteEl.createSpan({ cls: "tagfolder-style-preview-sample-tags" });
 		for (const tag of note.tags) {
-			const tagEl = document.createElement("span");
-			tagEl.className = "tagfolder-style-preview-sample-tag";
-			tagEl.textContent = `#${tag}`;
-			tagsEl.append(tagEl);
+			tagsEl.createSpan({ cls: "tagfolder-style-preview-sample-tag", text: `#${tag}` });
 		}
-		noteEl.append(nameEl, tagsEl);
-		sampleEl.append(noteEl);
 	}
-	container.append(sampleEl);
 
-	const treeLabelEl = document.createElement("div");
-	treeLabelEl.className = "tagfolder-style-preview-label";
-	treeLabelEl.textContent = tr("Rendered project branch");
-	container.append(treeLabelEl);
+	container.createDiv({ cls: "tagfolder-style-preview-label", text: tr("Rendered project branch") });
 
-	const treeEl = document.createElement("div");
-	treeEl.className = "tagfolder-style-preview-tree";
+	const treeEl = container.createDiv({ cls: "tagfolder-style-preview-tree" });
 	treeEl.setAttribute("role", "tree");
-	appendPreviewNodes(document, treeEl, suggestion.preview);
-	container.append(treeEl);
+	appendPreviewNodes(treeEl, suggestion.preview);
 }

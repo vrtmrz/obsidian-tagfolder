@@ -27,13 +27,13 @@ export default defineConfig([
     ...sveltePlugin.configs["flat/base"],
     ...obsidianmd.configs.recommended,
     {
-        files: ["**/*.ts"],
+        files: ["**/*.{ts,cts,mts,tsx}"],
         languageOptions: {
             globals: { ...globals.browser },
             parser: tsParser,
             parserOptions: {
                 projectService: true,
-                rootDir: "./",
+                tsconfigRootDir: import.meta.dirname,
             },
         },
         linterOptions: {
@@ -53,12 +53,25 @@ export default defineConfig([
                 parser: tsParser,
                 extraFileExtensions: [".svelte"],
                 projectService: true,
-                rootDir: "./",
+                tsconfigRootDir: import.meta.dirname,
             },
         },
         rules: {
             "no-unused-vars": "off",
             ...obsidianRules,
+        },
+    },
+    {
+        // Tests and their configuration run in Node.js.
+        files: ["tests/**/*.ts", "test/e2e-obsidian/**/*.mts", "vitest.config.ts"],
+        languageOptions: {
+            globals: { ...globals.node },
+        },
+        rules: {
+            ...Object.fromEntries(Object.keys(obsidianmd.rules).map((rule) => [`obsidianmd/${rule}`, "off"])),
+            "no-restricted-globals": "off",
+            "@typescript-eslint/no-restricted-imports": "off",
+            "import/no-extraneous-dependencies": ["warn", { devDependencies: true }],
         },
     },
 ]);

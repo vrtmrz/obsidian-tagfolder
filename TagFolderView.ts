@@ -1,4 +1,4 @@
-import { WorkspaceLeaf } from "obsidian";
+import { WorkspaceLeaf, type App } from "obsidian";
 import TagFolderViewComponent from "./TagFolderViewComponent.svelte";
 import { VIEW_TYPE_TAGFOLDER, type TREE_TYPE, VIEW_TYPE_TAGFOLDER_LINK } from "./types";
 import TagFolderPlugin from "./main";
@@ -30,8 +30,10 @@ export class TagFolderView extends TagFolderViewBase {
 	}
 
 	newNote(evt: MouseEvent) {
-		//@ts-ignore
-		this.app.commands.executeCommandById("file-explorer:new-file");
+		const app = this.app as App & {
+			commands: { executeCommandById(id: string): boolean };
+		};
+		app.commands.executeCommandById("file-explorer:new-file");
 	}
 
 	getViewType() {

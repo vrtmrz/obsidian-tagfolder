@@ -33,6 +33,21 @@ if (!String.prototype.contains) {
 	});
 }
 
+for (const [method, tag] of [["createDiv", "div"], ["createSpan", "span"]] as const) {
+	Object.defineProperty(HTMLElement.prototype, method, {
+		configurable: true,
+		writable: true,
+		value: function (this: HTMLElement, options: { cls?: string; text?: string; attr?: Record<string, string> } = {}) {
+			const element = this.ownerDocument.createElement(tag);
+			if (options.cls) element.className = options.cls;
+			if (options.text !== undefined) element.textContent = options.text;
+			for (const [key, value] of Object.entries(options.attr ?? {})) element.setAttribute(key, value);
+			this.append(element);
+			return element;
+		},
+	});
+}
+
 if (!window.requestAnimationFrame) {
 	window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(performance.now()), 0);
 }

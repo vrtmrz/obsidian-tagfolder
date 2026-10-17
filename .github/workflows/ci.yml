@@ -19,8 +19,8 @@ jobs:
           node-version: "24.x"
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies with npm 10
+        run: npx --yes npm@10.9.9 ci
 
       - name: Check
         run: npm run check

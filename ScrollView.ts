@@ -81,7 +81,7 @@ export class ScrollView extends ItemView {
 			} else {
 				const f = this.app.vault.getAbstractFileByPath(item.path);
 				if (f == null || !(f instanceof TFile)) {
-					console.log(`File not found:${item.path}`);
+					console.debug(`File not found:${item.path}`);
 					items.push(item);
 					continue;
 				}

@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules -- fileURLToPath(node:url) 用于把 import.meta.url 转成系统路径（含中文/Windows 盘符），供 vitest 别名解析。 */
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import { compile } from "svelte/compiler";

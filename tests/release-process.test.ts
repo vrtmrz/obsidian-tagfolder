@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules -- Release-process tests exercise Node.js scripts. */
 /// <reference types="node" />
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
