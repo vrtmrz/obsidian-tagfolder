@@ -1,6 +1,6 @@
 # TagFolder
 
-Browse your Obsidian notes through their tags as if they were folders. Notes with several tags can appear in several branches, and nested tags keep their hierarchy.
+Browse your Obsidian notes through their tags as if they were folders. Notes with multiple tags appear in every matching branch, and nested tags keep their hierarchy.
 
 ![TagFolder showing notes in a tag tree](images/screenshot.png)
 
@@ -28,7 +28,7 @@ Tags used together can form additional branches to narrow the matching notes.
 
 ### Choose a tree style
 
-Open **Settings → TagFolder → Tags → Suggested tag tree styles** to preview a style, then choose `Apply`:
+Open **Settings → TagFolder → Tags → Suggested tag tree style** to preview a style, then choose `Apply`:
 
 - `Simple list` shows notes directly beneath each tag and displays their other tags as labels.
 - `Drill-down` uses other tags as additional folders and shows notes at the deepest matching level.
@@ -36,17 +36,15 @@ Open **Settings → TagFolder → Tags → Suggested tag tree styles** to previe
 
 The related settings remain individually editable after applying a style.
 
-### Simple case
+### Basic example
 
-For example, these notes can appear under several matching tag folders:
+For example, these notes appear under every tag branch they match:
 ```
 Apple : #food #red #sweet
 Pear  : #food #green #sweet
 Tuna  : #food #red
 ```
 ![Notes grouped by their shared tags](images/simplecase.png)
-
-The same note can appear in each matching branch.
 
 ### Nested tags
 
@@ -58,11 +56,11 @@ Technical information: #dev #note #2021/12/09 #status/draft
 SelfHosted LiveSync Readme : #dev #readme #2021/12/06 #status/proofread
 Old Note: #dev #readme #2021/12/10 #status/abandoned
 ```
-#### Tag hierarchy of status
+#### Status tag hierarchy
 
 ![Nested status tags in TagFolder](images/respect-nestedtag-1.png)
 
-#### Tag hierarchy of date
+#### Date tag hierarchy
 
 ![Nested date tags in TagFolder](images/respect-nestedtag-2.png)
 
@@ -70,7 +68,7 @@ Old Note: #dev #readme #2021/12/10 #status/abandoned
 
 Use the `Change sort order` button in the toolbar. In the tag tree, choose `Items` to sort notes or `Tags` to sort tag folders. In a separate file list pane, the note-order options appear directly in the menu.
 
-Choose `Tag grouping Ascending` or `Tag grouping Descending` to keep notes together by their written tag sequence. For example, `#project #client` and `#project #client #report` share the same leading tags and stay together. See [Files](#files) for the full ordering rules.
+Choose `Tag grouping Ascending` or `Tag grouping Descending` to keep notes together by their written tag sequence. For example, `#project #client` and `#project #client #report` share the same leading tags and stay together. See [Order method](#order-method) under **Files** for the full ordering rules.
 
 ## Choose what appears
 
@@ -86,9 +84,9 @@ Open **Settings → TagFolder → Filters** to control which notes and tags appe
 
 For a note tagged `#project #private/client`, setting `Ignore note Tag` to `#private/*` removes the note from both the tag tree and note lookup. The same value in `Ignore Tag` hides `#private/client` while leaving the note available under `#project`.
 
-Tag filters match exact tags by default: `#private` matches that tag alone, and `#private/*` matches its descendants. Use `#private,#private/*` to match both. A leading `#` is optional, and matching ignores letter case. See [Filters](#filters) for more pattern examples.
+Tag filters match exact tag names by default: `#private` matches only `#private` itself, while `#private/*` matches its descendants. Use `#private,#private/*` to match both. A leading `#` is optional, and matching ignores letter case. See [Filters](#filters) for more pattern examples.
 
-Ignored-note and ignored-tag patterns also apply to `Open note by tags` and `Open note with similar tags`. `Archive tags` changes the note's location in the tree; archived notes remain available to those lookup commands. For a query without changing saved settings, use [Find notes](#find-notes).
+Ignored-note and ignored-tag patterns also apply to `Open note by tags` and `Open note with similar tags`. `Archive tags` changes the note's location in the tree; archived notes remain available to those lookup commands. To filter notes temporarily without changing saved settings, see [Find notes](#find-notes).
 
 ## Find notes
 
@@ -106,7 +104,7 @@ With [Search tags inside TagFolder when clicking tags](#search-tags-inside-tagfo
 
 ### Open notes by tags
 
-Run `Open note by tags` from the command palette to find and open a note by incrementally adding tag conditions. Positive tags use OR matching and results with more matching tags appear first. Prefix a tag with `-` to exclude matching notes completely. A separate note input fuzzily filters titles and Vault-relative paths.
+Run `Open note by tags` from the command palette to find and open a note by incrementally adding tag conditions. Tags without a leading `-` use OR matching, and notes matching more of them appear first. Prefix a tag with `-` to exclude matching notes completely. A separate note input fuzzily filters titles and Vault-relative paths.
 
 Run `Open note with similar tags` while a Markdown note is active to start with that note's tags selected. The active note itself is omitted from the results.
 
@@ -128,11 +126,11 @@ The following options are under **Settings → TagFolder → Tags**.
 
 ### Store tags in frontmatter for new notes
 
-This setting changes how tags are stored in new notes created by TagFolder. When disabled, tags are stored as #hashtags at the top of new notes. When enabled, tags are stored in the frontmatter and displayed in the note's Properties.
+This setting changes how tags are stored in new notes created by TagFolder. When disabled, tags are stored as inline hashtags at the top of new notes. When enabled, tags are stored in the frontmatter and displayed in the note's Properties.
 
 ### Template for new notes
 
-When this setting is set to a valid markdown template path, TagFolder uses that template immediately when creating a new note from the tag tree. The `.md` extension is optional. If a non-empty path is invalid, TagFolder opens a template picker. If the setting is empty, TagFolder creates the note without a template and uses the configured Properties or hashtag behaviour.
+When this setting is set to a valid Markdown template path, TagFolder uses that template immediately when creating a new note from the tag tree. The `.md` extension is optional. If a non-empty path is invalid, TagFolder opens a template picker. If the setting is empty, TagFolder creates the note without a template and uses the configured Properties or hashtag behaviour.
 
 If templates change while the settings tab is open, reopen it to refresh the suggestions. The template picker refreshes its list each time it opens.
 
@@ -165,12 +163,12 @@ Pin tags using the configured pin information file. Pinned tags are sorted by `k
 
 Choose the file which stores pin information. This can also be configured from the context menu.
 
-| Item     | Meaning of the value                                                    |
-| -------- | ----------------------------------------------------------------------- |
-| key      | Pins the tag and determines its order.                                   |
-| mark     | The label shown instead of `📌`.                                         |
-| alt      | Displays this label without merging tags. No `#` is required.             |
-| redirect | Redirects and merges the tag into the configured tag. No `#` is required. |
+| Item       | Meaning of the value                                                      |
+| ---------- | ------------------------------------------------------------------------- |
+| `key`      | Pins the tag and determines its order.                                    |
+| `mark`     | The label shown instead of `📌`.                                          |
+| `alt`      | Displays this label without merging tags. No `#` is required.             |
+| `redirect` | Redirects and merges the tag into the configured tag. No `#` is required. |
 
 #### Disable narrowing down
 
@@ -237,7 +235,7 @@ Show a note's folder as a tag.
 
 #### Search tags inside TagFolder when clicking tags
 
-Search within TagFolder when clicking a tag instead of opening the default search pane. Use the Control and Shift modifiers to remove a tag from the search condition or add an exclusion.
+Search within TagFolder when clicking a tag instead of opening the default search pane. `Ctrl+click` adds an inclusion or clears an exclusion; `Ctrl+Shift+click` removes an inclusion or adds an exclusion.
 
 #### List files in a separated pane
 
@@ -298,7 +296,7 @@ daily
 
 - Only intermediates of nested tags
 
-Show notes only at the end of, or a break in, a nested tag path.
+Show notes only where a nested tag path ends or branches into another tag.
 ```
 daily
 	→ 2021
@@ -336,7 +334,7 @@ daily
 
 #### Merge redundant combinations
 
-When this feature is enabled, a/b and b/a are merged into a/b if there are no intermediates.
+When this feature is enabled, `a/b` and `b/a` are merged into `a/b` if there are no intermediates.
 
 #### Do not simplify empty folders
 
@@ -350,7 +348,7 @@ If you enable this option, every nested tag is split into normal tags.
 
 #### Reduce duplicated parents in nested tags
 
-For a note such as `example note` with nested tags sharing a parent, such as `#topic/calculus` and `#topic/electromagnetics`:
+For a note (`example note`) with nested tags that share a parent, such as `#topic/calculus` and `#topic/electromagnetics`:
 
 - Disabled
 
