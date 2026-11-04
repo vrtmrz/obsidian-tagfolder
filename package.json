@@ -54,8 +54,8 @@
 		"vitest": "^4.1.12"
 	},
 	"dependencies": {
-		"@vrtmrz/obsidian-plugin-kit": "0.1.1",
-		"@vrtmrz/ui-interactions": "0.1.0"
+		"@vrtmrz/obsidian-plugin-kit": "0.1.7",
+		"@vrtmrz/ui-interactions": "0.1.2"
 	},
 	"overrides": {
 		"eslint-plugin-obsidianmd": {
