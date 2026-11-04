@@ -1,4 +1,4 @@
-## Unreleased
+## 0.18.24
 
 ### Improved
 
