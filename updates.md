@@ -1,12 +1,16 @@
 ## 0.18.24
 
+4th November, 2026
+
 ### Improved
 
+-   The template picker on mobile now accounts for the on-screen keyboard and safe-area insets, keeping its search field and suggestions within the available screen area.
 -   Reorganised the README around getting started, browsing tags, finding notes, and creating notes. Language options are now part of the settings reference.
 -   Added practical guidance for excluding notes, hiding tags, archiving tag groups, choosing a tree style, and using the sort controls.
 
 ### Digging the weeds
 
+-   Updated dependencies.
 -   Updated GitHub Actions to versions which use Node.js 24.
 -   Releases provide `main.js`, `manifest.json`, and `styles.css` individually, without a separate ZIP archive.
 
